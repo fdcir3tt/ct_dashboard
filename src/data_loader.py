@@ -1,6 +1,7 @@
 import os
 import json
 import pyodbc
+import mysql.connector
 import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
@@ -25,7 +26,7 @@ conn_str = (
     f'PWD={pwd}'   # Password
 )
 
-## Columnas
+## Columnas Factura
 
 table_name=os.getenv("SALES_TABLE_NAME")
 date_col=os.getenv("SALES_DATE_COLUMN")
@@ -33,6 +34,32 @@ schema=os.getenv("DB_SCHEMA")
 data_columns=os.getenv("SALES_DATA_COLUMNS")
 sales_art_col=os.getenv("SALES_ARTICLE_COLUMN")
 price_col=os.getenv("SALES_PRICE")
+
+## Columnas producto
+
+table = os.getenv("ART_TABLE_NAME")
+art_col = os.getenv("ARTICLE_COLUMN")
+art_desc = os.getenv("ARTICLE_DESCRIPTION")
+art_cost = os.getenv("ARTICLE_COST")
+
+## Conexión 
+ip=os.getenv("CDB_IP")
+user=os.getenv("CDB_UID")
+password=os.getenv("CDB_PASSWORD")
+database=os.getenv('CDB_DATABASE')
+category_table=os.getenv('CDB_CATEGORY_TABLE')
+product_table=os.getenv('CDB_PRODUCT_TABLE')
+
+
+
+conn_mysql = mysql.connector.connect(
+    host=ip,
+    user=user,
+    password=password,
+    database=database
+)
+
+
 
 def build_query(start_date:str,end_date:str)->str:
     """
@@ -63,7 +90,7 @@ def build_query(start_date:str,end_date:str)->str:
 
 
 
-def get_query(query:str,connection_str:str)->pd.DataFrame:    
+def get_query(query:str,connection_str:str=conn_str)->pd.DataFrame:    
     try:
         
         conn = pyodbc.connect(connection_str)
@@ -219,19 +246,60 @@ def extract_table_parallel(
 
 
 @st.cache_data
-def load_data(start_date:str="2025-01-01",end_date:str="2025-12-31",output_file:str="data/facturas.csv")->pd.DataFrame:
+def load_data(start_date:str="2025-01-01",end_date:str="2025-12-31",output_file:str="data/facturas.csv")->tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
     """
     Función que recibe fecha de inicio y final de periodo junto con ruta de salida
     especifícada. Extrae los datos necesarios, los guarda en un archivo csv y los 
     carga en un dataframe de pandas.
     
     """
+    desc_data_file_exists = os.path.exists("data/codigos_productos.csv")
+    if desc_data_file_exists:
+        products= pd.read_csv('data/codigos_productos.csv')
+        products= products.drop(columns='Unnamed: 0')
+    else:
+        query = f""" 
+                    SELECT {art_col},{art_desc},{art_cost}
+                    FROM {table}
+        """
+
+        products = get_query(query)
+        products = products.rename(columns={art_col:'PRODUCTO',art_desc:'DESCRIPCION'})
+        products.to_csv('data/codigos_productos.csv')
+
+
+    # Categorías y productos
+    categories_exist = os.path.exists("data/categorias.parquet")
+    products_exist = os.path.exists("data/productos.parquet")
+    if (categories_exist & products_exist):
+        categories = pd.read_parquet("data/categorias.parquet")
+        products = pd.read_parquet("data/productos.parquet")
+        
+    else:
+        cursor = conn_mysql.cursor(dictionary=True)  # devuelve resultados como diccionarios
+
+        cursor.execute(f"SELECT * FROM {category_table};")
+        rows_category = cursor.fetchall()
+
+        cursor.execute(f"SELECT * FROM {product_table};")
+        rows_products = cursor.fetchall()
+        cursor.close()
+        conn_mysql.close()
+
+        categories = pd.DataFrame(rows_category)
+        products = pd.DataFrame(rows_products)
+
+        categories.to_parquet("data/categorias.parquet")
+        products.to_parquet("data/productos.parquet")
+    
+    
+    # Facturas
     query = build_query(start_date,end_date)
     extract_table_parallel(query= query ,output_file=output_file ,connection_str= conn_str)
     
-    df=pd.read_csv(output_file)
+    df = pd.read_csv(output_file)
 
-    return df
+    return df,categories,products
 
 
 
