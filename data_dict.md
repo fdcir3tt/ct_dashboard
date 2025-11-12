@@ -8,7 +8,7 @@
 | **código**                            | Código identificador de producto                                       | `ART_COD1`          | Texto / String          | Catálogo de artículos / DWH  |
 | **código sustituto**                  | Código del producto que reemplazará al actual                      | `ART_COD2`    | Texto / String          | Catálogo de artículos / DWH |
 | **categoría**                         | Categoría a la que pertenece el producto                           | `categorias.nombre`           | Texto / String          | Categorías / ctonline2 |
-| **cliente**                  | Cliente del artículo indicado en factura de venta                | `VREN_CLIE`    | Numérico / Decimal          | Catálogo de facturasdetalle / DWH |
+| **cliente**                  | Cliente del artículo indicado en factura de venta                | `VREN_CLI`    | Numérico / Decimal          | Catálogo de facturasdetalle / DWH |
 | **cantidad pedida**                  | Cantidad de producto pedido en la factura de venta                      | `VREN_CANTIDAD`    | Numérico / Entero          | Catálogo de facturasdetalle / DWH |
 | **fecha**                  | Fecha de venta indicada en factura de venta                      | `VREN_FCH`    | Fecha (YYYY-MM-DD)         | Catálogo de facturasdetalle / DWH |
 | **precio de producto**                  | Precio por pieza al que se vendió artículo                 | `VREN_PRE`    | Numérico / Decimal          | Catálogo de facturasdetalle / DWH |

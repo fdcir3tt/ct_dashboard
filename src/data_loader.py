@@ -1,16 +1,15 @@
 import os
 import json
 import pyodbc
-import argparse
-import pyarrow.parquet as pq
-import pyarrow as pa
+import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
-import tempfile
 import shutil
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
+
 
 ## Conexión
 driver=os.getenv("DWH_DRIVER")
@@ -29,11 +28,40 @@ conn_str = (
 ## Columnas
 
 table_name=os.getenv("SALES_TABLE_NAME")
-date_col=os.getenv("DATE_COLUMN")
+date_col=os.getenv("SALES_DATE_COLUMN")
 schema=os.getenv("DB_SCHEMA")
 data_columns=os.getenv("SALES_DATA_COLUMNS")
 sales_art_col=os.getenv("SALES_ARTICLE_COLUMN")
 price_col=os.getenv("SALES_PRICE")
+
+def build_query(start_date:str,end_date:str)->str:
+    """
+    Recibe fecha de inicio y final de periodo y regresa un query
+    utilizado para la extracción de la tabla de facturas de venta.
+
+    Args:
+    start_date := Se espera una fecha con el formato YYYY-MM-DD
+    end_date := Se espera una fecha con el formato YYYY-MM-DD
+    """
+    fi = datetime.strptime(start_date,"%Y-%m-%d").date()
+    ff = datetime.strptime(end_date,"%Y-%m-%d").date()
+    if fi > ff:
+        print("Periodo invalido detectado, fecha inicio comienza después de fecha final")
+        return None
+    elif fi == ff:
+        print("Periodo invalido detectado, fecha inicio igual a fecha final")
+        return None
+    
+    query = f"""
+                SELECT {data_columns}
+                FROM {schema}.{table_name}
+                WHERE {date_col} BETWEEN '{start_date}' AND '{end_date}'
+                AND {price_col} > 0 
+
+            """
+    return query
+
+
 
 def get_query(query:str,connection_str:str)->pd.DataFrame:    
     try:
@@ -75,8 +103,9 @@ def fetch_and_write_chunk(query:str,
                           chunk_size:int, 
                           connection_str:str, 
                           order_column:str, 
-                          temp_dir:str,**kwargs):
+                          temp_dir:str,**kwargs)->int:
     conn = pyodbc.connect(connection_str)
+
     query = query + f"""
         ORDER BY {order_column}
         OFFSET {offset} ROWS FETCH NEXT {chunk_size} ROWS ONLY
@@ -176,53 +205,36 @@ def extract_table_parallel(
                             next(f)  # saltar header
                             shutil.copyfileobj(f, out_file)
 
-        # Guardar último offset
-        save_last_processed_offset(offset_file, n_rows)
-        print(f" Extracción completada. Archivo guardado en: {output_file}")
+       
+        
 
         shutil.rmtree(temp_dir)
         print(f" Archivos temporales eliminados: {temp_dir}")
 
+        shutil.rmtree(offset_file)
+        print(f" Archivos temporales eliminados: {offset_file}")
+        
     except Exception as e:
         print(f" Error crítico: {e}")
 
 
-
-
-
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Extraer tabla en paralelo y guardarla en un archivo CSV.")
-    parser.add_argument('--output_file', type=str, required=True, help='Ruta de archivo CSV final ')
-    parser.add_argument('--connection_str', type=str, default=conn_str, help='String de conexión')
-    parser.add_argument('--chunk_percent', type=float, default=10.0, help='Porcentaje de tabla a extraer por chunk')
-    parser.add_argument('--table_name', type=str, default=table_name, help='Nombre de tabla extraída')
-    parser.add_argument('--schema', type=str, default='dbo', help='Esquema de base de datos')
-    parser.add_argument('--order_column', type=str, default=date_col, help='Columna fecha utilizada para ordenamiento en consulta')
-    parser.add_argument('--offset_file', type=str, default='last_offset.json', help='Archivo en el cual se guarda último offset')
-    parser.add_argument('--max_workers', type=int, default=4, help='Number of threads to use')
-    parser.add_argument('--start_date', type=int, required=True, help='Fecha inicio de periodo de ventas')
-    parser.add_argument('--end_date', type=int, required=True, help='Fecha final de periodo de ventas')
-
-    args = parser.parse_args()
-
-    query = f"""
-            SELECT {data_columns}
-            FROM {schema}.{table_name}
-            WHERE {date_col} BETWEEN '{args.start_date}' AND '{args.end_date}'
-            AND {price_col} > 0 
-
+@st.cache_data
+def load_data(start_date:str="2025-01-01",end_date:str="2025-12-31",output_file:str="data/facturas.csv")->pd.DataFrame:
     """
+    Función que recibe fecha de inicio y final de periodo junto con ruta de salida
+    especifícada. Extrae los datos necesarios, los guarda en un archivo csv y los 
+    carga en un dataframe de pandas.
+    
+    """
+    query = build_query(start_date,end_date)
+    extract_table_parallel(query= query ,output_file=output_file ,connection_str= conn_str)
+    
+    df=pd.read_csv(output_file)
 
-    extract_table_parallel(
-        query=query,
-        output_file=args.output_file,
-        connection_str=args.connection_str,
-        chunk_percent=args.chunk_percent,
-        table_name=args.table_name,
-        schema=args.schema,
-        order_column=args.order_column,
-        offset_file=args.offset_file,
-        max_workers=args.max_workers
-    )
+    return df
+
+
+
+    
+
+   
