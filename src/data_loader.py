@@ -246,60 +246,68 @@ def extract_table_parallel(
 
 
 @st.cache_data
-def load_data(start_date:str="2025-01-01",end_date:str="2025-12-31",output_file:str="data/facturas.csv")->tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
-    """
-    Función que recibe fecha de inicio y final de periodo junto con ruta de salida
-    especifícada. Extrae los datos necesarios, los guarda en un archivo csv y los 
-    carga en un dataframe de pandas.
+def load_data(start_date:str="2025-01-01",end_date:str="2025-12-31"):
+    df = pd.read_csv("data/facturas.csv")
+    categories = pd.read_csv("data/categorias.csv")
+    products = pd.read_csv("data/codigos_productos.csv")
     
-    """
-    desc_data_file_exists = os.path.exists("data/codigos_productos.csv")
-    if desc_data_file_exists:
-        products= pd.read_csv('data/codigos_productos.csv')
-        products= products.drop(columns='Unnamed: 0')
-    else:
-        query = f""" 
-                    SELECT {art_col},{art_desc},{art_cost}
-                    FROM {table}
-        """
+    return df,categories,products
 
-        products = get_query(query)
-        products = products.rename(columns={art_col:'PRODUCTO',art_desc:'DESCRIPCION'})
-        products.to_csv('data/codigos_productos.csv')
+
+#def load_data(start_date:str="2025-01-01",end_date:str="2025-12-31",output_file:str="data/facturas.csv")->tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
+#    """
+#    Función que recibe fecha de inicio y final de periodo junto con ruta de salida
+#    especifícada. Extrae los datos necesarios, los guarda en un archivo csv y los 
+#    carga en un dataframe de pandas.
+#    
+#    """
+#    desc_data_file_exists = os.path.exists("data/codigos_productos.csv")
+#    if desc_data_file_exists:
+#        products= pd.read_csv('data/codigos_productos.csv')
+#        products= products.drop(columns='Unnamed: 0')
+#    else:
+#        query = f""" 
+#                    SELECT {art_col},{art_desc},{art_cost}
+#                    FROM {table}
+#        """
+#
+#        products = get_query(query)
+#        products = products.rename(columns={art_col:'PRODUCTO',art_desc:'DESCRIPCION'})
+#        products.to_csv('data/codigos_productos.csv')
 
 
     # Categorías y productos
-    categories_exist = os.path.exists("data/categorias.parquet")
-    products_exist = os.path.exists("data/productos.parquet")
-    if (categories_exist & products_exist):
-        categories = pd.read_parquet("data/categorias.parquet")
-        products = pd.read_parquet("data/productos.parquet")
+#    categories_exist = os.path.exists("data/categorias.parquet")
+#    products_exist = os.path.exists("data/productos.parquet")
+#    if (categories_exist & products_exist):
+#        categories = pd.read_parquet("data/categorias.parquet")
+#        products = pd.read_parquet("data/productos.parquet")
         
-    else:
-        cursor = conn_mysql.cursor(dictionary=True)  # devuelve resultados como diccionarios
+#    else:
+#        cursor = conn_mysql.cursor(dictionary=True)  # devuelve resultados como diccionarios
 
-        cursor.execute(f"SELECT * FROM {category_table};")
-        rows_category = cursor.fetchall()
+#        cursor.execute(f"SELECT * FROM {category_table};")
+#        rows_category = cursor.fetchall()
 
-        cursor.execute(f"SELECT * FROM {product_table};")
-        rows_products = cursor.fetchall()
-        cursor.close()
-        conn_mysql.close()
+#        cursor.execute(f"SELECT * FROM {product_table};")
+#        rows_products = cursor.fetchall()
+#        cursor.close()
+#        conn_mysql.close()
 
-        categories = pd.DataFrame(rows_category)
-        products = pd.DataFrame(rows_products)
+#        categories = pd.DataFrame(rows_category)
+#        products = pd.DataFrame(rows_products)
 
-        categories.to_parquet("data/categorias.parquet")
-        products.to_parquet("data/productos.parquet")
+#        categories.to_parquet("data/categorias.parquet")
+#        products.to_parquet("data/productos.parquet")
     
     
     # Facturas
-    query = build_query(start_date,end_date)
-    extract_table_parallel(query= query ,output_file=output_file ,connection_str= conn_str)
+#    query = build_query(start_date,end_date)
+#    extract_table_parallel(query= query ,output_file=output_file ,connection_str= conn_str)
     
-    df = pd.read_csv(output_file)
+#    df = pd.read_csv(output_file)
 
-    return df,categories,products
+#    return df,categories,products
 
 
 

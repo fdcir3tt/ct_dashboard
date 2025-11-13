@@ -24,6 +24,8 @@
 | **código**                            | Código identificador de producto                                       | `productId`          | Texto / String          |
 | **código sustituto**                  | Código del producto que reemplazará al actual                      | `productId_subst`    | Texto / String          |
 | **categoría**                         | Categoría a la que pertenece el producto                           | `category`           | Texto / String          |
+| **sucursal**                         | Sucursal en la que se vendió el producto                           | `branch`           | Texto / String          |
+| **estado**                         | Estado en el que se vendió el producto                           | `state`           | Texto / String          |
 | **ventas diarias (producto)**         | Cantidad de unidades vendidas por día del producto                 | `sales_day`          | Numérico / Entero       |
 | **ventas mensuales (producto)**       | Cantidad total de unidades vendidas en el mes                      | `sales_month`        | Numérico / Entero       |
 | **ventas totales(producto)**         | Ventas totales del producto                 | `total_sales`       |
