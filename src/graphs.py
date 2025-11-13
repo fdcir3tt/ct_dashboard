@@ -1,0 +1,148 @@
+import pandas as pd
+import geopandas as gpd
+import numpy as np
+import matplotlib.pyplot as plt
+
+def top_n(data:pd.DataFrame,type:str,criteria:str="ventas_diarias",n:int=5)->list[str]:
+    """
+    Recibe el dataframe de datos del periodo especificado y regresa los mejores
+    'n' productos o categorías en base el criterio específicado.
+    """
+    criteria_dict={"ventas_diarias":"sales_day",
+                   "ventas_mensuales":"sales_month",
+                   "ganancia_total":"total_profit"}
+    
+    if n==1:
+        top_n= list( data[ criteria_dict[criteria] ].max() )
+        return 
+
+    top_n= list( data[ criteria_dict[criteria] ].sort_values(ascending=False)[:n] )
+
+    return top_n
+
+def stock_v_sales(data:pd.DataFrame):
+    """
+    Función que recibe el dataframe de datos del periodo especificado y 
+    grafíca las curvas de existencia del producto y ventas. 
+
+    """
+    plt.figure(figsize=(10, 5))
+    plt.plot(data["fecha"], data["sales_day"], label="Ventas", marker="o", color="red")
+    plt.plot(data["fecha"], data["stock"], label="Stock", marker="s", color="blue")
+    plt.title("Stock y Ventas - Octubre 2025")
+    plt.xlabel("Fecha")
+    plt.ylabel("Cantidad")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("plots/almacen_ventas.png")
+
+
+def sales_heat_map(data:pd.DataFrame):
+    """ 
+    Función que recibe el dataframe de datos del periodo especificado y 
+    grafíca las ventas sobre un mapa de calor en méxico.
+    """
+    mexico_estados = gpd.read_file("gadm41_MEX_shp/gadm41_MEX_1.shp")
+    mexico_estados = mexico_estados.merge(data, left_on="NAME_1",right_on="estado")
+
+    # --- Graficar heatmap --- #
+    fig, ax = plt.subplots(1, 1, figsize=(12, 12))
+    mexico_estados.plot(
+        column="sales_day", 
+        cmap="Reds",        # paleta más atractiva
+        linewidth=0.5, 
+        edgecolor="white",    # bordes blancos suaves
+        legend=True, 
+        legend_kwds={'shrink': 0.6, 'label': "Ventas"}, 
+        ax=ax
+    )
+
+    # --- Estética --- #
+    ax.set_title("Mapa de calor de ventas simuladas por estado - México", fontsize=16, fontweight='bold')
+    ax.axis("off")
+    fig.patch.set_facecolor('lightgrey')  # fondo del mapa
+
+    fig.savefig("plots/heatmap_ventas_mexico.png", dpi=300, bbox_inches="tight")
+
+def sales_hist(data:pd.DataFrame):
+    """
+    Función que recibe el dataframe de datos del periodo especificado y 
+    gráfica las curvas de existencia del producto y ventas.
+    """
+    plt.figure(figsize=(10,6))
+    plt.hist(data, bins=15, color='blue', edgecolor='black')
+    plt.title("Histograma de Cantidad de Ventas", fontsize=14, fontweight='bold')
+    plt.xlabel("Cantidad de ventas")
+    plt.ylabel("Frecuencia")
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig("plots/hist_ventas_prod.png")
+
+def profits_sales_bar(data:pd.DataFrame,categories:list[str]):
+    """
+    Función que recibe el dataframe de datos del periodo especificado y las categorias 
+    seleccionadas,gráfica las barras de ganancia y cantidad de ventas lado a lado. 
+
+    """
+    x = np.arange(len(categories))
+    width = 0.4  # ancho de las barras
+
+    fig, ax1 = plt.subplots(figsize=(10,6))
+
+    # Barras de ventas (eje izquierdo)
+    sales_bars = ax1.bar(x - width/2, data["total_sales"], width, color='blue', label='Ventas')
+    
+    ax1.set_ylabel('Ventas', color='blue', fontsize=12)
+    ax1.tick_params(axis='y', labelcolor='blue')
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(categories)
+    ax1.grid(axis='y', linestyle='--', alpha=0.5)
+
+    # Barras de ganancias (eje derecho)
+    ax2 = ax1.twinx()
+    profit_bars = ax2.bar(x + width/2, data["total_profit"], width, color='red', label='Ganancia')
+    ax2.set_ylabel('Ganancia', color='red', fontsize=12)
+    ax2.tick_params(axis='y', labelcolor='red')
+
+    # Añadir título
+    fig.suptitle('Ventas y Ganancia por Categoría', fontsize=14, fontweight='bold')
+    fig.tight_layout()
+    plt.savefig("plots/bar_ventas_ganancia.png")
+
+def sales_freq_bar(data:pd.DataFrame):
+    """
+    Función que recibe el dataframe de datos del periodo especificado y las categorias 
+    seleccionadas,gráfica las barras de ganancia y cantidad de ventas lado a lado. 
+
+    """
+    products = top_n(data=data,type="producto")
+
+    is_in_products= data["productId"].isin(products)
+    frequencies = data[is_in_products].value_counts()
+    
+    plt.figure(figsize=(10,6))
+    bars = plt.bar(products, frequencies, color="blue", edgecolor='black')
+
+    # --- Etiquetas sobre cada barra ---
+    for bar in bars:
+        altura = bar.get_height()
+        plt.text(
+            bar.get_x() + bar.get_width()/2, 
+            altura + 5,  # un poco arriba de la barra
+            str(altura),
+            ha='center', 
+            va='bottom',
+            fontsize=10,
+            fontweight='bold'
+        )
+
+    # --- Estética ---
+    plt.title('Frecuencia de compra de productos electrónicos en periodo', fontsize=16, fontweight='bold')
+    plt.xlabel('Productos', fontsize=12)
+    plt.ylabel('Cantidad de compras', fontsize=12)
+    plt.grid(axis='y', linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.savefig("plots/bar_frecs_compras.png")
+
+

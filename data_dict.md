@@ -26,6 +26,7 @@
 | **categoría**                         | Categoría a la que pertenece el producto                           | `category`           | Texto / String          |
 | **ventas diarias (producto)**         | Cantidad de unidades vendidas por día del producto                 | `sales_day`          | Numérico / Entero       |
 | **ventas mensuales (producto)**       | Cantidad total de unidades vendidas en el mes                      | `sales_month`        | Numérico / Entero       |
+| **ventas totales(producto)**         | Ventas totales del producto                 | `total_sales`       |
 | **ganancia total (producto)**         | Ingreso neto obtenido por las ventas del producto                  | `total_profit`       | Numérico / Decimal      |
 | **costo total (producto)**            | Costo total de producción o adquisición del producto               | `total_cost`         | Numérico / Decimal      |
 | **cliente frecuente**                 | Cliente que compra con mayor recurrencia el producto               | `freq_client`        | Texto / String          |
@@ -35,6 +36,7 @@
 | **año**  | Año de la venta realizada                        | `year`     | Texto / String      |
 | **ventas diarias (categoría)**        | Total de unidades vendidas por día dentro de la categoría          | `cat_sales_day`      | Numérico / Entero       |
 | **ventas mensuales (categoría)**      | Total de unidades vendidas en el mes dentro de la categoría        | `cat_sales_month`    | Numérico / Entero       |
+| **ventas totales(categoría)**         | Ventas totales de la categoría                 | `total_cat_sales`       |
 | **ganancia total (categoría)**        | Ingreso neto total obtenido de todos los productos de la categoría | `total_cat_profit`   | Numérico / Decimal      |
 | **costo total (categoría)**           | Suma total de los costos de los productos dentro de la categoría   | `total_cat_cost`     | Numérico / Decimal      |
 | **fecha de última venta (categoría)** | Fecha de la venta más reciente dentro de la categoría              | `last_cat_sale_date` | Fecha (YYYY-MM-DD)      |
