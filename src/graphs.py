@@ -29,7 +29,7 @@ def stock_v_sales(data:pd.DataFrame):
     plt.figure(figsize=(10, 5))
     plt.plot(data["fecha"], data["sales_day"], label="Ventas", marker="o", color="red")
     plt.plot(data["fecha"], data["stock"], label="Stock", marker="s", color="blue")
-    plt.title("Stock y Ventas - Octubre 2025")
+    plt.title("Stock y Ventas")
     plt.xlabel("Fecha")
     plt.ylabel("Cantidad")
     plt.legend()
@@ -38,18 +38,24 @@ def stock_v_sales(data:pd.DataFrame):
     plt.savefig("plots/almacen_ventas.png")
 
 
-def sales_heat_map(data:pd.DataFrame):
+def sales_heat_map(data:pd.DataFrame,productId:str):
     """ 
     Función que recibe el dataframe de datos del periodo especificado y 
     grafíca las ventas sobre un mapa de calor en méxico.
     """
-    mexico_estados = gpd.read_file("gadm41_MEX_shp/gadm41_MEX_1.shp")
-    mexico_estados = mexico_estados.merge(data, left_on="NAME_1",right_on="estado")
+    is_product=data["productId"]==productId
+    df_filtered=data[is_product]
 
+    total_sales_per_state= df_filtered.groupby(["state"])["cantidad"].sum()
+    mexico_estados = gpd.read_file("gadm41_MEX_shp/gadm41_MEX_1.shp")
+    mexico_estados["state"] = mexico_estados["NAME_1"].str.upper()
+    mexico_estados = mexico_estados.merge(total_sales_per_state, left_on="state",right_on="state")
+    
+    
     # --- Graficar heatmap --- #
     fig, ax = plt.subplots(1, 1, figsize=(12, 12))
     mexico_estados.plot(
-        column="sales_day", 
+        column="cantidad", 
         cmap="Reds",        # paleta más atractiva
         linewidth=0.5, 
         edgecolor="white",    # bordes blancos suaves
@@ -59,12 +65,12 @@ def sales_heat_map(data:pd.DataFrame):
     )
 
     # --- Estética --- #
-    ax.set_title("Mapa de calor de ventas simuladas por estado - México", fontsize=16, fontweight='bold')
+    ax.set_title("Mapa de calor de ventas por estado ", fontsize=16, fontweight='bold')
     ax.axis("off")
     fig.patch.set_facecolor('lightgrey')  # fondo del mapa
 
     fig.savefig("plots/heatmap_ventas_mexico.png", dpi=300, bbox_inches="tight")
-
+    
 def sales_hist(data:pd.DataFrame):
     """
     Función que recibe el dataframe de datos del periodo especificado y 
@@ -85,13 +91,18 @@ def profits_sales_bar(data:pd.DataFrame,categories:list[str]):
     seleccionadas,gráfica las barras de ganancia y cantidad de ventas lado a lado. 
 
     """
+    is_category=data["category"].isin(categories)
+    df_filtered=data[is_category]
+
+    total_sales= df_filtered.groupby("category")["cantidad"].sum()
+    total_profit= df_filtered.groupby("category")["profit"].sum()
     x = np.arange(len(categories))
     width = 0.4  # ancho de las barras
 
     fig, ax1 = plt.subplots(figsize=(10,6))
 
     # Barras de ventas (eje izquierdo)
-    sales_bars = ax1.bar(x - width/2, data["total_sales"], width, color='blue', label='Ventas')
+    sales_bars = ax1.bar(x - width/2, total_sales, width, color='blue', label='Ventas')
     
     ax1.set_ylabel('Ventas', color='blue', fontsize=12)
     ax1.tick_params(axis='y', labelcolor='blue')
@@ -101,7 +112,7 @@ def profits_sales_bar(data:pd.DataFrame,categories:list[str]):
 
     # Barras de ganancias (eje derecho)
     ax2 = ax1.twinx()
-    profit_bars = ax2.bar(x + width/2, data["total_profit"], width, color='red', label='Ganancia')
+    profit_bars = ax2.bar(x + width/2, total_profit, width, color='red', label='Ganancia')
     ax2.set_ylabel('Ganancia', color='red', fontsize=12)
     ax2.tick_params(axis='y', labelcolor='red')
 

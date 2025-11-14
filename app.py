@@ -37,7 +37,31 @@ st.markdown('<div class="main-header">📦 Inventario CT International</div>', u
 # FILTROS
 # -----------------------------------------------------------
 st.sidebar.header("Filtros")
-producto = st.sidebar.selectbox("Producto", ["< NombreProducto >", "AA2013", "VSCT721", "A21C"])
+producto = st.sidebar.selectbox("Producto", ['MEMDAT6830',
+ 'SUBCCT010',
+ 'DDUACR220',
+ 'ACCPCM1160',
+ 'CJNNTE010',
+ 'IMPECL320',
+ 'CABITL4210',
+ 'VENBLR170',
+ 'DDUACR020',
+ 'IMPSTR1020',
+ 'CARGO100',
+ 'CABITL265',
+ 'VENBLR270',
+ 'DDUDAT520',
+ 'MEMDAT6260',
+ 'VENNCB090',
+ 'ACCDAT1460',
+ 'DDUDAT450',
+ 'KITTPL360',
+ 'NBKVIC690',
+ 'NBKCDP1670',
+ 'ESDKPK1820',
+ 'GABBLR320',
+ 'MOULEN060',
+ 'ACCTRG3480'])
 fecha_inicio = st.sidebar.date_input("Inicio", datetime.date(2025, 10, 1))
 fecha_fin = st.sidebar.date_input("Fin", datetime.date(2025, 11, 1))
 
@@ -46,6 +70,9 @@ fecha_fin = st.sidebar.date_input("Fin", datetime.date(2025, 11, 1))
 # -----------------------------------------------------------
 
 data = process_data ()
+categorias = pd.read_csv("data/categorias.csv")
+categorias = list(categorias["nombre"])
+
 
 # Crear carpeta de salida si no existe
 os.makedirs("plots", exist_ok=True)
@@ -55,24 +82,24 @@ os.makedirs("plots", exist_ok=True)
 # -----------------------------------------------------------
 gr.stock_v_sales(data)
 gr.sales_hist(data["sales_day"])
-gr.sales_heat_map(data_estados)
-gr.profits_sales_bar(data_categorias, categorias)
+gr.sales_heat_map(data,producto)
+gr.profits_sales_bar(data, categorias[20:25])
 
 # -----------------------------------------------------------
 # VISUALIZACIÓN EN STREAMLIT
 # -----------------------------------------------------------
-st.image("plots/almacen_ventas.png", caption="Stock y Ventas - Octubre 2025", use_container_width=True)
+st.image("plots/almacen_ventas.png", caption="Stock y Ventas - 2025", use_container_width=True)
 
 # Info del producto
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.markdown("**Código:** AA2013")
-    st.markdown("**Producto Sustituto:** AA2134")
+    st.markdown(f"**Código:** {producto}")
+    st.markdown("**Producto Sustituto:** <Código ejemplo>")
 with col2:
-    st.markdown("**Productos Acompañados:** VSCT721, A21C")
-    st.markdown("**Día más vendido:** Lunes")
+    st.markdown("**Productos Acompañados:** <Código ejemplo>, <Código ejemplo>")
+    st.markdown("**Día más vendido:** día ")
 with col3:
-    st.markdown("**Clientes frecuentes:** COL1010, MOR0095")
+    st.markdown("**Clientes frecuentes:** <Código ejemplo>, <Código ejemplo>")
 
 # Histograma y mapa
 col1, col2 = st.columns(2)
@@ -91,7 +118,7 @@ with col3:
     st.markdown('<div class="metric-card"><h3>Ventas Trimestrales Promedio</h3><h2>10,353</h2><p>+1.2% mes a mes</p></div>', unsafe_allow_html=True)
 
 # Top/Bottom 5
-st.markdown("#### 🏆 Top 5 / Bottom 5")
+st.markdown("####  Top 5 / Bottom 5")
 tab1, tab2 = st.tabs(["Top 5", "Bottom 5"])
 with tab1:
     st.table(pd.DataFrame({
