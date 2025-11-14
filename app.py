@@ -24,6 +24,7 @@ st.markdown("""
         .metric-card {
             text-align: center;
             background-color: #f8f9fa;
+            color: #333333;
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -80,7 +81,7 @@ os.makedirs("plots", exist_ok=True)
 # -----------------------------------------------------------
 # LLAMADA A LAS FUNCIONES DE TU MÓDULO
 # -----------------------------------------------------------
-gr.stock_v_sales(data)
+gr.stock_v_sales(data,producto)
 gr.sales_hist(data["sales_day"])
 gr.sales_heat_map(data,producto)
 gr.profits_sales_bar(data, categorias[20:25])
@@ -111,11 +112,11 @@ with col2:
 # KPIs
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.markdown('<div class="metric-card"><h3>Ganancia Total</h3><h2>$45,678.90</h2><p>+20% mes a mes</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="metric-card"><h3>Ganancia Total</h3><h2>$numero</h2><p>+20% mes a mes</p></div>', unsafe_allow_html=True)
 with col2:
-    st.markdown('<div class="metric-card"><h3>Ventas Total</h3><h2>2,405</h2><p>+12% mes a mes</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="metric-card"><h3>Ventas Total</h3><h2>2,numero</h2><p>+12% mes a mes</p></div>', unsafe_allow_html=True)
 with col3:
-    st.markdown('<div class="metric-card"><h3>Ventas Trimestrales Promedio</h3><h2>10,353</h2><p>+1.2% mes a mes</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="metric-card"><h3>Ventas Trimestrales Promedio</h3><h2>10,numero</h2><p>+1.2% mes a mes</p></div>', unsafe_allow_html=True)
 
 # Top/Bottom 5
 st.markdown("####  Top 5 / Bottom 5")

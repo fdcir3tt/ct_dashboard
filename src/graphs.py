@@ -2,6 +2,7 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 def top_n(data:pd.DataFrame,type:str,criteria:str="ventas_diarias",n:int=5)->list[str]:
     """
@@ -20,22 +21,51 @@ def top_n(data:pd.DataFrame,type:str,criteria:str="ventas_diarias",n:int=5)->lis
 
     return top_n
 
-def stock_v_sales(data:pd.DataFrame):
+def stock_v_sales(data: pd.DataFrame,productId:str):
     """
-    Función que recibe el dataframe de datos del periodo especificado y 
-    grafíca las curvas de existencia del producto y ventas. 
+    Grafica curvas de stock y ventas con estética mejorada,
+    eje X limpio, datos interpolados y fechas correctamente manejadas.
+    """
+    is_product=data["productId"]==productId
+    df_filtered=data[is_product]
 
-    """
-    plt.figure(figsize=(10, 5))
-    plt.plot(data["fecha"], data["sales_day"], label="Ventas", marker="o", color="red")
-    plt.plot(data["fecha"], data["stock"], label="Stock", marker="s", color="blue")
-    plt.title("Stock y Ventas")
+    data = df_filtered.copy()
+
+    # --- Asegurar que las fechas SON datetime ---
+    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+
+    # Eliminar filas con fechas inválidas que causen el 1970-01-01
+    data = data.dropna(subset=["fecha"]).sort_values("fecha")
+
+    # --- Interpolación lineal ---
+    data["sales_day"] = data["sales_day"].interpolate(method="linear")
+    data["stock"]     = data["stock"].interpolate(method="linear")
+
+    plt.figure(figsize=(12, 6))
+    plt.style.use("seaborn-v0_8")
+
+    # Líneas interpoladas
+    plt.plot(data["fecha"], data["sales_day"], label="Ventas", marker="o", color="#e63946")
+    plt.plot(data["fecha"], data["stock"],     label="Stock", marker="s", color="#457b9d")
+
+    # Título y etiquetas
+    plt.title("Stock y Ventas (Interpolado)", fontsize=16, fontweight="bold")
     plt.xlabel("Fecha")
     plt.ylabel("Cantidad")
+
+    # --- Eje X limpio ---
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    plt.xticks(rotation=45, ha="right")
+
+    # Sin grid
+    plt.grid(False)
+
     plt.legend()
-    plt.grid(True)
     plt.tight_layout()
     plt.savefig("plots/almacen_ventas.png")
+    plt.close()
 
 
 def sales_heat_map(data:pd.DataFrame,productId:str):
