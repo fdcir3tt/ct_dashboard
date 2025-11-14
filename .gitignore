@@ -1,5 +1,6 @@
 # Directorios
 data/
+gadm41_MEX_shp/
 
 # Archivos
 .env
