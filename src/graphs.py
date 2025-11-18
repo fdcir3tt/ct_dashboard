@@ -4,6 +4,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
+
+
+def remove_outliers(data: pd.DataFrame, column: str) -> pd.DataFrame:
+    series = data[column]
+    
+    Q1 = series.quantile(0.25)
+    Q3 = series.quantile(0.75)
+    IQR = Q3 - Q1
+    lower = Q1 - 1.5 * IQR
+    upper = Q3 + 1.5 * IQR
+    
+    clean_data = data[(series >= lower) & (series <= upper)]
+    return clean_data
+
+
 def top_n(data:pd.DataFrame,type:str="producto",criteria:str="ventas_diarias",n:int=5)->list[str]:
     """
     Recibe el dataframe de datos del periodo especificado y regresa los mejores
@@ -30,17 +45,29 @@ def top_n(data:pd.DataFrame,type:str="producto",criteria:str="ventas_diarias",n:
 
     return top_n
 
-def frequency(data:pd.DataFrame):
+def frequency(data:pd.DataFrame,type:str="cliente")->pd.DataFrame:
+    """
+    Recibe el dataframe de datos del periodo especificado y regresa los ritmos de ventas promedio
+    en dicho periodo. 
+
+    """
+    type_dict= {"producto":"productId",
+                "categoria":"category",
+                "sucursal":"branch",
+                "cliente":"client",
+                "dia":"weekday"}
+    
+    column = type_dict[type]
     data["fecha"] = pd.to_datetime(data["fecha"])
     start = data["fecha"].min().day
     end = data["fecha"].max().day
 
     period_length = end - start
-    df = data[["client","fecha"]].value_counts().to_frame("count")
-    df["total"] = df.groupby(level="client")["count"].transform("sum") 
+    df = data[[column,"fecha"]].value_counts().to_frame("count")
+    df["total"] = df.groupby(level=column)["count"].transform("sum") 
     df["avg_rate"] = df["total"]/period_length
     df = df.reset_index()
-    df = df[["client","avg_rate"]].drop_duplicates().reset_index().drop(columns="index")
+    df = df[[column,"avg_rate"]].drop_duplicates().reset_index().drop(columns="index")
     return df
 
 def frequent_clients(data:pd.DataFrame,level:str="producto",n:int=5)->list[str]:
@@ -49,6 +76,21 @@ def frequent_clients(data:pd.DataFrame,level:str="producto",n:int=5)->list[str]:
     df = df.sort_values(by="avg_rate",ascending=False)
     frequent_clients = list( df[:n])
     return frequent_clients
+
+def top_day(data:pd.DataFrame)->str:
+    weekday_dict={0:"Lunes",
+                  1:"Martes",
+                  2:"Miercoles",
+                  3:"Jueves",
+                  4:"Viernes",
+                  5:"Dábado",
+                  6:"Domingo"}
+    
+    data["fecha"] = pd.to_datetime(data["fecha"])
+    data["weekday"]=data["fecha"].dt.weekday
+    df = frequency(data,type="dia")
+    df = df.sort_values(by="avg_rate",ascending=False)
+    return weekday_dict[df["weekday"].iloc[0]]
 
 def stock_v_sales(data: pd.DataFrame,productId:str):
     """
