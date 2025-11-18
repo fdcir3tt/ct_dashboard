@@ -4,20 +4,29 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
-def top_n(data:pd.DataFrame,type:str,criteria:str="ventas_diarias",n:int=5)->list[str]:
+def top_n(data:pd.DataFrame,type:str="producto",criteria:str="ventas_diarias",n:int=5)->list[str]:
     """
     Recibe el dataframe de datos del periodo especificado y regresa los mejores
     'n' productos o categorías en base el criterio específicado.
     """
+    type_dict= {"producto":"productId",
+                "categoria":"category",
+                "sucursal":"branch",
+                "cliente":"client"}
+
     criteria_dict={"ventas_diarias":"sales_day",
                    "ventas_mensuales":"sales_month",
                    "ganancia_total":"total_profit"}
     
     if n==1:
-        top_n= list( data[ criteria_dict[criteria] ].max() )
+        top_n= list( data[ criteria_dict[criteria] ].max()[type_dict[type]] )
         return 
+    if n<0 :
+        df= data[[type_dict[type],criteria_dict[criteria]]].sort_values(by=criteria_dict[criteria],ascending=True).drop_duplicates()[:abs(n)]
+        return df
+    df= data[[type_dict[type],criteria_dict[criteria]]].sort_values(by=criteria_dict[criteria],ascending=False).drop_duplicates()[:n]
 
-    top_n= list( data[ criteria_dict[criteria] ].sort_values(ascending=False)[:n] )
+    top_n= df
 
     return top_n
 
