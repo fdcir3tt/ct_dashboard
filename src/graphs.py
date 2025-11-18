@@ -21,6 +21,26 @@ def top_n(data:pd.DataFrame,type:str,criteria:str="ventas_diarias",n:int=5)->lis
 
     return top_n
 
+def frequency(data:pd.DataFrame):
+    data["fecha"] = pd.to_datetime(data["fecha"])
+    start = data["fecha"].min().day
+    end = data["fecha"].max().day
+
+    period_length = end - start
+    df = data[["client","fecha"]].value_counts().to_frame("count")
+    df["total"] = df.groupby(level="client")["count"].transform("sum") 
+    df["avg_rate"] = df["total"]/period_length
+    df = df.reset_index()
+    df = df[["client","avg_rate"]].drop_duplicates().reset_index().drop(columns="index")
+    return df
+
+def frequent_clients(data:pd.DataFrame,level:str="producto",n:int=5)->list[str]:
+    level_dict={"producto":"productId"}
+    df = frequency(data)
+    df = df.sort_values(by="avg_rate",ascending=False)
+    frequent_clients = list( df[:n])
+    return frequent_clients
+
 def stock_v_sales(data: pd.DataFrame,productId:str):
     """
     Grafica curvas de stock y ventas con estética mejorada,
