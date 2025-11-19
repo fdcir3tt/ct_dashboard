@@ -157,7 +157,7 @@ def sales_heat_map(data:pd.DataFrame,productId:str):
     fig, ax = plt.subplots(1, 1, figsize=(12, 12))
     mexico_estados.plot(
         column="cantidad", 
-        cmap="Reds",        # paleta más atractiva
+        cmap="Blues",        # paleta más atractiva
         linewidth=0.5, 
         edgecolor="white",    # bordes blancos suaves
         legend=True, 

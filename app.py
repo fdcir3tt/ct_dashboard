@@ -45,16 +45,26 @@ categorias = list(categorias["nombre"])
 # FILTROS
 # -----------------------------------------------------------
 st.sidebar.header("Filtros")
-level = st.sidebar.radio("Nivel de Análisis",["Producto","Categoria","Sucursal"])
+level = st.sidebar.radio("Nivel de Análisis",["Global","Sucursal"])
 product = st.sidebar.selectbox("Producto", data["productId"].unique())
 fecha_inicio = st.sidebar.date_input("Inicio", datetime.date(2025, 10, 1))
 fecha_fin = st.sidebar.date_input("Fin", datetime.date(2025, 11, 1))
 outliers= st.sidebar.radio("Análisis con ventas anomalas", ["Sí","No"])
 
+if level=="Sucursal":
+    branch = st.sidebar.selectbox("Sucursal", data["sucursal"].unique())
+else:
+    branch = None
 
 os.makedirs("plots", exist_ok=True)
 is_product= data["productId"]==product
 # -----------------------------------------------------------
+if branch:
+    in_branch = data["sucursal"] == branch
+    data = data [in_branch]
+else:
+    data = process_data()
+
 if outliers=="Sí":
     data = process_data()
 else:
@@ -101,14 +111,14 @@ with col2:
 
 total_profit = data[is_product]["profit"].sum()
 total_sales = data[is_product]["sales_day"].sum()
-
+inventory_t_ratio = 0
 col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>${total_profit}</h2><p>+20% mes a mes</p></div>', unsafe_allow_html=True)
 with col2:
     st.markdown(f'<div class="metric-card"><h3>Ventas Total</h3><h2>2,{total_sales}</h2><p>+12% mes a mes</p></div>', unsafe_allow_html=True)
 with col3:
-    st.markdown(f'<div class="metric-card"><h3>Ventas Trimestrales Promedio</h3><h2>10,numero</h2><p>+1.2% mes a mes</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card"><h3>Cociente Rotación de Inventario</h3><h2>{inventory_t_ratio}</h2><p>+1.2% mes a mes</p></div>', unsafe_allow_html=True)
 
 # Top/Bottom 5
 top_n=gr.top_n(data)
