@@ -257,4 +257,49 @@ def sales_freq_bar(data:pd.DataFrame):
     plt.tight_layout()
     plt.savefig("plots/bar_frecs_compras.png")
 
+def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str):
+    def abc_class(x):
+        if x <= 0.80:
+            return "A"
+        elif x <= 0.95:
+            return "B"
+        else:
+            return "C"
+    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
+    df_filtered = data[is_in_period]
 
+
+
+
+    df_summary = (
+        df_filtered
+            .groupby("productId")
+            .agg(
+                total_sales=("sales_day", "sum"),
+                min_cost=("cost", "min")  
+            )
+    )
+
+    df_summary["annual_value"] = df_summary["total_sales"] * df_summary["min_cost"]
+    df_summary = df_summary.sort_values("annual_value", ascending=False)
+    df_summary["cumulative_val"] = df_summary["annual_value"].cumsum() / df_summary["annual_value"].sum()
+    df_summary["ABC"] = df_summary["cumulative_val"].apply(abc_class)
+
+    color_map = {"A":"red", "B":"blue", "C":"gray"}
+
+    df_plot = df_summary.sort_values(by="total_sales",ascending=False)
+    df_plot = df_plot.reset_index()[:20]
+
+
+    plt.figure(figsize=(10, 8))
+    plt.barh(df_plot["productId"], df_plot["total_sales"], color=df_plot["ABC"].map(color_map))
+    plt.xlabel("Ventas Totales")
+    plt.title("Ventas Totales por Producto ")
+
+    # Mostrar el valor sobre la barra
+    for i, v in enumerate(df_plot["total_sales"]):
+        plt.text(v + max(df_plot["total_sales"]) * 0.01, i, str(v), va='center')
+
+    plt.gca().invert_yaxis()  # El mayor arriba
+    plt.tight_layout()
+    plt.savefig("plots/abc_chart.png")

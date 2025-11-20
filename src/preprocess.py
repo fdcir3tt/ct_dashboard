@@ -5,10 +5,16 @@ from src.data_loader import get_query,load_data
 import numpy as np
 
 
-def get_existence(existences:list)->int:
+def get_existence(existences:str)->int:
     global_existence = 0
-    for branch in existences:
-       global_existence += branch["existencia"]
+    existences_clean = existences.replace('nan', 'null')
+    existence_data = json.loads(existences_clean)
+    for branch in existence_data:
+        existencia = branch.get("existencia")
+        if existencia is None:
+            existencia = 0
+        global_existence += existencia
+       
     return global_existence
 
 def clean_data()->pd.DataFrame:
@@ -52,9 +58,20 @@ def process_data(update:bool=False)->pd.DataFrame:
     útiles/relevantes en el dashboard. 
 
     """
-    #existence= pd.read_csv("data/existencia.csv")
-    #existence["stock"] =  existence["almacenes"].apply(lambda x: get_existence(x) )
-    #existence = existence[["codigo","stock"]]
+    existence= pd.read_csv("data/existencia.csv")
+    existence["almacenes"] = existence["almacenes"].str.replace("'", '"')
+    existence["total_stock"] =  existence["almacenes"].apply(lambda x: get_existence(x) )
+
+    is_active = existence["activo"]
+    exists = existence["total_stock"]!= 0
+
+    existence = existence[is_active&exists]
+
+    columns=["codigo","activo","existencia","total_stock","fechaRegistro"]
+    existence = existence[columns]
+
+    
+
     data_exists= os.path.exists("data/processed.csv")
     if (data_exists)&(~update):
         df=pd.read_csv("data/processed.csv")
@@ -103,13 +120,13 @@ def process_data(update:bool=False)->pd.DataFrame:
     
 
         # Existencia
-        #df = df.merge(existence,how="left",left_on ="productId",right_on="codigo")
+        df = df.merge(existence,how="inner",left_on="productId",right_on="codigo")
         
 
         
-        n = len(df)
-        df["stock"] = np.linspace(1000, 200, n) + np.random.randint(-20, 20, n)
-
+        #n = len(df)
+        #df["stock"] = np.linspace(1000, 200, n) + np.random.randint(-20, 20, n)
+        df = df.rename(columns={"ART_COS":"cost"})
         df.to_csv('data/processed.csv',index=False)
 
     return df
