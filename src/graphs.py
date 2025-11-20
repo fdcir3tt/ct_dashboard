@@ -34,8 +34,8 @@ def top_n(data:pd.DataFrame,type:str="producto",criteria:str="ventas_diarias",n:
                    "ganancia_total":"total_profit"}
     
     if n==1:
-        top_n= list( data[ criteria_dict[criteria] ].max()[type_dict[type]] )
-        return 
+        top_n= data[[type_dict[type],criteria_dict[criteria]]].sort_values(by=criteria_dict[criteria],ascending=False)[type_dict[type]].iloc[0]
+        return top_n
     if n<0 :
         df= data[[type_dict[type],criteria_dict[criteria]]].sort_values(by=criteria_dict[criteria],ascending=True).drop_duplicates()[:abs(n)]
         return df
@@ -92,22 +92,25 @@ def top_day(data:pd.DataFrame)->str:
     df = df.sort_values(by="avg_rate",ascending=False)
     return weekday_dict[df["weekday"].iloc[0]]
 
-def stock_v_sales(data: pd.DataFrame,productId:str):
+def stock_v_sales(data: pd.DataFrame,productId:str,start_date,end_date):
     """
     Grafica curvas de stock y ventas con estética mejorada,
     eje X limpio, datos interpolados y fechas correctamente manejadas.
     """
+    # --- Asegurar que las fechas SON datetime ---
+    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+
+    start_date = pd.to_datetime(start_date)
+    end_date   = pd.to_datetime(end_date)
+    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
+    data = data[is_in_period]
+
     is_product=data["productId"]==productId
     df_filtered=data[is_product]
 
     data = df_filtered.copy()
 
-    # --- Asegurar que las fechas SON datetime ---
-    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
-
-    # Eliminar filas con fechas inválidas que causen el 1970-01-01
-    data = data.dropna(subset=["fecha"]).sort_values("fecha")
-
+    
     # --- Interpolación lineal ---
     data["sales_day"] = data["sales_day"].interpolate(method="linear")
     data["stock"]     = data["stock"].interpolate(method="linear")
@@ -139,11 +142,17 @@ def stock_v_sales(data: pd.DataFrame,productId:str):
     plt.close()
 
 
-def sales_heat_map(data:pd.DataFrame,productId:str):
+def sales_heat_map(data:pd.DataFrame,productId:str,start_date,end_date):
     """ 
     Función que recibe el dataframe de datos del periodo especificado y 
     grafíca las ventas sobre un mapa de calor en méxico.
     """
+    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+    start_date = pd.to_datetime(start_date)
+    end_date   = pd.to_datetime(end_date)
+    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
+    data = data[is_in_period]
+
     is_product=data["productId"]==productId
     df_filtered=data[is_product]
 
@@ -172,13 +181,21 @@ def sales_heat_map(data:pd.DataFrame,productId:str):
 
     fig.savefig("plots/heatmap_ventas_mexico.png", dpi=300, bbox_inches="tight")
     
-def sales_hist(data:pd.DataFrame):
+def sales_hist(data:pd.DataFrame,start_date,end_date):
     """
     Función que recibe el dataframe de datos del periodo especificado y 
     gráfica las curvas de existencia del producto y ventas.
     """
+    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+    start_date = pd.to_datetime(start_date)
+    end_date   = pd.to_datetime(end_date)
+    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
+    data = data[is_in_period]
+
+    
+
     plt.figure(figsize=(10,6))
-    plt.hist(data, bins=15, color='blue', edgecolor='black')
+    plt.hist(data["sales_day"], bins=15, color='blue', edgecolor='black')
     plt.title("Histograma de Cantidad de Ventas", fontsize=14, fontweight='bold')
     plt.xlabel("Cantidad de ventas")
     plt.ylabel("Frecuencia")
@@ -222,17 +239,25 @@ def profits_sales_bar(data:pd.DataFrame,categories:list[str]):
     fig.tight_layout()
     plt.savefig("plots/bar_ventas_ganancia.png")
 
-def sales_freq_bar(data:pd.DataFrame):
+def sales_freq_bar(data:pd.DataFrame,start_date,end_date):
     """
     Función que recibe el dataframe de datos del periodo especificado y las categorias 
     seleccionadas,gráfica las barras de ganancia y cantidad de ventas lado a lado. 
 
     """
+    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+    start_date = pd.to_datetime(start_date)
+    end_date   = pd.to_datetime(end_date)
+    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
+    data = data[is_in_period]
+
     products = top_n(data=data,type="producto")
 
     is_in_products= data["productId"].isin(products)
     frequencies = data[is_in_products].value_counts()
     
+    
+
     plt.figure(figsize=(10,6))
     bars = plt.bar(products, frequencies, color="blue", edgecolor='black')
 
@@ -257,6 +282,50 @@ def sales_freq_bar(data:pd.DataFrame):
     plt.tight_layout()
     plt.savefig("plots/bar_frecs_compras.png")
 
+def stockCov_vs_salesVel(data:pd.DataFrame,start_date,end_date):
+
+    
+    data["avg_daily_sales"] = data["sales_day"].expanding().mean()
+    data["stock_cover"] = data["stock"]/data["avg_daily_sales"]
+
+    data["sales_velocity"] = data["sales_day"].rolling(window=7).mean()
+
+    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+
+    
+    start_date = pd.to_datetime(start_date)
+    end_date   = pd.to_datetime(end_date)
+    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
+    data = data[is_in_period]
+
+    plt.figure(figsize=(12, 6))
+    plt.style.use("seaborn-v0_8")
+
+    # Líneas interpoladas
+    plt.plot(data["fecha"], data["sales_velocity"], label="Velocidad de Ventas (ventas/día)", marker="o", color="#e63946")
+    plt.plot(data["fecha"],  data["stock_cover"],     label="Stock Cover", marker="s", color="#457b9d")
+
+
+    # Título y etiquetas
+    plt.title("Stock Cover vs Rápidez de Ventas", fontsize=16, fontweight="bold")
+    plt.xlabel("Fecha")
+    plt.ylabel("Cantidad")
+
+    # --- Eje X limpio ---
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+ 
+    plt.xticks(rotation=45, ha="right")
+
+    # Sin grid
+    plt.grid(False)
+
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("plots/almacen_v_rapidez_ventas.png")
+    plt.show()
+
 def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str):
     def abc_class(x):
         if x <= 0.80:
@@ -265,6 +334,12 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str):
             return "B"
         else:
             return "C"
+    
+    start_date = pd.to_datetime(start_date)
+    end_date   = pd.to_datetime(end_date)
+
+    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+
     is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
     df_filtered = data[is_in_period]
 
@@ -303,3 +378,4 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str):
     plt.gca().invert_yaxis()  # El mayor arriba
     plt.tight_layout()
     plt.savefig("plots/abc_chart.png")
+
