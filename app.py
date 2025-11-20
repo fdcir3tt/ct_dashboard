@@ -122,13 +122,16 @@ with col2:
 
 total_profit = data[is_product]["profit"].sum()
 total_sales = data[is_product]["sales_day"].sum()
+total_cost = 0
 inventory_t_ratio =0
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>${total_profit}</h2><p>ritmo</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card"><h3>Costo Total</h3><h2>${total_cost}</h2><p>ritmo</p></div>', unsafe_allow_html=True)
 with col2:
     st.markdown(f'<div class="metric-card"><h3>Ventas Total</h3><h2>2,{total_sales}</h2><p>ritmo</p></div>', unsafe_allow_html=True)
 with col3:
+    st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>{total_profit}</h2><p>ritmo</p></div>', unsafe_allow_html=True)
+with col4:
     st.markdown(f'<div class="metric-card"><h3>Cociente de Inventario</h3><h2>{inventory_t_ratio}</h2><p>ritmo</p></div>', unsafe_allow_html=True)
 
 
