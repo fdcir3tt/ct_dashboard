@@ -124,8 +124,8 @@ def process_data(update:bool=False)->pd.DataFrame:
         
 
         
-        #n = len(df)
-        #df["stock"] = np.linspace(1000, 200, n) + np.random.randint(-20, 20, n)
+        n = len(df)
+        df["stock"] = np.linspace(1000, 200, n) + np.random.randint(-20, 20, n)
         df = df.rename(columns={"ART_COS":"cost"})
         df.to_csv('data/processed.csv',index=False)
 
