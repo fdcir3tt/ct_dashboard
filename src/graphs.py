@@ -113,54 +113,63 @@ def top_month(data:pd.DataFrame)->str:
     df = df.sort_values(by="avg_rate",ascending=False)
     return month_dict[df["month"].iloc[0]]
 
-def stock_v_sales(data: pd.DataFrame,productId:str,start_date,end_date):
+def stock_v_sales(data: pd.DataFrame, productId: str, start_date, end_date):
     """
-    Grafica curvas de stock y ventas con estética mejorada,
-    eje X limpio, datos interpolados y fechas correctamente manejadas.
+    Grafica curvas de stock y ventas y regresa la figura.
     """
+
+    # --- Validaciones básicas ---
+    if data.empty:
+        raise ValueError("El dataset está vacío.")
+
+    if "fecha" not in data or "productId" not in data:
+        raise ValueError("El DataFrame debe contener las columnas 'fecha' y 'productId'.")
+
     # --- Asegurar que las fechas SON datetime ---
     data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
 
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
-    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
-    data = data[is_in_period]
 
-    is_product=data["productId"]==productId
-    df_filtered=data[is_product]
+    # Filtro por rango de fechas
+    in_period = (data["fecha"] >= start_date) & (data["fecha"] <= end_date)
+    data = data[in_period]
 
-    data = df_filtered.copy()
+    # Filtro por producto
+    data = data[data["productId"] == productId].copy()
 
-    
-    # --- Interpolación lineal ---
-    data["sales_day"] = data["sales_day"].interpolate(method="linear")
-    data["stock"]     = data["stock"].interpolate(method="linear")
+    #if data.empty:
+    #    raise ValueError(f"No hay datos para productId '{productId}' en ese rango de fechas.")
 
-    plt.figure(figsize=(12, 6))
+    # --- Interpolación ---
+    if "sales_day" in data:
+        data["sales_day"] = data["sales_day"].interpolate(method="linear")
+    if "stock" in data:
+        data["stock"] = data["stock"].interpolate(method="linear")
+
+    # --- Crear figura ---
+    fig, ax = plt.subplots(figsize=(12, 6))
     plt.style.use("seaborn-v0_8")
 
-    # Líneas interpoladas
-    plt.plot(data["fecha"], data["sales_day"], label="Ventas", marker="o", color="#e63946")
-    plt.plot(data["fecha"], data["stock"],     label="Stock", marker="s", color="#457b9d")
+    ax.plot(data["fecha"], data["sales_day"], label="Ventas",
+            marker="o", color="#e63946")
+    ax.plot(data["fecha"], data["stock"], label="Stock",
+            marker="s", color="#457b9d")
 
-    # Título y etiquetas
-    plt.title("Stock y Ventas (Interpolado)", fontsize=16, fontweight="bold")
-    plt.xlabel("Fecha")
-    plt.ylabel("Cantidad")
+    ax.set_title("Stock y Ventas (Interpolado)", fontsize=16, fontweight="bold")
+    ax.set_xlabel("Fecha")
+    ax.set_ylabel("Cantidad")
 
-    # --- Eje X limpio ---
-    ax = plt.gca()
+    # Eje X limpio
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
     plt.xticks(rotation=45, ha="right")
 
-    # Sin grid
     plt.grid(False)
-
     plt.legend()
     plt.tight_layout()
-    plt.savefig("plots/almacen_ventas.png")
-    plt.close()
+
+    return fig
 
 
 def sales_heat_map(data:pd.DataFrame,productId:str,start_date,end_date):
@@ -347,7 +356,8 @@ def stockCov_vs_salesVel(data:pd.DataFrame,start_date,end_date):
     plt.savefig("plots/almacen_v_rapidez_ventas.png")
     plt.show()
 
-def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str):
+def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="productos"):
+    type_dict={"productos":"productId","categorias":"category"}
     def abc_class(x):
         if x <= 0.80:
             return "A"
@@ -355,7 +365,8 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str):
             return "B"
         else:
             return "C"
-    
+        
+    type_selected = type_dict[type]
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
 
@@ -369,7 +380,7 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str):
 
     df_summary = (
         df_filtered
-            .groupby("productId")
+            .groupby(type_selected)
             .agg(
                 total_sales=("sales_day", "sum"),
                 min_cost=("cost", "min")  
@@ -388,9 +399,9 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str):
 
 
     plt.figure(figsize=(10, 8))
-    plt.barh(df_plot["productId"], df_plot["total_sales"], color=df_plot["ABC"].map(color_map))
+    plt.barh(df_plot[type_selected], df_plot["total_sales"], color=df_plot["ABC"].map(color_map))
     plt.xlabel("Ventas Totales")
-    plt.title("Ventas Totales por Producto ")
+    plt.title(f"Ventas Totales por {type[:-1].capitalize()} ")
 
     # Mostrar el valor sobre la barra
     for i, v in enumerate(df_plot["total_sales"]):
@@ -398,5 +409,5 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str):
 
     plt.gca().invert_yaxis()  # El mayor arriba
     plt.tight_layout()
-    plt.savefig("plots/abc_chart.png")
+    plt.savefig(f"plots/{type}_abc_chart.png")
 

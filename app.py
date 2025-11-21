@@ -6,6 +6,7 @@ import os
 import src.graphs as gr  
 from src.preprocess import process_data
 
+
 # -----------------------------------------------------------
 # CONFIGURACIÓN INICIAL
 # -----------------------------------------------------------
@@ -41,6 +42,7 @@ data = process_data ()
 global_data = data.copy()
 categorias = pd.read_csv("data/categorias.csv")
 categorias = list(categorias["nombre"])
+
 # -----------------------------------------------------------
 # FILTROS
 # -----------------------------------------------------------
@@ -81,18 +83,21 @@ else:
 
 
 # -----------------------------------------------------------
-gr.stock_v_sales(data,product,start_date=fecha_inicio,end_date=fecha_fin)
+stock_vs_sales = gr.stock_v_sales(data,product,start_date=fecha_inicio,end_date=fecha_fin)
 gr.sales_hist(data[["sales_day","fecha"]],start_date=fecha_inicio,end_date=fecha_fin)
 gr.sales_heat_map(global_data,product,start_date=fecha_inicio,end_date=fecha_fin)
-gr.abc_bar_chart(data,fecha_inicio,fecha_fin)
+gr.abc_bar_chart(data,fecha_inicio,fecha_fin,type="productos")
+gr.abc_bar_chart(data,fecha_inicio,fecha_fin,type="categorias")
 gr.stockCov_vs_salesVel(data[is_category],start_date=fecha_inicio,end_date=fecha_fin)
 
 # -----------------------------------------------------------
 # VISUALIZACIÓN EN STREAMLIT
 # -----------------------------------------------------------
+
+
 col1, col2 = st.columns(2)
 with col1:
-    st.image("plots/almacen_ventas.png", caption="Stock y Ventas - 2025", use_container_width=True)
+    st.pyplot(stock_vs_sales)
 with col2:
     st.image("plots/almacen_v_rapidez_ventas.png", caption="Stock Cover vs Rápidez de Ventas", use_container_width=True)
 
@@ -130,19 +135,19 @@ with col2:
 
 # KPIs
 
-total_profit = data[is_product]["profit"].sum()
+total_profit =round( data[is_product]["profit"].sum() ,2 )
 total_sales = data[is_product]["sales_day"].sum()
 total_cost = 0
 inventory_t_ratio =0
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.markdown(f'<div class="metric-card"><h3>Costo Total</h3><h2>${total_cost}</h2><p>ritmo</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card"><h3>Costo Total</h3><h2>${total_cost}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 with col2:
-    st.markdown(f'<div class="metric-card"><h3>Ventas Total</h3><h2>2,{total_sales}</h2><p>ritmo</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card"><h3>Ventas Total</h3><h2>{total_sales}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 with col3:
-    st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>{total_profit}</h2><p>ritmo</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>{total_profit}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 with col4:
-    st.markdown(f'<div class="metric-card"><h3>Cociente de Inventario</h3><h2>{inventory_t_ratio}</h2><p>ritmo</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card"><h3>Cociente de Inventario</h3><h2>{inventory_t_ratio}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 
 
 
@@ -151,6 +156,6 @@ with col4:
 
 col1, col2 = st.columns(2)
 with col1:
-    st.image("plots/abc_chart.png", caption="Ventas Totales por Producto", use_container_width=True)
+    st.image("plots/productos_abc_chart.png", caption="Ventas Totales por Producto", use_container_width=True)
 with col2:
-    st.image("plots/abc_chart.png", caption="Ventas Totales por Producto", use_container_width=True)
+    st.image("plots/categorias_abc_chart.png", caption="Ventas Totales por Producto", use_container_width=True)
