@@ -113,17 +113,23 @@ def top_month(data:pd.DataFrame)->str:
     df = df.sort_values(by="avg_rate",ascending=False)
     return month_dict[df["month"].iloc[0]]
 
-def stock_v_sales(data: pd.DataFrame, productId: str, start_date, end_date):
+def stock_vs_sales(data: pd.DataFrame, productId: str, start_date, end_date):
     """
     Grafica curvas de stock y ventas y regresa la figura.
     """
 
     # --- Validaciones básicas ---
     if data.empty:
-        raise ValueError("El dataset está vacío.")
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig
 
     if "fecha" not in data or "productId" not in data:
-        raise ValueError("El DataFrame debe contener las columnas 'fecha' y 'productId'.")
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig
 
     # --- Asegurar que las fechas SON datetime ---
     data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
@@ -138,8 +144,7 @@ def stock_v_sales(data: pd.DataFrame, productId: str, start_date, end_date):
     # Filtro por producto
     data = data[data["productId"] == productId].copy()
 
-    #if data.empty:
-    #    raise ValueError(f"No hay datos para productId '{productId}' en ese rango de fechas.")
+    
 
     # --- Interpolación ---
     if "sales_day" in data:
