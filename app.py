@@ -38,31 +38,35 @@ st.markdown('<div class="main-header"> Inventario CT International</div>', unsaf
 # -----------------------------------------------------------
 
 data = process_data ()
+global_data = data.copy()
 categorias = pd.read_csv("data/categorias.csv")
 categorias = list(categorias["nombre"])
-top_category = gr.top_n(data,type="categoria",n=1)
 # -----------------------------------------------------------
 # FILTROS
 # -----------------------------------------------------------
 
 st.sidebar.header("Filtros")
-selected_categories = st.sidebar.multiselect("Categorías", data["category"].unique(),default=top_category)
+selected_categories = st.sidebar.multiselect("Categorías", data["category"].unique(),default=data["category"].unique())
 is_category = data["category"].isin(selected_categories)
 
-level = st.sidebar.radio("Nivel de Análisis",["Global","Sucursal"])
+
 product = st.sidebar.selectbox("Producto", data[is_category]["productId"].unique())
-fecha_inicio = st.sidebar.date_input("Inicio", datetime.date(2025, 10, 1))
-fecha_fin = st.sidebar.date_input("Fin", datetime.date(2025, 11, 1))
+
+today = datetime.date.today()
+fecha_inicio = st.sidebar.date_input("Inicio", datetime.date(today.year, today.month, 1))
+fecha_fin = st.sidebar.date_input("Fin", today)
 outliers= st.sidebar.radio("Análisis con ventas anomalas incluídas", ["No","Sí"])
 
-if level=="Sucursal":
-    branch = st.sidebar.selectbox("Sucursal", data["sucursal"].unique())
-else:
-    branch = None
+
+is_product= data["productId"]==product
+branches = list( data[is_product]["sucursal"].unique() )
+branch = st.sidebar.selectbox("Sucursal", branches,index=0)
+
 
 os.makedirs("plots", exist_ok=True)
-is_product= data["productId"]==product
+
 # -----------------------------------------------------------
+
 if branch:
     in_branch = data["sucursal"] == branch
     data = data [in_branch]
@@ -73,10 +77,13 @@ if outliers=="Sí":
     data = process_data()
 else:
     data = gr.remove_outliers(data,"sales_day")
+
+
+
 # -----------------------------------------------------------
 gr.stock_v_sales(data,product,start_date=fecha_inicio,end_date=fecha_fin)
 gr.sales_hist(data[["sales_day","fecha"]],start_date=fecha_inicio,end_date=fecha_fin)
-gr.sales_heat_map(data,product,start_date=fecha_inicio,end_date=fecha_fin)
+gr.sales_heat_map(global_data,product,start_date=fecha_inicio,end_date=fecha_fin)
 gr.abc_bar_chart(data,fecha_inicio,fecha_fin)
 gr.stockCov_vs_salesVel(data[is_category],start_date=fecha_inicio,end_date=fecha_fin)
 
@@ -93,20 +100,23 @@ with col2:
 
 # Info del producto
 
+category = data[is_product]["category"].iloc[0]
 top_clients = list ( gr.top_n(data[is_product],type="cliente")["client"] )
+
 clients_str=''
 for client in top_clients:
     clients_str+=client+','
 clients_str = clients_str[:-1]
 
 top_day = gr.top_day(data[is_product])
+top_month = gr.top_month(data[is_product])
 
 col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown(f"**Código:** {product}")
-    st.markdown("**Producto Sustituto:** <Código ejemplo>")
+    st.markdown(f"**Categoría:** {category}")
 with col2:
-    st.markdown("**Productos Acompañados:** <Código ejemplo>, <Código ejemplo>")
+    st.markdown(f"**Mes más vendido:** {top_month}")
     st.markdown(f"**Día más vendido:** {top_day}")
 with col3:
     st.markdown(f"**Clientes frecuentes:** {clients_str}")

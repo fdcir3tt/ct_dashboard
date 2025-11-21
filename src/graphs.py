@@ -55,7 +55,8 @@ def frequency(data:pd.DataFrame,type:str="cliente")->pd.DataFrame:
                 "categoria":"category",
                 "sucursal":"branch",
                 "cliente":"client",
-                "dia":"weekday"}
+                "dia":"weekday",
+                "mes":"month"}
     
     column = type_dict[type]
     data["fecha"] = pd.to_datetime(data["fecha"])
@@ -91,6 +92,26 @@ def top_day(data:pd.DataFrame)->str:
     df = frequency(data,type="dia")
     df = df.sort_values(by="avg_rate",ascending=False)
     return weekday_dict[df["weekday"].iloc[0]]
+
+def top_month(data:pd.DataFrame)->str:
+    month_dict={  0:"Enero",
+                  1:"Febrero",
+                  2:"Marzo",
+                  3:"Abril",
+                  4:"Mayo",
+                  5:"Junio",
+                  6:"Julio",
+                  7:"Agosto",
+                  8:"Septiembre",
+                  9:"Octubre",
+                  10:"Noviembre",
+                  11:"Diciembre"}
+    
+    data["fecha"] = pd.to_datetime(data["fecha"])
+    
+    df = frequency(data,type="mes")
+    df = df.sort_values(by="avg_rate",ascending=False)
+    return month_dict[df["month"].iloc[0]]
 
 def stock_v_sales(data: pd.DataFrame,productId:str,start_date,end_date):
     """
