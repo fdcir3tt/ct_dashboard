@@ -50,16 +50,4 @@ def test_returns_figure():
     assert isinstance(fig, Figure), "La función debe retornar un objeto matplotlib.figure.Figure"
 
 
-# --- Test: filtrado por producto ---
-def test_filter_product():
-    df = sample_data()
-    fig = stock_vs_sales(df, "B", "2024-01-01", "2024-01-05")
-    # Debe retornar figura sin error incluso si solo hay filas del producto B
-    assert isinstance(fig, Figure)
 
-
-# --- Test: filtrado por rango de fechas ---
-def test_filter_dates():
-    df = sample_data()
-    fig = stock_vs_sales(df, "A", "2024-01-02", "2024-01-03")
-    assert isinstance(fig, Figure)

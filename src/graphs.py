@@ -3,7 +3,7 @@ import geopandas as gpd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-
+import matplotlib.patches as mpatches
 
 
 def remove_outliers(data: pd.DataFrame, column: str) -> pd.DataFrame:
@@ -365,11 +365,11 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="produc
     type_dict={"productos":"productId","categorias":"category"}
     def abc_class(x):
         if x <= 0.80:
-            return "A"
+            return "Alta"
         elif x <= 0.95:
-            return "B"
+            return "Media"
         else:
-            return "C"
+            return "Baja"
         
     type_selected = type_dict[type]
     start_date = pd.to_datetime(start_date)
@@ -395,22 +395,25 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="produc
     df_summary["annual_value"] = df_summary["total_sales"] * df_summary["min_cost"]
     df_summary = df_summary.sort_values("annual_value", ascending=False)
     df_summary["cumulative_val"] = df_summary["annual_value"].cumsum() / df_summary["annual_value"].sum()
-    df_summary["ABC"] = df_summary["cumulative_val"].apply(abc_class)
+    df_summary["prioridad"] = df_summary["cumulative_val"].apply(abc_class)
 
-    color_map = {"A":"red", "B":"blue", "C":"gray"}
+    color_map = {"Alta":"red", "Media":"blue", "Baja":"gray"}
 
     df_plot = df_summary.sort_values(by="total_sales",ascending=False)
     df_plot = df_plot.reset_index()[:20]
 
 
     plt.figure(figsize=(10, 8))
-    plt.barh(df_plot[type_selected], df_plot["total_sales"], color=df_plot["ABC"].map(color_map))
+    plt.barh(df_plot[type_selected], df_plot["total_sales"], color=df_plot["prioridad"].map(color_map))
     plt.xlabel("Ventas Totales")
     plt.title(f"Ventas Totales por {type[:-1].capitalize()} ")
 
     # Mostrar el valor sobre la barra
     for i, v in enumerate(df_plot["total_sales"]):
         plt.text(v + max(df_plot["total_sales"]) * 0.01, i, str(v), va='center')
+
+    patches = [mpatches.Patch(color=color, label=cls) for cls, color in color_map.items()]
+    plt.legend(handles=patches, title="Prioridad ")
 
     plt.gca().invert_yaxis()  # El mayor arriba
     plt.tight_layout()

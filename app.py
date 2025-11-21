@@ -83,7 +83,7 @@ else:
 
 
 # -----------------------------------------------------------
-stock_vs_sales = gr.stock_v_sales(data,product,start_date=fecha_inicio,end_date=fecha_fin)
+stock_vs_sales = gr.stock_vs_sales(data,product,start_date=fecha_inicio,end_date=fecha_fin)
 gr.sales_hist(data[["sales_day","fecha"]],start_date=fecha_inicio,end_date=fecha_fin)
 gr.sales_heat_map(global_data,product,start_date=fecha_inicio,end_date=fecha_fin)
 gr.abc_bar_chart(data,fecha_inicio,fecha_fin,type="productos")
