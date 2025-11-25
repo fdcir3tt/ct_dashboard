@@ -4,35 +4,47 @@ Para obtener valor del dashboard, necesita tener confianza en que los datos plas
 
 ## Validaciones básicas
 
-- Registros no nulos
+**Registros no nulos :**
 
-- Formatos consistentes de columnas
+Para nuestro caso, los registros nulos no nos sirven para nada por el momento. Es por ello que los filtraremos del conjunto final de datos. Como estaremos implementando [`dask`](https://docs.dask.org/en/stable/), para llevar a cabo esta tarea utilizaremos el método `dask.dataframe.DataFrame.isna()` para detectar valores nulos y `dask.dataframe.DataFrame.dropna()` para eliminarlos.
 
-- Productos activos congruencia entre bases
+**Formatos consistentes de columnas :**
 
-- Suma de ventas por producto total deben ser igual a la suma de categorias total
+Se utilizará el método `dask.dataframe.DataFrame.dtypes` para confirmar que los formatos sean los adecuados.  
 
 
-## Rangos
 
-- Precios,costos, cantidades positivas
 
-- Precio debe ser mayor a costo
 
-- Fechas dentro de 2022 y actualidad
 
-- Ventas totales de cada producto deben sumar a ventas totales globales
 
-- Velocidad de venta diaria debe ser menor o igual a la venta diaria. 
+## Rangos y Duplicidad
 
-- 
+**Suma de ventas por producto total deben ser igual a la suma de categorias total :**
 
-## Duplicidad
+Esta validación consiste en verificar si se hace la agrupación/separación entre productos y categorías correctamente. Para ello, se compara la suma de ventas a nivel producto con la suma de ventas a nivel categoría. 
 
-- Suma de registros de cada producto debe sumar al total de registros
+**Precios,costos, cantidades positivas :**
 
-- Suma de productos activos debe ser menor o igual a total de productos
+Se revisará que columnas como `price` ,`cost`, `sales_{frequency}` caigan dentro de su rango lógico. 
 
-- Cantidad de folios debe ser igual a la cantidad de registros
+**Precio debe ser mayor a costo :**
+
+Para que nuestro conjunto de datos refleje información que tenga sentido, una debe ser que el precio de producto sea mayor a su costo. 
+
+
+**Fechas dentro de 2020 y actualidad**
+
+A nosotros y los usuarios solo nos interesan fechas que se encuentren dentro del periodo del 2020 hasta la actualidad.
+
+
+**Velocidad de venta diaria debe ser menor o igual a la venta diaria** 
+
+No son validas las velocidades de venta diaria que sean mayores a la venta diaria. 
+ 
+
+**Cantidad de folios debe ser igual a la cantidad de registros :** 
+
+Esto es para probar la unicidad de la columna de `folio`.
 
 
