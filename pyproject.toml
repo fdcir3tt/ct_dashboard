@@ -20,7 +20,10 @@ dependencies = [
     "mysql (>=0.0.3,<0.0.4)",
     "mysql-connector-python (>=9.5.0,<10.0.0)",
     "plotly (>=6.4.0,<7.0.0)",
-    "pymongo (>=4.15.4,<5.0.0)"
+    "pymongo (>=4.15.4,<5.0.0)",
+    "dask[distributed] (>=2025.11.0,<2026.0.0)",
+    "bokeh (>=3.8.1,<4.0.0)",
+    "sqlalchemy (>=2.0.44,<3.0.0)"
 ]
 
 
