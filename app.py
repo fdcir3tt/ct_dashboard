@@ -47,7 +47,7 @@ categorias = pd.read_csv("data/categorias.csv")
 categorias = list(categorias["nombre"])
 
 # -----------------------------------------------------------
-# VALORES DEFAULT
+# VALORES PREDETERMINADOS
 # -----------------------------------------------------------
 
 today = datetime.date.today()
@@ -115,11 +115,11 @@ os.makedirs("plots", exist_ok=True)
 
 # -----------------------------------------------------------
 stock_vs_sales = gr.stock_vs_sales(data,product,start_date=fecha_inicio,end_date=fecha_fin)
-gr.sales_hist(data[["sales_day","fecha"]],start_date=fecha_inicio,end_date=fecha_fin)
-gr.sales_heat_map(global_data,product,start_date=fecha_inicio,end_date=fecha_fin)
+histogram = gr.sales_hist(data[["sales_day","fecha"]],start_date=fecha_inicio,end_date=fecha_fin)
+heat_map = gr.sales_heat_map(global_data,product,start_date=fecha_inicio,end_date=fecha_fin)
 product_priorities = gr.abc_bar_chart(data,fecha_inicio,fecha_fin,type="productos")
 category_priorities = gr.abc_bar_chart(data,fecha_inicio,fecha_fin,type="categorias")
-gr.stockCov_vs_salesVel(data[is_category],start_date=fecha_inicio,end_date=fecha_fin)
+sales_velocity = gr.stockCov_vs_salesVel(data[is_category],start_date=fecha_inicio,end_date=fecha_fin)
 
 # -----------------------------------------------------------
 # VISUALIZACIÓN EN STREAMLIT
@@ -130,9 +130,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.pyplot(stock_vs_sales)
 with col2:
-    st.image("plots/almacen_v_rapidez_ventas.png", caption="Stock Cover vs Rápidez de Ventas", use_container_width=True)
-
-
+    st.pyplot(sales_velocity)
 
 # -----------------------------------------------------------
 # INFO DE PRODUCTO
@@ -163,10 +161,9 @@ with col3:
 # Histograma y mapa
 col1, col2 = st.columns(2)
 with col1:
-    st.image("plots/hist_ventas_prod.png", caption="Histograma de Cantidad de Ventas", use_container_width=True)
+    st.pyplot(histogram)
 with col2:
-    st.image("plots/heatmap_ventas_mexico.png", caption="Mapa de calor de ventas simuladas por estado - México", use_container_width=True)
-
+    st.pyplot(heat_map)
 # -----------------------------------------------------------
 # KPIs
 # -----------------------------------------------------------

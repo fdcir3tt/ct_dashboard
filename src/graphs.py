@@ -214,7 +214,7 @@ def sales_heat_map(data:pd.DataFrame,productId:str,start_date,end_date):
     ax.axis("off")
     fig.patch.set_facecolor('lightgrey')  # fondo del mapa
 
-    fig.savefig("plots/heatmap_ventas_mexico.png", dpi=300, bbox_inches="tight")
+    return fig
     
 def sales_hist(data:pd.DataFrame,start_date,end_date):
     """
@@ -229,93 +229,18 @@ def sales_hist(data:pd.DataFrame,start_date,end_date):
 
     
 
-    plt.figure(figsize=(10,6))
-    plt.hist(data["sales_day"], bins=15, color='blue', edgecolor='black')
-    plt.title("Histograma de Cantidad de Ventas", fontsize=14, fontweight='bold')
-    plt.xlabel("Cantidad de ventas")
-    plt.ylabel("Frecuencia")
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.tight_layout()
-    plt.savefig("plots/hist_ventas_prod.png")
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-def profits_sales_bar(data:pd.DataFrame,categories:list[str]):
-    """
-    Función que recibe el dataframe de datos del periodo especificado y las categorias 
-    seleccionadas,gráfica las barras de ganancia y cantidad de ventas lado a lado. 
+    ax.hist(data["sales_day"], bins=15, color='blue', edgecolor='black')
+    ax.set_title("Histograma de Cantidad de Ventas", fontsize=14, fontweight='bold')
+    ax.set_xlabel("Cantidad de ventas")
+    ax.set_ylabel("Frecuencia")
+    ax.grid(axis='y', linestyle='--', alpha=0.7)
 
-    """
-    is_category=data["category"].isin(categories)
-    df_filtered=data[is_category]
-
-    total_sales= df_filtered.groupby("category")["cantidad"].sum()
-    total_profit= df_filtered.groupby("category")["profit"].sum()
-    x = np.arange(len(categories))
-    width = 0.4  # ancho de las barras
-
-    fig, ax1 = plt.subplots(figsize=(10,6))
-
-    # Barras de ventas (eje izquierdo)
-    sales_bars = ax1.bar(x - width/2, total_sales, width, color='blue', label='Ventas')
-    
-    ax1.set_ylabel('Ventas', color='blue', fontsize=12)
-    ax1.tick_params(axis='y', labelcolor='blue')
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(categories)
-    ax1.grid(axis='y', linestyle='--', alpha=0.5)
-
-    # Barras de ganancias (eje derecho)
-    ax2 = ax1.twinx()
-    profit_bars = ax2.bar(x + width/2, total_profit, width, color='red', label='Ganancia')
-    ax2.set_ylabel('Ganancia', color='red', fontsize=12)
-    ax2.tick_params(axis='y', labelcolor='red')
-
-    # Añadir título
-    fig.suptitle('Ventas y Ganancia por Categoría', fontsize=14, fontweight='bold')
     fig.tight_layout()
-    plt.savefig("plots/bar_ventas_ganancia.png")
 
-def sales_freq_bar(data:pd.DataFrame,start_date,end_date):
-    """
-    Función que recibe el dataframe de datos del periodo especificado y las categorias 
-    seleccionadas,gráfica las barras de ganancia y cantidad de ventas lado a lado. 
+    return fig
 
-    """
-    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
-    start_date = pd.to_datetime(start_date)
-    end_date   = pd.to_datetime(end_date)
-    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
-    data = data[is_in_period]
-
-    products = top_n(data=data,type="producto")
-
-    is_in_products= data["productId"].isin(products)
-    frequencies = data[is_in_products].value_counts()
-    
-    
-
-    plt.figure(figsize=(10,6))
-    bars = plt.bar(products, frequencies, color="blue", edgecolor='black')
-
-    # --- Etiquetas sobre cada barra ---
-    for bar in bars:
-        altura = bar.get_height()
-        plt.text(
-            bar.get_x() + bar.get_width()/2, 
-            altura + 5,  # un poco arriba de la barra
-            str(altura),
-            ha='center', 
-            va='bottom',
-            fontsize=10,
-            fontweight='bold'
-        )
-
-    # --- Estética ---
-    plt.title('Frecuencia de compra de productos electrónicos en periodo', fontsize=16, fontweight='bold')
-    plt.xlabel('Productos', fontsize=12)
-    plt.ylabel('Cantidad de compras', fontsize=12)
-    plt.grid(axis='y', linestyle='--', alpha=0.5)
-    plt.tight_layout()
-    plt.savefig("plots/bar_frecs_compras.png")
 
 def stockCov_vs_salesVel(data:pd.DataFrame,start_date,end_date):
 
@@ -333,33 +258,33 @@ def stockCov_vs_salesVel(data:pd.DataFrame,start_date,end_date):
     is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
     data = data[is_in_period]
 
-    plt.figure(figsize=(12, 6))
     plt.style.use("seaborn-v0_8")
+    fig, ax = plt.subplots(figsize=(12, 6))
 
     # Líneas interpoladas
-    plt.plot(data["fecha"], data["sales_velocity"], label="Velocidad de Ventas (ventas/día)", marker="o", color="#e63946")
-    plt.plot(data["fecha"],  data["stock_cover"],     label="Stock Cover", marker="s", color="#457b9d")
-
+    ax.plot(data["fecha"], data["sales_velocity"], label="Velocidad de Ventas (ventas/día)",
+            marker="o", color="#e63946")
+    ax.plot(data["fecha"], data["stock_cover"], label="Stock Cover",
+            marker="s", color="#457b9d")
 
     # Título y etiquetas
-    plt.title("Stock Cover vs Rápidez de Ventas", fontsize=16, fontweight="bold")
-    plt.xlabel("Fecha")
-    plt.ylabel("Cantidad")
+    ax.set_title("Stock Cover vs Rápidez de Ventas", fontsize=16, fontweight="bold")
+    ax.set_xlabel("Fecha")
+    ax.set_ylabel("Cantidad")
 
-    # --- Eje X limpio ---
-    ax = plt.gca()
+    # --- Formato de fechas en eje X ---
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
- 
-    plt.xticks(rotation=45, ha="right")
+    fig.autofmt_xdate(rotation=45, ha="right")  # reemplaza plt.xticks
 
     # Sin grid
-    plt.grid(False)
+    ax.grid(False)
 
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig("plots/almacen_v_rapidez_ventas.png")
-    plt.show()
+    ax.legend()
+    fig.tight_layout()
+
+
+    return fig
 
 def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="productos"):
     type_dict={"productos":"productId","categorias":"category"}
@@ -387,7 +312,7 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="produc
         df_filtered
             .groupby(type_selected)
             .agg(
-                total_sales=("sales_day", "sum"),
+                total_sales=("cantidad", "sum"),
                 min_cost=("cost", "min")  
             )
     )
@@ -403,19 +328,31 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="produc
     df_plot = df_plot.reset_index()[:20]
 
 
-    plt.figure(figsize=(10, 8))
-    plt.barh(df_plot[type_selected], df_plot["total_sales"], color=df_plot["prioridad"].map(color_map))
-    plt.xlabel("Ventas Totales")
-    plt.title(f"Ventas Totales por {type[:-1].capitalize()} ")
+    fig, ax = plt.subplots(figsize=(10, 8))
 
-    # Mostrar el valor sobre la barra
+    # Barras
+    ax.barh(
+        df_plot[type_selected],
+        df_plot["total_sales"],
+        color=df_plot["prioridad"].map(color_map)
+    )
+
+    ax.set_xlabel("Ventas Totales")
+    ax.set_title(f"Ventas Totales por {type[:-1].capitalize()} ")
+
+    # Mostrar valores sobre las barras
+    max_val = df_plot["total_sales"].max()
     for i, v in enumerate(df_plot["total_sales"]):
-        plt.text(v + max(df_plot["total_sales"]) * 0.01, i, str(v), va='center')
+        ax.text(v + max_val * 0.01, i, str(v), va='center')
 
+    # Leyenda
     patches = [mpatches.Patch(color=color, label=cls) for cls, color in color_map.items()]
-    plt.legend(handles=patches, title="Prioridad ")
+    ax.legend(handles=patches, title="Prioridad")
 
-    plt.gca().invert_yaxis()  # El mayor arriba
-    plt.tight_layout()
-    plt.savefig(f"plots/{type}_abc_chart.png")
+    # Invertir eje y
+    ax.invert_yaxis()
+
+    fig.tight_layout()
+
+    return fig
 
