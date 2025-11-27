@@ -34,14 +34,51 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="main-header"> Inventario CT International</div>', unsafe_allow_html=True)
+
+
 # -----------------------------------------------------------
 # CARGA DE DATOS
 # -----------------------------------------------------------
 
-data = process_data ()
-global_data = data.copy()
+global_data = process_data ()
+data = global_data.copy()
+
 categorias = pd.read_csv("data/categorias.csv")
 categorias = list(categorias["nombre"])
+
+# -----------------------------------------------------------
+# VALORES DEFAULT
+# -----------------------------------------------------------
+
+today = datetime.date.today()
+start_date = datetime.date(today.year, today.month, 1)
+end_date = today
+start_date = pd.to_datetime(start_date)
+end_date   = pd.to_datetime(end_date)
+
+global_data["fecha"] = pd.to_datetime(global_data["fecha"], errors="coerce")
+data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+
+is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
+top_product= (
+    data[is_in_period]
+    .groupby("productId")["cantidad"]
+    .sum()
+    .idxmax()
+)
+product_list = list( data["productId"].unique() )
+top_product_index = product_list.index(top_product)
+
+
+is_top_product= data["productId"]==top_product
+frequent_branch= (
+    data[is_top_product]
+    .groupby("sucursal")["fecha"]
+    .nunique() 
+    .idxmax()
+)
+branch_list = list( data[is_top_product]["sucursal"].unique() )
+frequent_branch_index = branch_list.index(frequent_branch)
 
 # -----------------------------------------------------------
 # FILTROS
@@ -52,42 +89,36 @@ selected_categories = st.sidebar.multiselect("Categorías", data["category"].uni
 is_category = data["category"].isin(selected_categories)
 
 
-product = st.sidebar.selectbox("Producto", data[is_category]["productId"].unique())
+product = st.sidebar.selectbox("Producto", product_list ,index = top_product_index)
 
-today = datetime.date.today()
-fecha_inicio = st.sidebar.date_input("Inicio", datetime.date(today.year, today.month, 1))
+
+fecha_inicio = st.sidebar.date_input("Inicio", start_date)
 fecha_fin = st.sidebar.date_input("Fin", today)
 outliers= st.sidebar.radio("Análisis con ventas anomalas incluídas", ["No","Sí"])
 
 
 is_product= data["productId"]==product
-branches = list( data[is_product]["sucursal"].unique() )
-branch = st.sidebar.selectbox("Sucursal", branches,index=0)
+branch = st.sidebar.selectbox("Sucursal", branch_list, index=frequent_branch_index)
 
 
-os.makedirs("plots", exist_ok=True)
+in_branch = global_data["sucursal"] == branch
+data = global_data [in_branch].copy()
 
-# -----------------------------------------------------------
-
-if branch:
-    in_branch = data["sucursal"] == branch
-    data = data [in_branch]
-else:
-    data = process_data()
 
 if outliers=="Sí":
     data = process_data()
 else:
     data = gr.remove_outliers(data,"sales_day")
 
+os.makedirs("plots", exist_ok=True)
 
 
 # -----------------------------------------------------------
 stock_vs_sales = gr.stock_vs_sales(data,product,start_date=fecha_inicio,end_date=fecha_fin)
 gr.sales_hist(data[["sales_day","fecha"]],start_date=fecha_inicio,end_date=fecha_fin)
 gr.sales_heat_map(global_data,product,start_date=fecha_inicio,end_date=fecha_fin)
-gr.abc_bar_chart(data,fecha_inicio,fecha_fin,type="productos")
-gr.abc_bar_chart(data,fecha_inicio,fecha_fin,type="categorias")
+product_priorities = gr.abc_bar_chart(data,fecha_inicio,fecha_fin,type="productos")
+category_priorities = gr.abc_bar_chart(data,fecha_inicio,fecha_fin,type="categorias")
 gr.stockCov_vs_salesVel(data[is_category],start_date=fecha_inicio,end_date=fecha_fin)
 
 # -----------------------------------------------------------
@@ -103,7 +134,10 @@ with col2:
 
 
 
-# Info del producto
+# -----------------------------------------------------------
+# INFO DE PRODUCTO
+# -----------------------------------------------------------
+
 
 category = data[is_product]["category"].iloc[0]
 top_clients = list ( gr.top_n(data[is_product],type="cliente")["client"] )
@@ -133,12 +167,16 @@ with col1:
 with col2:
     st.image("plots/heatmap_ventas_mexico.png", caption="Mapa de calor de ventas simuladas por estado - México", use_container_width=True)
 
+# -----------------------------------------------------------
 # KPIs
+# -----------------------------------------------------------
 
-total_profit =round( data[is_product]["profit"].sum() ,2 )
-total_sales = data[is_product]["sales_day"].sum()
-total_cost = 0
-inventory_t_ratio =0
+
+total_sales = data[is_product]["cantidad"].sum()
+total_cost = total_sales*data[is_product]["cost"].iloc[0]
+total_profit = round( data[is_product]["income"].sum() - total_cost ,2 )
+inventory_t_ratio = 0
+
 col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.markdown(f'<div class="metric-card"><h3>Costo Total</h3><h2>${total_cost}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
@@ -152,10 +190,13 @@ with col4:
 
 
 
-# Gráfica de ventas y ganancia por categoría
+# -----------------------------------------------------------
+# PRIORIDADES
+# -----------------------------------------------------------
+
 
 col1, col2 = st.columns(2)
 with col1:
-    st.image("plots/productos_abc_chart.png", caption="Ventas Totales por Producto", use_container_width=True)
+    st.pyplot(product_priorities)
 with col2:
-    st.image("plots/categorias_abc_chart.png", caption="Ventas Totales por Producto", use_container_width=True)
+    st.pyplot(category_priorities)

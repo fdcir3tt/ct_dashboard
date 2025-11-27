@@ -100,8 +100,8 @@ def process_data(update:bool=False)->pd.DataFrame:
         df["sales_freq"]  = df.groupby(["productId", "fecha"])["cantidad"].transform("count")
 
         # Cálculo de ganancias
-        df["profit"] = df["price"] * df["cantidad"]
-        df["total_profit"] = df.groupby("productId")["profit"].transform("sum")
+        df["income"] = df["price"] * df["cantidad"]
+        
 
         # Categorías
 
