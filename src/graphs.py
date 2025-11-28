@@ -51,6 +51,9 @@ def frequency(data:pd.DataFrame,type:str="cliente")->pd.DataFrame:
     en dicho periodo. 
 
     """
+    if data.empty:
+        print("Dataset vacío")
+        return None
     type_dict= {"producto":"productId",
                 "categoria":"category",
                 "sucursal":"branch",
@@ -129,6 +132,7 @@ def stock_vs_sales(data: pd.DataFrame, productId: str, start_date, end_date):
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
         ax.axis("off")
+        fig.savefig("plots/almacen_ventas.png")
         return fig
 
     # --- Asegurar que las fechas SON datetime ---
@@ -173,7 +177,7 @@ def stock_vs_sales(data: pd.DataFrame, productId: str, start_date, end_date):
     plt.grid(False)
     plt.legend()
     plt.tight_layout()
-
+    fig.savefig("plots/almacen_ventas.png")
     return fig
 
 
@@ -182,6 +186,9 @@ def sales_heat_map(data:pd.DataFrame,productId:str,start_date,end_date):
     Función que recibe el dataframe de datos del periodo especificado y 
     grafíca las ventas sobre un mapa de calor en méxico.
     """
+    if data.empty:
+        print("Dataset vacío")
+        return None
     data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
@@ -210,8 +217,9 @@ def sales_heat_map(data:pd.DataFrame,productId:str,start_date,end_date):
     )
 
     # --- Estética --- #
-    ax.set_title("Mapa de calor de ventas por estado ", fontsize=16, fontweight='bold')
+    ax.set_title(f"Ventas de {productId} por estado ", fontsize=16, fontweight='bold')
     ax.axis("off")
+    fig.savefig("plots/heatmap_ventas_mexico.png")
     fig.patch.set_facecolor('lightgrey')  # fondo del mapa
 
     return fig
@@ -221,6 +229,9 @@ def sales_hist(data:pd.DataFrame,start_date,end_date):
     Función que recibe el dataframe de datos del periodo especificado y 
     gráfica las curvas de existencia del producto y ventas.
     """
+    if data.empty:
+        print("Dataset vacío")
+        return None
     data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
@@ -231,19 +242,21 @@ def sales_hist(data:pd.DataFrame,start_date,end_date):
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    ax.hist(data["sales_day"], bins=15, color='blue', edgecolor='black')
-    ax.set_title("Histograma de Cantidad de Ventas", fontsize=14, fontweight='bold')
-    ax.set_xlabel("Cantidad de ventas")
+    ax.hist(data["cantidad"], bins=15, color='blue', edgecolor='black')
+    ax.set_title("Frecuencia de Ventas", fontsize=14, fontweight='bold')
+    ax.set_xlabel("Ventas diarias")
     ax.set_ylabel("Frecuencia")
     ax.grid(axis='y', linestyle='--', alpha=0.7)
 
     fig.tight_layout()
-
+    fig.savefig("plots/hist_ventas_prod.png")
     return fig
 
 
 def stockCov_vs_salesVel(data:pd.DataFrame,start_date,end_date):
-
+    if data.empty:
+        print("Dataset vacío")
+        return None
     
     data["avg_daily_sales"] = data["sales_day"].expanding().mean()
     data["stock_cover"] = data["stock"]/data["avg_daily_sales"]
@@ -268,9 +281,9 @@ def stockCov_vs_salesVel(data:pd.DataFrame,start_date,end_date):
             marker="s", color="#457b9d")
 
     # Título y etiquetas
-    ax.set_title("Stock Cover vs Rápidez de Ventas", fontsize=16, fontweight="bold")
+    ax.set_title("Rápidez de Ventas", fontsize=16, fontweight="bold")
     ax.set_xlabel("Fecha")
-    ax.set_ylabel("Cantidad")
+    ax.set_ylabel("Ventas")
 
     # --- Formato de fechas en eje X ---
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
@@ -282,11 +295,15 @@ def stockCov_vs_salesVel(data:pd.DataFrame,start_date,end_date):
 
     ax.legend()
     fig.tight_layout()
-
+    fig.savefig("plots/almacen_v_rapidez_ventas.png")
 
     return fig
 
 def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="productos"):
+    
+    if data.empty:
+        print("Dataset vacío")
+        return None
     type_dict={"productos":"productId","categorias":"category"}
     def abc_class(x):
         if x <= 0.80:
@@ -338,7 +355,7 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="produc
     )
 
     ax.set_xlabel("Ventas Totales")
-    ax.set_title(f"Ventas Totales por {type[:-1].capitalize()} ")
+    ax.set_title(f"Ventas Totales en Sucursal por {type[:-1].capitalize()} ")
 
     # Mostrar valores sobre las barras
     max_val = df_plot["total_sales"].max()
@@ -353,6 +370,7 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="produc
     ax.invert_yaxis()
 
     fig.tight_layout()
+    fig.savefig(f"plots/{type}_abc_chart.png")
 
     return fig
 

@@ -42,6 +42,7 @@ st.markdown('<div class="main-header"> Inventario CT International</div>', unsaf
 
 global_data = process_data ()
 data = global_data.copy()
+data = gr.remove_outliers(data,"sales_day")
 
 categorias = pd.read_csv("data/categorias.csv")
 categorias = list(categorias["nombre"])
@@ -97,32 +98,40 @@ fecha_fin = st.sidebar.date_input("Fin", today)
 outliers= st.sidebar.radio("Análisis con ventas anomalas incluídas", ["No","Sí"])
 
 
-is_product= data["productId"]==product
+
 branch = st.sidebar.selectbox("Sucursal", branch_list, index=frequent_branch_index)
 
 
 in_branch = global_data["sucursal"] == branch
-data = global_data [in_branch].copy()
+is_product= global_data["productId"]==product
+data = global_data [in_branch&is_product].copy()
 
 
 if outliers=="Sí":
     data = process_data()
-else:
-    data = gr.remove_outliers(data,"sales_day")
+
+if data.empty:
+    print("Dataset vacío")
+        
 
 os.makedirs("plots", exist_ok=True)
 
 
 # -----------------------------------------------------------
+# GRÁFICAS
+# -----------------------------------------------------------
+
 stock_vs_sales = gr.stock_vs_sales(data,product,start_date=fecha_inicio,end_date=fecha_fin)
-histogram = gr.sales_hist(data[["sales_day","fecha"]],start_date=fecha_inicio,end_date=fecha_fin)
+histogram = gr.sales_hist(data[["cantidad","fecha"]],start_date=fecha_inicio,end_date=fecha_fin)
 heat_map = gr.sales_heat_map(global_data,product,start_date=fecha_inicio,end_date=fecha_fin)
-product_priorities = gr.abc_bar_chart(data,fecha_inicio,fecha_fin,type="productos")
-category_priorities = gr.abc_bar_chart(data,fecha_inicio,fecha_fin,type="categorias")
-sales_velocity = gr.stockCov_vs_salesVel(data[is_category],start_date=fecha_inicio,end_date=fecha_fin)
+product_priorities = gr.abc_bar_chart(global_data[in_branch],fecha_inicio,fecha_fin,type="productos")
+category_priorities = gr.abc_bar_chart(global_data[in_branch],fecha_inicio,fecha_fin,type="categorias")
+sales_velocity = gr.stockCov_vs_salesVel(data,start_date=fecha_inicio,end_date=fecha_fin)
+
+
 
 # -----------------------------------------------------------
-# VISUALIZACIÓN EN STREAMLIT
+# VENTAS Y RÁPIDEZ DE VENTAS
 # -----------------------------------------------------------
 
 
@@ -158,32 +167,36 @@ with col2:
 with col3:
     st.markdown(f"**Clientes frecuentes:** {clients_str}")
 
-# Histograma y mapa
+# -----------------------------------------------------------
+# HISTOGRAMA Y MAPA CALOR
+# -----------------------------------------------------------
+
 col1, col2 = st.columns(2)
 with col1:
     st.pyplot(histogram)
 with col2:
     st.pyplot(heat_map)
+
+
 # -----------------------------------------------------------
 # KPIs
 # -----------------------------------------------------------
 
 
-total_sales = data[is_product]["cantidad"].sum()
-total_cost = total_sales*data[is_product]["cost"].iloc[0]
-total_profit = round( data[is_product]["income"].sum() - total_cost ,2 )
+total_sales = data["cantidad"].sum()
+total_cost = total_sales*data["cost"].iloc[0]
+total_profit = round( data["income"].sum() - total_cost ,2 )
 inventory_t_ratio = 0
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.markdown(f'<div class="metric-card"><h3>Costo Total</h3><h2>${total_cost}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card"><h3>Ventas Totales</h3><h2>{total_sales}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 with col2:
-    st.markdown(f'<div class="metric-card"><h3>Ventas Total</h3><h2>{total_sales}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
-with col3:
-    st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>{total_profit}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
-with col4:
     st.markdown(f'<div class="metric-card"><h3>Cociente de Inventario</h3><h2>{inventory_t_ratio}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
-
+with col3:
+    st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>${total_profit}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+with col4:
+    st.markdown(f'<div class="metric-card"><h3>Costo Total</h3><h2>${total_cost}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 
 
 
