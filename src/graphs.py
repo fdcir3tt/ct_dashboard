@@ -116,11 +116,22 @@ def top_month(data:pd.DataFrame)->str:
     df = df.sort_values(by="avg_rate",ascending=False)
     return month_dict[df["month"].iloc[0]]
 
-def stock_vs_sales(data: pd.DataFrame, productId: str, start_date, end_date):
+def period_sales(data: pd.DataFrame, productId: str, start_date, end_date):
     """
-    Grafica curvas de stock y ventas y regresa la figura.
+    Grafica curva de ventas y regresa la figura.
     """
-
+    month_dict={  0:"Enero",
+                  1:"Febrero",
+                  2:"Marzo",
+                  3:"Abril",
+                  4:"Mayo",
+                  5:"Junio",
+                  6:"Julio",
+                  7:"Agosto",
+                  8:"Septiembre",
+                  9:"Octubre",
+                  10:"Noviembre",
+                  11:"Diciembre"}
     # --- Validaciones básicas ---
     if data.empty:
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -147,28 +158,44 @@ def stock_vs_sales(data: pd.DataFrame, productId: str, start_date, end_date):
 
     # Filtro por producto
     data = data[data["productId"] == productId].copy()
+    month = month_dict[ data["month"].iloc[0] ]
+    year = data["year"].iloc[0]
 
-    
-
-    # --- Interpolación ---
+    # Líneas interpoladas
     if "sales_day" in data:
         data["sales_day"] = data["sales_day"].interpolate(method="linear")
-    if "stock" in data:
-        data["stock"] = data["stock"].interpolate(method="linear")
+    
 
-    # --- Crear figura ---
+   
     fig, ax = plt.subplots(figsize=(12, 6))
     plt.style.use("seaborn-v0_8")
 
-    ax.plot(data["fecha"], data["sales_day"], label="Ventas",
+    ax.plot(data["fecha"], data["sales_day"], label= productId,
             marker="o", color="#e63946")
-    ax.plot(data["fecha"], data["stock"], label="Stock",
-            marker="s", color="#457b9d")
+    
 
-    ax.set_title("Stock y Ventas (Interpolado)", fontsize=16, fontweight="bold")
+    ax.set_title(f"Ventas diarias de {month},{year}", fontsize=16, fontweight="bold")
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Cantidad")
 
+    # === Recta de tendencia ===
+    # Convertir fechas a valores numéricos (ordinales)
+    x = mdates.date2num(data["fecha"])
+    y = data["sales_day"]
+
+    # Ajuste lineal
+    coeffs = np.polyfit(x, y, 1)  # pendiente y ordenada
+    trend_fn = np.poly1d(coeffs)
+
+    # Recta suavizada para graficar
+    x_smooth = np.linspace(x.min(), x.max(), 200)
+    y_smooth = trend_fn(x_smooth)
+
+    # Graficar recta de tendencia
+    ax.plot(mdates.num2date(x_smooth), y_smooth,
+            color="#1d3557", linewidth=2, linestyle="--",
+            label="Tendencia")
+    
     # Eje X limpio
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
@@ -180,6 +207,67 @@ def stock_vs_sales(data: pd.DataFrame, productId: str, start_date, end_date):
     fig.savefig("plots/almacen_ventas.png")
     return fig
 
+def sales_velocity(data:pd.DataFrame,productId: str,start_date,end_date):
+    if data.empty:
+        print("Dataset vacío")
+        return None
+    
+    data["avg_daily_sales"] = data["sales_day"].expanding().mean()
+    data["stock_cover"] = data["stock"]/data["avg_daily_sales"]
+
+    data["sales_velocity"] = data["sales_day"].rolling(window=7).mean()
+
+    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+
+    
+    start_date = pd.to_datetime(start_date)
+    end_date   = pd.to_datetime(end_date)
+    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
+    data = data[is_in_period]
+
+    plt.style.use("seaborn-v0_8")
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    # Líneas interpoladas
+    ax.plot(data["fecha"], data["sales_velocity"], label=productId,
+            marker="o", color="#e63946")
+    
+
+    # Título y etiquetas
+    ax.set_title("Rápidez de Ventas (ventas/día)", fontsize=16, fontweight="bold")
+    ax.set_xlabel("Fecha")
+    ax.set_ylabel("Rápidez (cantidad/día)")
+
+
+    # === Recta de tendencia ===
+    # Convertir fechas a valores numéricos (ordinales)
+    x = mdates.date2num(data["fecha"])
+    y = data["sales_velocity"]
+
+    # Ajuste lineal
+    coeffs = np.polyfit(x, y, 1)  # pendiente y ordenada
+    trend_fn = np.poly1d(coeffs)
+
+    # Recta suavizada para graficar
+    x_smooth = np.linspace(x.min(), x.max(), 200)
+    y_smooth = trend_fn(x_smooth)
+
+    # Graficar recta de tendencia
+    ax.plot(mdates.num2date(x_smooth), y_smooth,
+            color="#1d3557", linewidth=2, linestyle="--",
+            label="Tendencia")
+    # Eje X limpio
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    fig.autofmt_xdate(rotation=45, ha="right")  
+
+    
+    ax.grid(False)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig("plots/almacen_v_rapidez_ventas.png")
+
+    return fig
 
 def sales_heat_map(data:pd.DataFrame,productId:str,start_date,end_date):
     """ 
@@ -253,51 +341,7 @@ def sales_hist(data:pd.DataFrame,start_date,end_date):
     return fig
 
 
-def stockCov_vs_salesVel(data:pd.DataFrame,start_date,end_date):
-    if data.empty:
-        print("Dataset vacío")
-        return None
-    
-    data["avg_daily_sales"] = data["sales_day"].expanding().mean()
-    data["stock_cover"] = data["stock"]/data["avg_daily_sales"]
 
-    data["sales_velocity"] = data["sales_day"].rolling(window=7).mean()
-
-    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
-
-    
-    start_date = pd.to_datetime(start_date)
-    end_date   = pd.to_datetime(end_date)
-    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
-    data = data[is_in_period]
-
-    plt.style.use("seaborn-v0_8")
-    fig, ax = plt.subplots(figsize=(12, 6))
-
-    # Líneas interpoladas
-    ax.plot(data["fecha"], data["sales_velocity"], label="Velocidad de Ventas (ventas/día)",
-            marker="o", color="#e63946")
-    ax.plot(data["fecha"], data["stock_cover"], label="Stock Cover",
-            marker="s", color="#457b9d")
-
-    # Título y etiquetas
-    ax.set_title("Rápidez de Ventas", fontsize=16, fontweight="bold")
-    ax.set_xlabel("Fecha")
-    ax.set_ylabel("Ventas")
-
-    # --- Formato de fechas en eje X ---
-    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-    fig.autofmt_xdate(rotation=45, ha="right")  # reemplaza plt.xticks
-
-    # Sin grid
-    ax.grid(False)
-
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig("plots/almacen_v_rapidez_ventas.png")
-
-    return fig
 
 def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="productos"):
     

@@ -121,12 +121,12 @@ os.makedirs("plots", exist_ok=True)
 # GRÁFICAS
 # -----------------------------------------------------------
 
-stock_vs_sales = gr.stock_vs_sales(data,product,start_date=fecha_inicio,end_date=fecha_fin)
+period_sales = gr.period_sales(data,product,start_date=fecha_inicio,end_date=fecha_fin)
 histogram = gr.sales_hist(data[["cantidad","fecha"]],start_date=fecha_inicio,end_date=fecha_fin)
 heat_map = gr.sales_heat_map(global_data,product,start_date=fecha_inicio,end_date=fecha_fin)
 product_priorities = gr.abc_bar_chart(global_data[in_branch],fecha_inicio,fecha_fin,type="productos")
 category_priorities = gr.abc_bar_chart(global_data[in_branch],fecha_inicio,fecha_fin,type="categorias")
-sales_velocity = gr.stockCov_vs_salesVel(data,start_date=fecha_inicio,end_date=fecha_fin)
+sales_velocity = gr.sales_velocity(data,productId=product,start_date=fecha_inicio,end_date=fecha_fin)
 
 
 
@@ -137,7 +137,7 @@ sales_velocity = gr.stockCov_vs_salesVel(data,start_date=fecha_inicio,end_date=f
 
 col1, col2 = st.columns(2)
 with col1:
-    st.pyplot(stock_vs_sales)
+    st.pyplot(period_sales)
 with col2:
     st.pyplot(sales_velocity)
 
