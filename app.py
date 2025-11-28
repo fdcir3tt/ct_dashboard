@@ -145,7 +145,8 @@ with col2:
 # INFO DE PRODUCTO
 # -----------------------------------------------------------
 
-
+cost_per_unit = data["cost"].iloc[0]
+price_range =( data["price"].min() , data["price"].min() )
 category = data[is_product]["category"].iloc[0]
 top_clients = list ( gr.top_n(data[is_product],type="cliente")["client"] )
 
@@ -161,12 +162,19 @@ col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown(f"**Código:** {product}")
     st.markdown(f"**Categoría:** {category}")
+    
 with col2:
-    st.markdown(f"**Mes más vendido:** {top_month}")
-    st.markdown(f"**Día más vendido:** {top_day}")
+    st.markdown(f"**Costo por unidad:** $ {cost_per_unit}")
+
+    if price_range[0]==price_range[1]:
+        st.markdown(f"**Precio por unidad:** $ {price_range[0]}")
+    else:
+        st.markdown(f"**Rango de precios:** $ {price_range[0]} - ${price_range[1]}")
+
 with col3:
     st.markdown(f"**Clientes frecuentes:** {clients_str}")
-
+    st.markdown(f"**Mes más vendido:** {top_month}")
+    st.markdown(f"**Día más vendido:** {top_day}")
 # -----------------------------------------------------------
 # HISTOGRAMA Y MAPA CALOR
 # -----------------------------------------------------------
@@ -184,7 +192,7 @@ with col2:
 
 
 total_sales = data["cantidad"].sum()
-total_cost = total_sales*data["cost"].iloc[0]
+total_cost = total_sales*cost_per_unit
 total_profit = round( data["income"].sum() - total_cost ,2 )
 inventory_t_ratio = 0
 
