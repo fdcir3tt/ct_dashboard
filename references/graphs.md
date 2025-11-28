@@ -1,11 +1,10 @@
 # Gráficos clave
-24 de noviembre 2025
 
-Federico Cirett Torres
+
 
 ## Ventas 
 
-**Objetivo:** Esta gráfica quiere visualizar el comportamiento de las ventas de los productos seleccionados,(máximo 4 productos), para lograr observar posibles tendencias y estacionalidades. 
+**Objetivo:** Esta gráfica quiere visualizar el comportamiento de las ventas de los productos seleccionados,(máximo 4 productos), para lograr observar posibles tendencias y estacionalidades dentro del periodo seleccionado. 
 
 **Variables:** Se toman en cuenta las variables `date` y `sales_{frecuencia}` como los ejes horizontal y vertical respectivamente donde frecuencia indica si se trata de ventas diarias,semanales o mensuales. 
 
@@ -16,7 +15,7 @@ Federico Cirett Torres
 
 ## Rápidez de Ventas
 
-**Objetivo:** Se tiene en mente comparar la velocidad venta de los productos seleccionados,(máximo 4 productos), para ayudar predecir la demanda de dichos productos.
+**Objetivo:** Se tiene en mente comparar la velocidad de venta de los productos seleccionados,(máximo 4 productos), para ayudar predecir la demanda de dichos productos.
 
 **Variables:** Se toman en cuenta las variables `date` y `sales_velocity_{frequency}` como los ejes horizontal y vertical respectivamente donde `frecuency` indica si se trata de ventas diarias,semanales o mensuales.
 
@@ -29,7 +28,7 @@ Federico Cirett Torres
 
 **Objetivo:** Queremos visualizar en general la frecuencia de las cantidades pedidas del producto seleccionado. Sólo se puede seleccionar uno a la vez. Esto ayuda tener una mejor idea en cuanto el umbral mínimo de productos que deben haber en almacen para evitar perder una venta potencial.
 
-**Variables:** Se toman en cuenta las variables `date` y `sales_day` como los ejes horizontal y vertical respectivamente.
+**Variables:** Se toman en cuenta las variables `date` y `quantity` como los ejes horizontal y vertical respectivamente.
 
 **Ejemplo:**
 <p align="center">
@@ -44,7 +43,7 @@ Federico Cirett Torres
 
 **Ejemplo:**
 <p align="center">
-  <img src="../plots/heatmap_ventas_mexico.png?updated=1" alt="dashboard1" width="1000">
+  <img src="../plots/heatmap_ventas_mexico.png?updated=1" alt="dashboard1" width="1000" >
 </p>
 
 ## KPIs
@@ -54,7 +53,7 @@ Federico Cirett Torres
 
 **Variables:** Estos son los KPIs en cuestión y el cómo se obtienen: 
 
-- `total_sales` : Se suman todos los valores de `sales_day` 
+- `total_sales` : Se suman todos los valores de `quantity` 
 
 - `total_profit` : Se suman todos los valores de `profit` 
 
@@ -66,13 +65,13 @@ Federico Cirett Torres
 
 ## Ventas por producto
 
-**Objetivo:** Visualizar productos con prioridad junto con la cantidad de ventas que aportaron durante el periodo.
+**Objetivo:** Visualizar productos con prioridad junto con la cantidad de ventas que aportaron durante el periodo. El criterio de prioridad que se utiliza para asignarle magnitud de prioridad a cada producto es en base cuanto valor aporta al valor total del més.
 
-**Variables:** Se utilizaron las variables `date`,`sales_day`,`cost` para crear las características: 
+**Variables:** Se utilizaron las variables `date`,`quantity`,`cost` para crear las características: 
 
 - `cost` : Costo del producto 
 
-- `total_sales` : Se suman todos los valores de `sales_day` por producto agrupado
+- `total_sales` : Se suman todos los valores de `quantity` por producto agrupado
 
 - `annual_value` : Multiplicación de los valores de `total_sales` y `cost`
 

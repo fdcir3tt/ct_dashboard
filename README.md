@@ -55,10 +55,6 @@ ct_dashboard/
 │
 ├── app.py                    # Punto de entrada principal (main)
 │
-├── pages/                    # Subcarpeta para las páginas (si usas multipage)
-│   ├── 1_Dashboard_General.py
-│   ├── 2_Análisis_Detallado.py
-│   └── 3_Ajustes.py
 │
 ├── data/                     # Datos locales (CSV, JSON, etc.)
 │   ├── ventas.csv
@@ -68,7 +64,7 @@ ct_dashboard/
 │   ├── __init__.py
 │   ├── data_loader.py        # Funciones para cargar datos
 │   ├── preprocess.py         # Limpieza y transformación de datos
-│   ├── charts.py             # Funciones para generar gráficos
+│   ├── graphs.py             # Funciones para generar gráficos
 │   └── utils.py              # Funciones de utilidad (colores, formatos, etc.)
 │
 ├── assets/                   # Recursos estáticos (imágenes, CSS, logos)
