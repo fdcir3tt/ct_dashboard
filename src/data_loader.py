@@ -4,9 +4,11 @@ import pyodbc
 import mysql.connector
 import streamlit as st
 import pandas as pd
+import pyarrow.parquet as pq
+import pyarrow as pa
 from dotenv import load_dotenv
 import shutil
-from datetime import datetime
+import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
@@ -59,9 +61,26 @@ conn_mysql = mysql.connector.connect(
     database=database
 )
 
+today = datetime.date.today()
+start_date = datetime.date(today.year, today.month, 1)
+end_date = today
+
+def format_columns(df:pd.DataFrame):
+
+    # Renombramiento
+    name_dict_str= os.getenv('NAME_DICT')
+    name_dict = json.loads(name_dict_str)
+
+    # Formatos de columnas
+    type_dict_str= os.getenv('TYPE_DICT')
+    type_dict = json.loads(type_dict_str)
 
 
-def build_query(start_date:str,end_date:str)->str:
+    df = df .astype(type_dict)
+    df  = df .rename(columns=name_dict)
+    return df
+
+def build_query(start_date:datetime.datetime,end_date:datetime.datetime)->str:
     """
     Recibe fecha de inicio y final de periodo y regresa un query
     utilizado para la extracción de la tabla de facturas de venta.
@@ -70,12 +89,11 @@ def build_query(start_date:str,end_date:str)->str:
     start_date := Se espera una fecha con el formato YYYY-MM-DD
     end_date := Se espera una fecha con el formato YYYY-MM-DD
     """
-    fi = datetime.strptime(start_date,"%Y-%m-%d").date()
-    ff = datetime.strptime(end_date,"%Y-%m-%d").date()
-    if fi > ff:
+    
+    if start_date > end_date:
         print("Periodo invalido detectado, fecha inicio comienza después de fecha final")
         return None
-    elif fi == ff:
+    elif start_date == end_date:
         print("Periodo invalido detectado, fecha inicio igual a fecha final")
         return None
     
@@ -124,13 +142,9 @@ def save_last_processed_offset(offset_file: str, offset: int):
 
 
 
-def fetch_and_write_chunk(query:str,
-                          chunk_index:int, 
-                          offset:int, 
-                          chunk_size:int, 
-                          connection_str:str, 
-                          order_column:str, 
-                          temp_dir:str,**kwargs)->int:
+def fetch_and_write_chunk(query:str,chunk_index:int, offset:int, chunk_size:int, connection_str:str, order_column:str, 
+temp_dir:str,file_format:str="parquet",**kwargs)->int:
+    
     conn = pyodbc.connect(connection_str)
 
     query = query + f"""
@@ -141,21 +155,16 @@ def fetch_and_write_chunk(query:str,
     conn.close()
 
     if not df.empty:
-        temp_file = os.path.join(temp_dir, f'chunk_{chunk_index}.csv')
-        df.to_csv(temp_file, index=False)
+        if file_format=="csv":
+            temp_file = os.path.join(temp_dir, f'chunk_{chunk_index}.{file_format}')
+            df.to_csv(temp_file, index=False)
+        if file_format=="parquet":
+            temp_file = os.path.join(temp_dir, f'chunk_{chunk_index}.{file_format}')
+            df.to_parquet(temp_file, index=False,engine="pyarrow")
     return chunk_index
 
-def extract_table_parallel(
-    query:str,
-    output_file: str,
-    connection_str: str,
-    chunk_percent: float = 10,
-    table_name: str = table_name,
-    schema: str = schema,
-    order_column: str = date_col,
-    offset_file: str = 'last_offset.json',
-    max_workers: int = 4,
-    temp_dir:str='./temp_chunks'
+def extract_table_parallel(query:str,output_file: str,connection_str: str,file_format:str="parquet",chunk_percent: float = 10,table_name: str = table_name,schema: str = schema,order_column: str = date_col,offset_file: str = 'last_offset.json',
+max_workers: int = 4,temp_dir:str='./temp_chunks'
 ):
     try:
         print("Conectando para obtener número de filas...")
@@ -218,19 +227,34 @@ def extract_table_parallel(
             return
 
         print(" Unificando archivos...")
+        if file_format=="csv":
+            with open(output_file, 'w', newline='', encoding='utf-8') as out_file:
+                first = True
+                for i in range(total_chunks):
+                    chunk_file = os.path.join(temp_dir, f'chunk_{i}.csv')
+                    if os.path.isfile(chunk_file):
+                        with open(chunk_file, 'r', encoding='utf-8') as f:
+                            if first:
+                                shutil.copyfileobj(f, out_file)
+                                first = False
+                            else:
+                                next(f)  # saltar header
+                                shutil.copyfileobj(f, out_file)
+        if file_format=="parquet":
+            writer = None
 
-        with open(output_file, 'w', newline='', encoding='utf-8') as out_file:
-            first = True
             for i in range(total_chunks):
-                chunk_file = os.path.join(temp_dir, f'chunk_{i}.csv')
-                if os.path.isfile(chunk_file):
-                    with open(chunk_file, 'r', encoding='utf-8') as f:
-                        if first:
-                            shutil.copyfileobj(f, out_file)
-                            first = False
-                        else:
-                            next(f)  # saltar header
-                            shutil.copyfileobj(f, out_file)
+                fchunk = os.path.join(temp_dir, f"chunk_{i}.parquet")
+                if os.path.isfile(fchunk):
+                    table = pq.read_table(fchunk)
+
+                    if writer is None:
+                        writer = pq.ParquetWriter(output_file, table.schema)
+
+                    writer.write_table(table)
+
+            if writer:
+                writer.close()
 
        
         
@@ -245,69 +269,137 @@ def extract_table_parallel(
         print(f" Error crítico: {e}")
 
 
-@st.cache_data
-def load_data(start_date:str="2025-01-01",end_date:str="2025-12-31"):
-    df = pd.read_csv("data/facturas.csv")
-    categories = pd.read_csv("data/categorias.csv")
-    products = pd.read_csv("data/codigos_productos.csv")
-    
-    return df,categories,products
 
-
-#def load_data(start_date:str="2025-01-01",end_date:str="2025-12-31",output_file:str="data/facturas.csv")->tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
-#    """
-#    Función que recibe fecha de inicio y final de periodo junto con ruta de salida
-#    especifícada. Extrae los datos necesarios, los guarda en un archivo csv y los 
-#    carga en un dataframe de pandas.
+#def load_data(start_date:str=start_date,end_date:str=end_date):
+#    df = pd.read_csv("data/facturas.csv")
+#    categories = pd.read_csv("data/categorias.csv")
+#    products = pd.read_csv("data/codigos_productos.csv")
 #    
-#    """
-#    desc_data_file_exists = os.path.exists("data/codigos_productos.csv")
-#    if desc_data_file_exists:
-#        products= pd.read_csv('data/codigos_productos.csv')
-#        products= products.drop(columns='Unnamed: 0')
-#    else:
-#        query = f""" 
-#                    SELECT {art_col},{art_desc},{art_cost}
-#                    FROM {table}
-#        """
-#
-#        products = get_query(query)
-#        products = products.rename(columns={art_col:'PRODUCTO',art_desc:'DESCRIPCION'})
-#        products.to_csv('data/codigos_productos.csv')
+#    return df,categories,products
 
+def update_table(table:str,latest_update:str,save_dir:str="data"):
+    """ 
+    Se especifica cual de las tablas de datos ocupa actualizarse y el último periodo
+    que tiene registrado para no generar una consulta grande.
+
+    """
+    query = build_query (start_date=latest_update,end_date=today)
+
+    extract_table_parallel(query=query,
+                           output_file=f"{save_dir}/{table}_update.parquet",
+                           connection_str=conn_str,
+                           file_format="parquet")
+    
+    update_df = pd.read_parquet(f"{save_dir}/{table}_update.parquet")
+    update_df = format_columns(update_df) 
+
+    outdated_df = pd.read_parquet(f"{save_dir}/{table}.parquet")
+    outdated_df = format_columns(outdated_df)
+
+    df = pd.concat([outdated_df, update_df], ignore_index=True)
+    df.to_parquet(f"{save_dir}/{table}.parquet")
+
+
+def load_product_codes():
+    desc_data_file_exists = os.path.exists("data/codigos_productos.csv")
+    if desc_data_file_exists:
+        df = pd.read_csv('data/codigos_productos.csv')
+        df = df.drop(columns='Unnamed: 0')
+    else:
+        query = f""" 
+                    SELECT {art_col},{art_desc},{art_cost}
+                    FROM {table}
+        """
+
+        df = get_query(query)
+        df = df.rename(columns={art_col:'PRODUCTO',art_desc:'DESCRIPCION'})
+        df.to_csv('data/codigos_productos.csv')
+
+    return df
+
+def load_categories():
+    categories_exist = os.path.exists("data/categorias.parquet")
+    if categories_exist:
+        df = pd.read_parquet("data/categorias.parquet")
+        
+    else:
+        cursor = conn_mysql.cursor(dictionary=True)  # devuelve resultados como diccionarios
+
+        cursor.execute(f"SELECT * FROM {category_table};")
+        rows_category = cursor.fetchall()
+
+        cursor.close()
+        conn_mysql.close()
+
+        df = pd.DataFrame(rows_category)
+        df.to_parquet("data/categorias.parquet")
+    return df
+
+def load_products():
+    products_exist = os.path.exists("data/productos.parquet")
+    if products_exist:
+        
+        df = pd.read_parquet("data/productos.parquet")
+        
+    else:
+        cursor = conn_mysql.cursor(dictionary=True)  # devuelve resultados como diccionarios
+        cursor.execute(f"SELECT * FROM {product_table};")
+        rows_products = cursor.fetchall()
+        
+        cursor.close()
+        conn_mysql.close()
+
+        df = pd.DataFrame(rows_products)
+        df.to_parquet("data/productos.parquet") 
+    return df 
+
+def load_invoices(source_file:str,file_format:str,start_date:str=start_date,end_date:str=end_date)->pd.DataFrame:
+    """
+    Recibe nombre de salida del archivo, su formato y el periodo de las facturas que se quieren
+    extraer. Revisa si esta actualizada la base con ese periodo para no hacer la consulta completa. 
+    """
+    if file_format=="csv":
+        current_df = pd.read_csv("data/facturas.csv")
+    if file_format=="parquet":
+        current_df = pd.read_parquet("data/facturas.parquet")
+    
+    if current_df.empty:
+        query = build_query(start_date,end_date)
+        extract_table_parallel(query= query ,output_file= source_file ,connection_str= conn_str)
+    
+
+    latest_period = datetime.datetime.strptime(current_df[date_col].max(), "%Y-%m-%d").date()
+    not_updated = latest_period < end_date
+    if not_updated:
+        update_table(table="facturas",latest_update=latest_period)
+
+
+    if file_format=="csv":
+        df = pd.read_csv(source_file)
+    if file_format=="parquet":
+        df = pd.read_parquet(source_file)
+    
+    return df
+
+
+def load_data(output_file:str,file_format:str,start_date:str=start_date,end_date:str=end_date)->tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
+    """
+    Función que recibe fecha de inicio y final de periodo junto con ruta de salida
+    especifícada. Extrae los datos necesarios, los guarda en un archivo csv y los 
+    carga en un dataframe de pandas.
+    
+    """
+    # Códigos de productos
+    product_codes = load_product_codes()
 
     # Categorías y productos
-#    categories_exist = os.path.exists("data/categorias.parquet")
-#    products_exist = os.path.exists("data/productos.parquet")
-#    if (categories_exist & products_exist):
-#        categories = pd.read_parquet("data/categorias.parquet")
-#        products = pd.read_parquet("data/productos.parquet")
-        
-#    else:
-#        cursor = conn_mysql.cursor(dictionary=True)  # devuelve resultados como diccionarios
-
-#        cursor.execute(f"SELECT * FROM {category_table};")
-#        rows_category = cursor.fetchall()
-
-#        cursor.execute(f"SELECT * FROM {product_table};")
-#        rows_products = cursor.fetchall()
-#        cursor.close()
-#        conn_mysql.close()
-
-#        categories = pd.DataFrame(rows_category)
-#        products = pd.DataFrame(rows_products)
-
-#        categories.to_parquet("data/categorias.parquet")
-#        products.to_parquet("data/productos.parquet")
-    
+    categories = load_categories()
+    products= load_products()
     
     # Facturas
-#    query = build_query(start_date,end_date)
-#    extract_table_parallel(query= query ,output_file=output_file ,connection_str= conn_str)
-    
-#    df = pd.read_csv(output_file)
+    invoices = load_invoices(source_file=output_file,file_format=file_format,start_date=start_date,end_date=end_date)
 
-#    return df,categories,products
+    return invoices,categories,products,product_codes
 
 
 
