@@ -87,7 +87,7 @@ def top_day(data:pd.DataFrame)->str:
                   2:"Miercoles",
                   3:"Jueves",
                   4:"Viernes",
-                  5:"Dábado",
+                  5:"Sábado",
                   6:"Domingo"}
     
     data["fecha"] = pd.to_datetime(data["fecha"])
@@ -97,18 +97,18 @@ def top_day(data:pd.DataFrame)->str:
     return weekday_dict[df["weekday"].iloc[0]]
 
 def top_month(data:pd.DataFrame)->str:
-    month_dict={  0:"Enero",
-                  1:"Febrero",
-                  2:"Marzo",
-                  3:"Abril",
-                  4:"Mayo",
-                  5:"Junio",
-                  6:"Julio",
-                  7:"Agosto",
-                  8:"Septiembre",
-                  9:"Octubre",
-                  10:"Noviembre",
-                  11:"Diciembre"}
+    month_dict={  1:"Enero",
+                  2:"Febrero",
+                  3:"Marzo",
+                  4:"Abril",
+                  5:"Mayo",
+                  6:"Junio",
+                  7:"Julio",
+                  8:"Agosto",
+                  9:"Septiembre",
+                  10:"Octubre",
+                  11:"Noviembre",
+                  12:"Diciembre"}
     
     data["fecha"] = pd.to_datetime(data["fecha"])
     
@@ -120,18 +120,18 @@ def period_sales(data: pd.DataFrame, productId: str, start_date, end_date):
     """
     Grafica curva de ventas y regresa la figura.
     """
-    month_dict={  0:"Enero",
-                  1:"Febrero",
-                  2:"Marzo",
-                  3:"Abril",
-                  4:"Mayo",
-                  5:"Junio",
-                  6:"Julio",
-                  7:"Agosto",
-                  8:"Septiembre",
-                  9:"Octubre",
-                  10:"Noviembre",
-                  11:"Diciembre"}
+    month_dict={  1:"Enero",
+                  2:"Febrero",
+                  3:"Marzo",
+                  4:"Abril",
+                  5:"Mayo",
+                  6:"Junio",
+                  7:"Julio",
+                  8:"Agosto",
+                  9:"Septiembre",
+                  10:"Octubre",
+                  11:"Noviembre",
+                  12:"Diciembre"}
     # --- Validaciones básicas ---
     if data.empty:
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -161,13 +161,14 @@ def period_sales(data: pd.DataFrame, productId: str, start_date, end_date):
     month = month_dict[ data["month"].iloc[0] ]
     year = data["year"].iloc[0]
     
-    data["sales_day"]   = data.groupby(["productId", "fecha"])["cantidad"].transform("sum")
+    
     # Líneas interpoladas
     if "sales_day" in data:
         data["sales_day"] = data["sales_day"].interpolate(method="linear")
-    
-
-   
+    else:
+        data["sales_day"]   = data.groupby(["productId", "fecha"])["cantidad"].transform("sum")
+        data["sales_day"] = data["sales_day"].interpolate(method="linear")
+        
     fig, ax = plt.subplots(figsize=(12, 6))
     plt.style.use("seaborn-v0_8")
 
@@ -213,8 +214,6 @@ def sales_velocity(data:pd.DataFrame,productId: str,start_date,end_date):
         print("Dataset vacío")
         return None
     
-    data["avg_daily_sales"] = data["sales_day"].expanding().mean()
-    data["stock_cover"] = data["stock"]/data["avg_daily_sales"]
 
     data["sales_velocity"] = data["sales_day"].rolling(window=7).mean()
 

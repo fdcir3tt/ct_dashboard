@@ -40,8 +40,10 @@ st.markdown('<div class="main-header"> Inventario CT International</div>', unsaf
 # CARGA DE DATOS
 # -----------------------------------------------------------
 
-global_data = process_data ()
+global_data = process_data (update=True)
+global_data["income"] = global_data["price"] * global_data["cantidad"]
 data = global_data.copy()
+data["sales_day"]   = data.groupby(["productId", "fecha"])["cantidad"].transform("sum")
 data = gr.remove_outliers(data,"sales_day")
 
 categorias = pd.read_csv("data/categorias.csv")
@@ -104,7 +106,12 @@ branch = st.sidebar.selectbox("Sucursal", branch_list, index=frequent_branch_ind
 
 in_branch = global_data["sucursal"] == branch
 is_product= global_data["productId"]==product
-data = global_data [in_branch&is_product].copy()
+data = global_data [in_branch&is_product&is_in_period].copy()
+data["sales_day"]   = data.groupby(["productId", "fecha"])["cantidad"].transform("sum")
+data["fecha"] = pd.to_datetime(data["fecha"])
+data["month"] = data["fecha"].dt.month
+data["year"] = data["fecha"].dt.year
+data["income"] = data["price"] * data["cantidad"]
 
 
 if outliers=="Sí":
@@ -186,14 +193,37 @@ with col2:
     st.pyplot(heat_map)
 
 
+
 # -----------------------------------------------------------
-# KPIs
+# KPIs (SUCURSAL)
 # -----------------------------------------------------------
 
 
-total_sales = data["cantidad"].sum()
+total_branch_sales = data["cantidad"].sum()
+total_branch_cost = total_branch_sales*cost_per_unit
+total_branch_profit = round( data["income"].sum() - total_branch_cost ,2 )
+branch_inventory_t_ratio = 0
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.markdown(f'<div class="metric-card"><h3>Ventas Totales</h3><h2>{total_branch_sales}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+with col2:
+    st.markdown(f'<div class="metric-card"><h3>Cociente de Inventario</h3><h2>{branch_inventory_t_ratio}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+with col3:
+    st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>${total_branch_profit}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+with col4:
+    st.markdown(f'<div class="metric-card"><h3>Costo Total</h3><h2>${total_branch_cost}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+
+
+
+# -----------------------------------------------------------
+# KPIs (GLOBAL)
+# -----------------------------------------------------------
+
+
+total_sales = global_data [is_product&is_in_period]["cantidad"].sum()
 total_cost = total_sales*cost_per_unit
-total_profit = round( data["income"].sum() - total_cost ,2 )
+total_profit = round( global_data [is_product&is_in_period]["income"].sum() - total_cost ,2 )
 inventory_t_ratio = 0
 
 col1, col2, col3, col4 = st.columns(4)
