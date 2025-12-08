@@ -61,9 +61,9 @@ def process_data(update:bool=False)->pd.DataFrame:
 
     
 
-    data_exists= os.path.exists("data/processed.csv")
-    if (data_exists)&(~update):
-        df=pd.read_csv("data/processed.csv")
+    data_exists= os.path.exists("data/processed.parquet")
+    if (data_exists)&(not update):
+        df=pd.read_parquet("data/processed.parquet")
         return df
     else:
         categories = pd.read_parquet("data/categorias.parquet")
@@ -79,12 +79,15 @@ def process_data(update:bool=False)->pd.DataFrame:
             states_dict = json.load(f)
 
         df["state"] = df["sucursal"].map(states_dict).fillna("UNKNOWN")
-    
+
+        # Categorías
+        df = df.merge(products,how="left",left_on="productId",right_on="clave")
+        df = df.rename(columns={"nombre":"category"})
 
         # Existencia
         df = df.merge(existence,how="inner",left_on="productId",right_on="codigo")
         
         df = df.rename(columns={"ART_COS":"cost"})
-        df.to_csv('data/processed.csv',index=False)
+        df.to_parquet('data/processed.parquet',index=False)
 
     return df

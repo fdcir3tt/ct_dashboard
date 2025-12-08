@@ -70,14 +70,32 @@ def format_columns(df:pd.DataFrame):
     # Renombramiento
     name_dict_str= os.getenv('NAME_DICT')
     name_dict = json.loads(name_dict_str)
+    inverse_name_dict = {v: k for k, v in name_dict.items()}
 
     # Formatos de columnas
     type_dict_str= os.getenv('TYPE_DICT')
     type_dict = json.loads(type_dict_str)
 
+    correct_dtype = True
+    for c in df.columns:
 
-    df = df .astype(type_dict)
-    df  = df .rename(columns=name_dict)
+        is_renamed = c in inverse_name_dict.keys()
+        if is_renamed:
+            expected_dtype = type_dict[ inverse_name_dict[c] ]
+        else:
+            expected_dtype = type_dict[c]
+            
+        is_correct_dtype = str(df[c].dtype)== expected_dtype
+        correct_dtype = correct_dtype & is_correct_dtype
+    
+
+    if not correct_dtype:
+        df = df.astype(type_dict)
+
+    if not is_renamed:
+        df  = df.rename(columns=name_dict)
+    
+    
     return df
 
 def build_query(start_date:datetime.datetime,end_date:datetime.datetime)->str:
@@ -360,15 +378,16 @@ def load_invoices(source_file:str,file_format:str,start_date:str=start_date,end_
     """
     if file_format=="csv":
         current_df = pd.read_csv("data/facturas.csv")
+        current_df = format_columns(current_df)
     if file_format=="parquet":
         current_df = pd.read_parquet("data/facturas.parquet")
-    
+        current_df = format_columns(current_df)
     if current_df.empty:
         query = build_query(start_date,end_date)
         extract_table_parallel(query= query ,output_file= source_file ,connection_str= conn_str)
     
 
-    latest_period = datetime.datetime.strptime(current_df[date_col].max(), "%Y-%m-%d").date()
+    latest_period = current_df["fecha"].max().date()
     not_updated = latest_period < end_date
     if not_updated:
         update_table(table="facturas",latest_update=latest_period)

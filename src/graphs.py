@@ -160,7 +160,8 @@ def period_sales(data: pd.DataFrame, productId: str, start_date, end_date):
     data = data[data["productId"] == productId].copy()
     month = month_dict[ data["month"].iloc[0] ]
     year = data["year"].iloc[0]
-
+    
+    data["sales_day"]   = data.groupby(["productId", "fecha"])["cantidad"].transform("sum")
     # Líneas interpoladas
     if "sales_day" in data:
         data["sales_day"] = data["sales_day"].interpolate(method="linear")
