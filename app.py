@@ -97,8 +97,10 @@ product = st.sidebar.selectbox("Producto", product_list ,index = top_product_ind
 
 fecha_inicio = st.sidebar.date_input("Inicio", start_date)
 fecha_fin = st.sidebar.date_input("Fin", today)
-outliers= st.sidebar.radio("Análisis con ventas anomalas incluídas", ["No","Sí"])
+fecha_inicio = pd.to_datetime(fecha_inicio)
+fecha_fin   = pd.to_datetime(fecha_fin)
 
+outliers= st.sidebar.radio("Análisis con ventas anomalas incluídas", ["No","Sí"])
 
 
 branch = st.sidebar.selectbox("Sucursal", branch_list, index=frequent_branch_index)
@@ -106,6 +108,8 @@ branch = st.sidebar.selectbox("Sucursal", branch_list, index=frequent_branch_ind
 
 in_branch = global_data["sucursal"] == branch
 is_product= global_data["productId"]==product
+is_in_period = ( fecha_inicio <= global_data["fecha"] ) & ( global_data["fecha"] <= fecha_fin )
+
 data = global_data [in_branch&is_product&is_in_period].copy()
 data["sales_day"]   = data.groupby(["productId", "fecha"])["cantidad"].transform("sum")
 data["fecha"] = pd.to_datetime(data["fecha"])
@@ -131,8 +135,8 @@ os.makedirs("plots", exist_ok=True)
 period_sales = gr.period_sales(data,product,start_date=fecha_inicio,end_date=fecha_fin)
 histogram = gr.sales_hist(data[["cantidad","fecha"]],start_date=fecha_inicio,end_date=fecha_fin)
 heat_map = gr.sales_heat_map(global_data,product,start_date=fecha_inicio,end_date=fecha_fin)
-product_priorities = gr.abc_bar_chart(global_data[in_branch],fecha_inicio,fecha_fin,type="productos")
-category_priorities = gr.abc_bar_chart(global_data[in_branch],fecha_inicio,fecha_fin,type="categorias")
+product_priorities = gr.abc_bar_chart(global_data[in_branch&is_in_period],fecha_inicio,fecha_fin,type="productos")
+category_priorities = gr.abc_bar_chart(global_data[in_branch&is_in_period],fecha_inicio,fecha_fin,type="categorias")
 sales_velocity = gr.sales_velocity(data,productId=product,start_date=fecha_inicio,end_date=fecha_fin)
 
 
@@ -153,7 +157,7 @@ with col2:
 # -----------------------------------------------------------
 
 cost_per_unit = data["cost"].iloc[0]
-price_range =( data["price"].min() , data["price"].min() )
+price_range =( data["price"].min() , data["price"].max() )
 category = data[is_product]["category"].iloc[0]
 top_clients = list ( gr.top_n(data[is_product],type="cliente")["client"] )
 
@@ -176,12 +180,13 @@ with col2:
     if price_range[0]==price_range[1]:
         st.markdown(f"**Precio por unidad:** $ {price_range[0]}")
     else:
-        st.markdown(f"**Rango de precios:** $ {price_range[0]} - ${price_range[1]}")
+        st.markdown(f"**Rango de precios:** $ {price_range[0]} - $ {price_range[1]}")
 
 with col3:
     st.markdown(f"**Clientes frecuentes:** {clients_str}")
     st.markdown(f"**Mes más vendido:** {top_month}")
     st.markdown(f"**Día más vendido:** {top_day}")
+
 # -----------------------------------------------------------
 # HISTOGRAMA Y MAPA CALOR
 # -----------------------------------------------------------
@@ -204,14 +209,12 @@ total_branch_cost = total_branch_sales*cost_per_unit
 total_branch_profit = round( data["income"].sum() - total_branch_cost ,2 )
 branch_inventory_t_ratio = 0
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown(f'<div class="metric-card"><h3>Ventas Totales</h3><h2>{total_branch_sales}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 with col2:
-    st.markdown(f'<div class="metric-card"><h3>Cociente de Inventario</h3><h2>{branch_inventory_t_ratio}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
-with col3:
     st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>${total_branch_profit}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
-with col4:
+with col3:
     st.markdown(f'<div class="metric-card"><h3>Costo Total</h3><h2>${total_branch_cost}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 
 
@@ -226,14 +229,12 @@ total_cost = total_sales*cost_per_unit
 total_profit = round( global_data [is_product&is_in_period]["income"].sum() - total_cost ,2 )
 inventory_t_ratio = 0
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown(f'<div class="metric-card"><h3>Ventas Totales</h3><h2>{total_sales}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 with col2:
-    st.markdown(f'<div class="metric-card"><h3>Cociente de Inventario</h3><h2>{inventory_t_ratio}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
-with col3:
     st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>${total_profit}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
-with col4:
+with col3:
     st.markdown(f'<div class="metric-card"><h3>Costo Total</h3><h2>${total_cost}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 
 

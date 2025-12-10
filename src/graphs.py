@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
+from matplotlib.ticker import MaxNLocator
 
 
 def remove_outliers(data: pd.DataFrame, column: str) -> pd.DataFrame:
@@ -180,6 +181,7 @@ def period_sales(data: pd.DataFrame, productId: str, start_date, end_date):
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Cantidad")
 
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     # === Recta de tendencia ===
     # Convertir fechas a valores numéricos (ordinales)
     x = mdates.date2num(data["fecha"])
@@ -198,6 +200,7 @@ def period_sales(data: pd.DataFrame, productId: str, start_date, end_date):
             color="#1d3557", linewidth=2, linestyle="--",
             label="Tendencia")
     
+
     # Eje X limpio
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
@@ -215,7 +218,7 @@ def sales_velocity(data:pd.DataFrame,productId: str,start_date,end_date):
         return None
     
 
-    data["sales_velocity"] = data["sales_day"].rolling(window=7).mean()
+    data["sales_velocity"] = data["sales_day"].rolling(window=2).mean()
 
     data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
 
@@ -237,7 +240,7 @@ def sales_velocity(data:pd.DataFrame,productId: str,start_date,end_date):
     ax.set_title("Rápidez de Ventas (ventas/día)", fontsize=16, fontweight="bold")
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Rápidez (cantidad/día)")
-
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
     # === Recta de tendencia ===
     # Convertir fechas a valores numéricos (ordinales)
@@ -293,7 +296,7 @@ def sales_heat_map(data:pd.DataFrame,productId:str,start_date,end_date):
     
     
     # --- Graficar heatmap --- #
-    fig, ax = plt.subplots(1, 1, figsize=(12, 12))
+    fig, ax = plt.subplots(1, 1, figsize=(12, 7))
     mexico_estados.plot(
         column="cantidad", 
         cmap="Blues",        # paleta más atractiva
@@ -329,11 +332,43 @@ def sales_hist(data:pd.DataFrame,start_date,end_date):
     
 
     fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Bins alineados a enteros
+    min_val = int(data["cantidad"].min())
+    max_value = int(data["cantidad"].max())
+    bins = range(min_val,max_value+10)
+    
+    counts, bin_edges, patches = ax.hist(data["cantidad"], 
+            bins=bins, 
+            color='blue', 
+            edgecolor='black')
+    
+    # --- Etiquetas debajo de cada barra ---
+    for i, patch in enumerate(patches):
+        x_center = patch.get_x() + patch.get_width() / 2
+        x_value  = int(bin_edges[i])  # valor del bin (entero)
 
-    ax.hist(data["cantidad"], bins=15, color='blue', edgecolor='black')
+        ax.text(
+            x_center,                # centrado
+            -0.5,                    # debajo del eje X
+            str(x_value),            # etiqueta
+            ha='center',
+            va='top',
+            fontsize=9
+        )
+
+    # Ocultar etiquetas del eje X
+    ax.set_xticks([])
+
     ax.set_title("Frecuencia de Ventas", fontsize=14, fontweight='bold')
     ax.set_xlabel("Ventas diarias")
     ax.set_ylabel("Frecuencia")
+
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+    # Expandir ligeramente el espacio inferior para que quepan etiquetas
+    plt.subplots_adjust(bottom=0.15)
+
     ax.grid(axis='y', linestyle='--', alpha=0.7)
 
     fig.tight_layout()
