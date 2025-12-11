@@ -117,7 +117,7 @@ def top_month(data:pd.DataFrame)->str:
     df = df.sort_values(by="avg_rate",ascending=False)
     return month_dict[df["month"].iloc[0]]
 
-def period_sales(data: pd.DataFrame, productId: str, start_date, end_date):
+def period_sales(data: pd.DataFrame, productIds: list[str], start_date, end_date):
     """
     Grafica curva de ventas y regresa la figura.
     """
@@ -157,8 +157,9 @@ def period_sales(data: pd.DataFrame, productId: str, start_date, end_date):
     in_period = (data["fecha"] >= start_date) & (data["fecha"] <= end_date)
     data = data[in_period]
 
-    # Filtro por producto
-    data = data[data["productId"] == productId].copy()
+    # Filtro por productos
+    in_products = data["productId"].isin(productIds)
+    data = data[in_products].copy()
     month = month_dict[ data["month"].iloc[0] ]
     year = data["year"].iloc[0]
     
@@ -172,33 +173,41 @@ def period_sales(data: pd.DataFrame, productId: str, start_date, end_date):
         
     fig, ax = plt.subplots(figsize=(12, 6))
     plt.style.use("seaborn-v0_8")
-
-    ax.plot(data["fecha"], data["sales_day"], label= productId,
-            marker="o", color="#e63946")
     
+    colors = ["#e63947","#39e6c9","#0400ff","#e43d0a"]
+    i = 0
+    for id in productIds:
+        is_product = data["productId"]==id
+        plot_df = data[is_product]
+        ax.plot(plot_df["fecha"], plot_df["sales_day"], label= id,
+                marker="o", color=colors[i])
+    
+    # === Recta de tendencia === #
+        # Convertir fechas a valores numéricos (ordinales)
+        
+        x = mdates.date2num(plot_df["fecha"])
+        y = plot_df["sales_day"]
 
+        # Ajuste lineal
+        coeffs = np.polyfit(x, y, 1)  # pendiente y ordenada
+        trend_fn = np.poly1d(coeffs)
+
+        # Recta suavizada para graficar
+        x_smooth = np.linspace(x.min(), x.max(), 200)
+        y_smooth = trend_fn(x_smooth)
+
+        # Graficar recta de tendencia
+        ax.plot(mdates.num2date(x_smooth), y_smooth,
+                color=colors[i], linewidth=2, linestyle="--",
+                label="Tendencia")
+        i+=1
+        
     ax.set_title(f"Ventas diarias de {month},{year}", fontsize=16, fontweight="bold")
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Cantidad")
 
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-    # === Recta de tendencia ===
-    # Convertir fechas a valores numéricos (ordinales)
-    x = mdates.date2num(data["fecha"])
-    y = data["sales_day"]
-
-    # Ajuste lineal
-    coeffs = np.polyfit(x, y, 1)  # pendiente y ordenada
-    trend_fn = np.poly1d(coeffs)
-
-    # Recta suavizada para graficar
-    x_smooth = np.linspace(x.min(), x.max(), 200)
-    y_smooth = trend_fn(x_smooth)
-
-    # Graficar recta de tendencia
-    ax.plot(mdates.num2date(x_smooth), y_smooth,
-            color="#1d3557", linewidth=2, linestyle="--",
-            label="Tendencia")
+    
     
 
     # Eje X limpio

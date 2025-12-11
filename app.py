@@ -6,7 +6,6 @@ import os
 import src.graphs as gr  
 from src.preprocess import process_data
 
-
 # -----------------------------------------------------------
 # CONFIGURACIÓN INICIAL
 # -----------------------------------------------------------
@@ -92,7 +91,9 @@ selected_categories = st.sidebar.multiselect("Categorías", data["category"].uni
 is_category = data["category"].isin(selected_categories)
 
 
-product = st.sidebar.selectbox("Producto", product_list ,index = top_product_index)
+products = st.sidebar.multiselect("Producto(s)", product_list ,default = [ product_list[top_product_index] ],max_selections=4 )
+main_product = st.sidebar.radio("Producto de análisis",options= products)
+
 
 
 fecha_inicio = st.sidebar.date_input("Inicio", start_date)
@@ -107,10 +108,12 @@ branch = st.sidebar.selectbox("Sucursal", branch_list, index=frequent_branch_ind
 
 
 in_branch = global_data["sucursal"] == branch
-is_product= global_data["productId"]==product
+in_products= global_data["productId"].isin(products)
+is_global_product = global_data["productId"]==main_product
 is_in_period = ( fecha_inicio <= global_data["fecha"] ) & ( global_data["fecha"] <= fecha_fin )
 
-data = global_data [in_branch&is_product&is_in_period].copy()
+data = global_data [in_branch&in_products&is_in_period].copy()
+is_product = data["productId"]==main_product
 data["sales_day"]   = data.groupby(["productId", "fecha"])["cantidad"].transform("sum")
 data["fecha"] = pd.to_datetime(data["fecha"])
 data["month"] = data["fecha"].dt.month
@@ -132,12 +135,12 @@ os.makedirs("plots", exist_ok=True)
 # GRÁFICAS
 # -----------------------------------------------------------
 
-period_sales = gr.period_sales(data,product,start_date=fecha_inicio,end_date=fecha_fin)
-histogram = gr.sales_hist(data[["cantidad","fecha"]],start_date=fecha_inicio,end_date=fecha_fin)
-heat_map = gr.sales_heat_map(global_data,product,start_date=fecha_inicio,end_date=fecha_fin)
+period_sales = gr.period_sales(data,products,start_date=fecha_inicio,end_date=fecha_fin)
+histogram = gr.sales_hist(data[is_product][["cantidad","fecha"]],start_date=fecha_inicio,end_date=fecha_fin)
+heat_map = gr.sales_heat_map(global_data,main_product,start_date=fecha_inicio,end_date=fecha_fin)
 product_priorities = gr.abc_bar_chart(global_data[in_branch&is_in_period],fecha_inicio,fecha_fin,type="productos")
 category_priorities = gr.abc_bar_chart(global_data[in_branch&is_in_period],fecha_inicio,fecha_fin,type="categorias")
-sales_velocity = gr.sales_velocity(data,productId=product,start_date=fecha_inicio,end_date=fecha_fin)
+sales_velocity = gr.sales_velocity(data,productId=main_product,start_date=fecha_inicio,end_date=fecha_fin)
 
 
 
@@ -171,7 +174,7 @@ top_month = gr.top_month(data[is_product])
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.markdown(f"**Código:** {product}")
+    st.markdown(f"**Código:** {main_product}")
     st.markdown(f"**Categoría:** {category}")
     
 with col2:
@@ -204,9 +207,9 @@ with col2:
 # -----------------------------------------------------------
 
 
-total_branch_sales = data["cantidad"].sum()
+total_branch_sales = data[is_product]["cantidad"].sum()
 total_branch_cost = total_branch_sales*cost_per_unit
-total_branch_profit = round( data["income"].sum() - total_branch_cost ,2 )
+total_branch_profit = round( data[is_product]["income"].sum() - total_branch_cost ,2 )
 branch_inventory_t_ratio = 0
 
 col1, col2, col3 = st.columns(3)
@@ -224,9 +227,9 @@ with col3:
 # -----------------------------------------------------------
 
 
-total_sales = global_data [is_product&is_in_period]["cantidad"].sum()
+total_sales = global_data [is_global_product&is_in_period]["cantidad"].sum()
 total_cost = total_sales*cost_per_unit
-total_profit = round( global_data [is_product&is_in_period]["income"].sum() - total_cost ,2 )
+total_profit = round( global_data [is_global_product&is_in_period]["income"].sum() - total_cost ,2 )
 inventory_t_ratio = 0
 
 col1, col2, col3 = st.columns(3)
