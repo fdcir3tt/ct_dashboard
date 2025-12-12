@@ -233,12 +233,22 @@ with col3:
 # HISTOGRAMA Y MAPA CALOR
 # -----------------------------------------------------------
 
+
+
+
 col1, col2 = st.columns(2)
 with col1:
     st.pyplot(histogram)
 with col2:
-    st.pyplot(heat_map)
-
+    #st.pyplot(heat_map)
+    
+    state = gr.interactive_sales_heat_map(
+        data=global_data,
+        main_element=main_element,
+        element_column=element_column,
+        start_date=fecha_inicio,
+        end_date=fecha_fin
+    )
 
 
 # -----------------------------------------------------------

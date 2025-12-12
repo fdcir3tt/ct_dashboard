@@ -23,7 +23,9 @@ dependencies = [
     "pymongo (>=4.15.4,<5.0.0)",
     "dask[distributed] (>=2025.11.0,<2026.0.0)",
     "bokeh (>=3.8.1,<4.0.0)",
-    "sqlalchemy (>=2.0.44,<3.0.0)"
+    "sqlalchemy (>=2.0.44,<3.0.0)",
+    "folium (>=0.20.0,<0.21.0)",
+    "streamlit-folium (>=0.25.3,<0.26.0)"
 ]
 
 

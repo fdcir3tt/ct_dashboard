@@ -1,11 +1,19 @@
 import pandas as pd
 import geopandas as gpd
 import numpy as np
+import folium
+import streamlit as st
+from streamlit_folium import st_folium
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
 from matplotlib.ticker import MaxNLocator
 
+@st.cache_resource
+def load_mexico_shp():
+    mexico = gpd.read_file("gadm41_MEX_shp/gadm41_MEX_1.shp")
+    mexico["state"] = mexico["NAME_1"].str.upper()
+    return mexico
 
 def remove_outliers(data: pd.DataFrame, column: str) -> pd.DataFrame:
     series = data[column]
@@ -371,6 +379,96 @@ def sales_heat_map(data:pd.DataFrame,main_element:str,element_column:str,start_d
 
     return fig
     
+
+def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_column: str,
+                               start_date, end_date):
+    """
+    Interactive choropleth heat map of Mexico with state selection.
+    """
+    if data.empty:
+        st.warning("Dataset vacío.")
+        return None
+
+    # --- Filter by date ---
+    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
+
+    data = data[(data["fecha"] >= start_date) & (data["fecha"] <= end_date)]
+
+    # --- Filtro de elemento ---
+    df_filtered = data[data[element_column] == main_element]
+    branches = df_filtered[["state","sucursal"]].drop_duplicates()
+    # --- Agregación ---
+    total_sales_per_state = df_filtered.groupby("state")["cantidad"].sum().reset_index()
+
+    
+    mexico = load_mexico_shp()
+
+   
+    merged = mexico.merge(total_sales_per_state, on="state", how="left")
+    #merged = merged.merge(branches, on="state", how="left")
+    merged["cantidad"] = merged["cantidad"].fillna(0)
+    #merged["branches"] = merged.groupby("state")["sucursal"].unique().apply(lambda x: ", ".join(str(i) for i in x))
+
+
+    # --- Mapa de Folium ---
+    m = folium.Map(location=[23.6345, -102.5528],
+                   tiles=None, 
+                   zoom_start=5,
+                   zoom_control=False,     
+                   scrollWheelZoom=False,  
+                   dragging=False,         
+                   doubleClickZoom=False,  
+                   touchZoom=False,
+                   attr=None         
+)   
+    title_html = f'''
+     <h3 align="center" style="font-size:20px"><b>Ventas de {main_element} por Estado</b></h3>
+     '''
+    m.get_root().html.add_child(folium.Element(title_html))
+
+    # --- Choropleth  ---
+    folium.Choropleth(
+        geo_data=merged,
+        name="choropleth",
+        data=merged,
+        columns=["state", "cantidad"],
+        key_on="feature.properties.state",
+        fill_color="Blues",
+        fill_opacity=0.8,
+        line_opacity=0,
+        nan_fill_color="white",
+        legend_name="Ventas",
+    ).add_to(m)
+
+    # ---  Estados clickeables ---
+    folium.GeoJson(
+        merged,
+        tooltip=folium.GeoJsonTooltip(fields=["NAME_1", "cantidad"],
+                                      aliases=["Estado", "Ventas"]),
+        popup=folium.GeoJsonPopup(fields=["NAME_1"], aliases=["Estado"]),
+        name="Estados",
+        style_function=lambda x: {
+            "color": "gray",
+            "weight": 0.5,
+            "fillOpacity": 0  
+        }
+    ).add_to(m)
+
+    # Render map
+    map_data = st_folium(m, width=700, height=420)
+
+    # Extracción de click
+    selected_state = None
+    if map_data and "last_active_drawing" in map_data:
+        props = map_data["last_active_drawing"]
+        if props and "properties" in props:
+            selected_state = props["properties"]["NAME_1"]
+
+   
+
+
 def sales_hist(data:pd.DataFrame,start_date,end_date):
     """
     Función que recibe el dataframe de datos del periodo especificado y 
@@ -430,8 +528,6 @@ def sales_hist(data:pd.DataFrame,start_date,end_date):
     fig.tight_layout()
     fig.savefig("plots/hist_ventas_prod.png")
     return fig
-
-
 
 
 def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="productos"):
