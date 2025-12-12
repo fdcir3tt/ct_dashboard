@@ -117,7 +117,7 @@ def top_month(data:pd.DataFrame)->str:
     df = df.sort_values(by="avg_rate",ascending=False)
     return month_dict[df["month"].iloc[0]]
 
-def period_sales(data: pd.DataFrame, productIds: list[str], start_date, end_date):
+def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_column:str, start_date, end_date):
     """
     Grafica curva de ventas y regresa la figura.
     """
@@ -133,6 +133,9 @@ def period_sales(data: pd.DataFrame, productIds: list[str], start_date, end_date
                   10:"Octubre",
                   11:"Noviembre",
                   12:"Diciembre"}
+    
+
+
     # --- Validaciones básicas ---
     if data.empty:
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -140,7 +143,7 @@ def period_sales(data: pd.DataFrame, productIds: list[str], start_date, end_date
         ax.axis("off")
         return fig
 
-    if "fecha" not in data or "productId" not in data:
+    if "fecha" not in data or element_column not in data:
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
         ax.axis("off")
@@ -157,31 +160,35 @@ def period_sales(data: pd.DataFrame, productIds: list[str], start_date, end_date
     in_period = (data["fecha"] >= start_date) & (data["fecha"] <= end_date)
     data = data[in_period]
 
-    # Filtro por productos
-    in_products = data["productId"].isin(productIds)
-    data = data[in_products].copy()
-    month = month_dict[ data["month"].iloc[0] ]
-    year = data["year"].iloc[0]
+    # Filtro por productos o categorías
+    in_selected = data[element_column].isin(selected_elements)
+    df = data[in_selected].copy()
+    month = month_dict[ df["month"].iloc[0] ]
+    year = df["year"].iloc[0]
     
     
     # Líneas interpoladas
-    if "sales_day" in data:
-        data["sales_day"] = data["sales_day"].interpolate(method="linear")
-    else:
-        data["sales_day"]   = data.groupby(["productId", "fecha"])["cantidad"].transform("sum")
-        data["sales_day"] = data["sales_day"].interpolate(method="linear")
+    
+    df["sales_day"]   = df.groupby([element_column, "fecha"])["cantidad"].transform("sum")
+    df["sales_day"] = df["sales_day"].interpolate(method="linear")
+    
         
     fig, ax = plt.subplots(figsize=(12, 6))
     plt.style.use("seaborn-v0_8")
     
     colors = ["#e63947","#39e6c9","#0400ff","#e43d0a"]
+    no_data_color = "#ee08db"
     i = 0
-    for id in productIds:
-        is_product = data["productId"]==id
-        plot_df = data[is_product]
+    for id in selected_elements:
+        is_element = df[element_column]==id
+        plot_df = df[is_element]
+        if plot_df.empty:
+            ax.plot(plot_df["fecha"], plot_df["sales_day"], label= id+" (no hay datos)",
+                marker="o", color=no_data_color)
+            continue
         ax.plot(plot_df["fecha"], plot_df["sales_day"], label= id,
                 marker="o", color=colors[i])
-    
+        
     # === Recta de tendencia === #
         # Convertir fechas a valores numéricos (ordinales)
         
@@ -221,7 +228,20 @@ def period_sales(data: pd.DataFrame, productIds: list[str], start_date, end_date
     fig.savefig("plots/almacen_ventas.png")
     return fig
 
-def sales_velocity(data:pd.DataFrame,productId: str,start_date,end_date):
+def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,start_date,end_date):
+    month_dict={  1:"Enero",
+                  2:"Febrero",
+                  3:"Marzo",
+                  4:"Abril",
+                  5:"Mayo",
+                  6:"Junio",
+                  7:"Julio",
+                  8:"Agosto",
+                  9:"Septiembre",
+                  10:"Octubre",
+                  11:"Noviembre",
+                  12:"Diciembre"}
+    
     if data.empty:
         print("Dataset vacío")
         return None
@@ -237,13 +257,56 @@ def sales_velocity(data:pd.DataFrame,productId: str,start_date,end_date):
     is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
     data = data[is_in_period]
 
-    plt.style.use("seaborn-v0_8")
-    fig, ax = plt.subplots(figsize=(12, 6))
 
-    # Líneas interpoladas
-    ax.plot(data["fecha"], data["sales_velocity"], label=productId,
-            marker="o", color="#e63946")
+    # Filtro por productos o categorías
+    in_selected = data[element_column].isin(selected_elements)
+    df = data[in_selected].copy()
+    month = month_dict[ df["month"].iloc[0] ]
+    year = df["year"].iloc[0]
     
+    
+    # Líneas interpoladas
+    
+        
+    fig, ax = plt.subplots(figsize=(12, 6))
+    plt.style.use("seaborn-v0_8")
+    
+    colors = ["#e63947","#39e6c9","#0400ff","#e43d0a"]
+    no_data_color = "#ee08db"
+    i = 0
+    for id in selected_elements:
+        is_element = df[element_column]==id
+        plot_df = df[is_element]
+        if plot_df.empty:
+            ax.plot(plot_df["fecha"], plot_df["sales_velocity"], label= id+" (no hay datos)",
+                marker="o", color=no_data_color)
+            continue
+        ax.plot(plot_df["fecha"], plot_df["sales_velocity"], label= id,
+                marker="o", color=colors[i])
+        
+    # === Recta de tendencia === #
+        # Convertir fechas a valores numéricos (ordinales)
+        
+        x = mdates.date2num(plot_df["fecha"])
+        y = plot_df["sales_velocity"]
+
+        # Ajuste lineal
+        coeffs = np.polyfit(x, y, 1)  # pendiente y ordenada
+        trend_fn = np.poly1d(coeffs)
+
+        # Recta suavizada para graficar
+        x_smooth = np.linspace(x.min(), x.max(), 200)
+        y_smooth = trend_fn(x_smooth)
+
+        # Graficar recta de tendencia
+        ax.plot(mdates.num2date(x_smooth), y_smooth,
+                color=colors[i], linewidth=2, linestyle="--",
+                label="Tendencia")
+        i+=1
+
+
+
+
 
     # Título y etiquetas
     ax.set_title("Rápidez de Ventas (ventas/día)", fontsize=16, fontweight="bold")
@@ -251,23 +314,7 @@ def sales_velocity(data:pd.DataFrame,productId: str,start_date,end_date):
     ax.set_ylabel("Rápidez (cantidad/día)")
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
-    # === Recta de tendencia ===
-    # Convertir fechas a valores numéricos (ordinales)
-    x = mdates.date2num(data["fecha"])
-    y = data["sales_velocity"]
-
-    # Ajuste lineal
-    coeffs = np.polyfit(x, y, 1)  # pendiente y ordenada
-    trend_fn = np.poly1d(coeffs)
-
-    # Recta suavizada para graficar
-    x_smooth = np.linspace(x.min(), x.max(), 200)
-    y_smooth = trend_fn(x_smooth)
-
-    # Graficar recta de tendencia
-    ax.plot(mdates.num2date(x_smooth), y_smooth,
-            color="#1d3557", linewidth=2, linestyle="--",
-            label="Tendencia")
+   
     # Eje X limpio
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
@@ -281,7 +328,7 @@ def sales_velocity(data:pd.DataFrame,productId: str,start_date,end_date):
 
     return fig
 
-def sales_heat_map(data:pd.DataFrame,productId:str,start_date,end_date):
+def sales_heat_map(data:pd.DataFrame,main_element:str,element_column:str,start_date,end_date):
     """ 
     Función que recibe el dataframe de datos del periodo especificado y 
     grafíca las ventas sobre un mapa de calor en méxico.
@@ -295,8 +342,8 @@ def sales_heat_map(data:pd.DataFrame,productId:str,start_date,end_date):
     is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
     data = data[is_in_period]
 
-    is_product=data["productId"]==productId
-    df_filtered=data[is_product]
+    is_element=data[element_column]==main_element
+    df_filtered=data[is_element]
 
     total_sales_per_state= df_filtered.groupby(["state"])["cantidad"].sum()
     mexico_estados = gpd.read_file("gadm41_MEX_shp/gadm41_MEX_1.shp")
@@ -317,7 +364,7 @@ def sales_heat_map(data:pd.DataFrame,productId:str,start_date,end_date):
     )
 
     # --- Estética --- #
-    ax.set_title(f"Ventas de {productId} por estado ", fontsize=16, fontweight='bold')
+    ax.set_title(f"Ventas de {main_element} por estado ", fontsize=16, fontweight='bold')
     ax.axis("off")
     fig.savefig("plots/heatmap_ventas_mexico.png")
     fig.patch.set_facecolor('lightgrey')  # fondo del mapa

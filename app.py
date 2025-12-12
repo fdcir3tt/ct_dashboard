@@ -45,8 +45,6 @@ data = global_data.copy()
 data["sales_day"]   = data.groupby(["productId", "fecha"])["cantidad"].transform("sum")
 data = gr.remove_outliers(data,"sales_day")
 
-categorias = pd.read_csv("data/categorias.csv")
-categorias = list(categorias["nombre"])
 
 # -----------------------------------------------------------
 # VALORES PREDETERMINADOS
@@ -82,18 +80,36 @@ frequent_branch= (
 branch_list = list( data[is_top_product]["sucursal"].unique() )
 frequent_branch_index = branch_list.index(frequent_branch)
 
+
+top_category= (
+    data[is_in_period]
+    .groupby("category")["cantidad"]
+    .sum()
+    .idxmax()
+)
+category_list = list( data["category"].unique() )
+top_category_index = category_list.index(top_category)
+
+
 # -----------------------------------------------------------
 # FILTROS
 # -----------------------------------------------------------
 
 st.sidebar.header("Filtros")
-selected_categories = st.sidebar.multiselect("Categorías", data["category"].unique(),default=data["category"].unique())
-is_category = data["category"].isin(selected_categories)
 
+analysis_lvl = st.sidebar.radio("Nivel de análisis",options=["Productos","Categorías"] )
 
-products = st.sidebar.multiselect("Producto(s)", product_list ,default = [ product_list[top_product_index] ],max_selections=4 )
-main_product = st.sidebar.radio("Producto de análisis",options= products)
+if analysis_lvl=="Categorías":
+    products = []
+    categories = st.sidebar.multiselect(label="Categorías",options= data["category"].unique(),default=[top_category] ,max_selections=4)
+    main_element = st.sidebar.radio("Categoría de análisis",options=categories)
 
+if analysis_lvl=="Productos":
+    categories = []
+    products = st.sidebar.multiselect("Producto(s)", product_list ,
+                                    default = [ top_product ],
+                                    max_selections= 4 )
+    main_element = st.sidebar.radio("Producto de análisis",options= products)
 
 
 fecha_inicio = st.sidebar.date_input("Inicio", start_date)
@@ -106,15 +122,21 @@ outliers= st.sidebar.radio("Análisis con ventas anomalas incluídas", ["No","S�
 
 branch = st.sidebar.selectbox("Sucursal", branch_list, index=frequent_branch_index)
 
+selected_elements = {"Productos":products,
+                     "Categorías":categories}[analysis_lvl]
+element_column = {"Productos":"productId",
+                  "Categorías":"category"}[analysis_lvl]
 
+is_category = data["category"].isin(categories)
 in_branch = global_data["sucursal"] == branch
-in_products= global_data["productId"].isin(products)
-is_global_product = global_data["productId"]==main_product
+in_elements= global_data[element_column].isin(selected_elements)
+is_global_element = global_data[element_column]==main_element
 is_in_period = ( fecha_inicio <= global_data["fecha"] ) & ( global_data["fecha"] <= fecha_fin )
 
-data = global_data [in_branch&in_products&is_in_period].copy()
-is_product = data["productId"]==main_product
-data["sales_day"]   = data.groupby(["productId", "fecha"])["cantidad"].transform("sum")
+data = global_data [in_branch & in_elements & is_in_period].copy()
+is_element = data[element_column]== main_element
+
+data["sales_day"]   = data.groupby([element_column, "fecha"])["cantidad"].transform("sum")
 data["fecha"] = pd.to_datetime(data["fecha"])
 data["month"] = data["fecha"].dt.month
 data["year"] = data["fecha"].dt.year
@@ -135,14 +157,28 @@ os.makedirs("plots", exist_ok=True)
 # GRÁFICAS
 # -----------------------------------------------------------
 
-period_sales = gr.period_sales(data,products,start_date=fecha_inicio,end_date=fecha_fin)
-histogram = gr.sales_hist(data[is_product][["cantidad","fecha"]],start_date=fecha_inicio,end_date=fecha_fin)
-heat_map = gr.sales_heat_map(global_data,main_product,start_date=fecha_inicio,end_date=fecha_fin)
-product_priorities = gr.abc_bar_chart(global_data[in_branch&is_in_period],fecha_inicio,fecha_fin,type="productos")
-category_priorities = gr.abc_bar_chart(global_data[in_branch&is_in_period],fecha_inicio,fecha_fin,type="categorias")
-sales_velocity = gr.sales_velocity(data,productId=main_product,start_date=fecha_inicio,end_date=fecha_fin)
+period_sales = gr.period_sales(data=data,
+                               selected_elements=selected_elements,
+                               element_column=element_column,
+                               start_date=fecha_inicio,end_date=fecha_fin)
+sales_velocity = gr.sales_velocity(data=data,
+                                   selected_elements=selected_elements,
+                                   element_column=element_column,
+                                   start_date=fecha_inicio,end_date=fecha_fin)
 
 
+histogram = gr.sales_hist(data=data[is_element][["cantidad","fecha"]],
+                          start_date=fecha_inicio,end_date=fecha_fin)
+heat_map = gr.sales_heat_map(data=global_data,
+                             main_element=main_element,
+                             element_column=element_column,
+                             start_date=fecha_inicio,end_date=fecha_fin)
+
+
+product_priorities = gr.abc_bar_chart(global_data[in_branch&is_in_period],
+                                      fecha_inicio,fecha_fin,type="productos")
+category_priorities = gr.abc_bar_chart(global_data[in_branch&is_in_period],
+                                       fecha_inicio,fecha_fin,type="categorias")
 
 # -----------------------------------------------------------
 # VENTAS Y RÁPIDEZ DE VENTAS
@@ -161,29 +197,32 @@ with col2:
 
 cost_per_unit = data["cost"].iloc[0]
 price_range =( data["price"].min() , data["price"].max() )
-category = data[is_product]["category"].iloc[0]
-top_clients = list ( gr.top_n(data[is_product],type="cliente")["client"] )
+category = data[is_element]["category"].iloc[0]
+top_clients = list ( gr.top_n(data[is_element],type="cliente")["client"] )
 
 clients_str=''
 for client in top_clients:
     clients_str+=client+','
 clients_str = clients_str[:-1]
 
-top_day = gr.top_day(data[is_product])
-top_month = gr.top_month(data[is_product])
+top_day = gr.top_day(data[is_element])
+top_month = gr.top_month(data[is_element])
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.markdown(f"**Código:** {main_product}")
+    if analysis_lvl=="Productos":
+        st.markdown(f"**Código:** {main_element}")
+    
     st.markdown(f"**Categoría:** {category}")
     
 with col2:
-    st.markdown(f"**Costo por unidad:** $ {cost_per_unit}")
+    if analysis_lvl=="Productos":
+        st.markdown(f"**Costo por unidad:** $ {cost_per_unit}")
 
-    if price_range[0]==price_range[1]:
-        st.markdown(f"**Precio por unidad:** $ {price_range[0]}")
-    else:
-        st.markdown(f"**Rango de precios:** $ {price_range[0]} - $ {price_range[1]}")
+        if price_range[0]==price_range[1]:
+            st.markdown(f"**Precio por unidad:** $ {price_range[0]}")
+        else:
+            st.markdown(f"**Rango de precios:** $ {price_range[0]} - $ {price_range[1]}")
 
 with col3:
     st.markdown(f"**Clientes frecuentes:** {clients_str}")
@@ -207,9 +246,9 @@ with col2:
 # -----------------------------------------------------------
 
 
-total_branch_sales = data[is_product]["cantidad"].sum()
-total_branch_cost = total_branch_sales*cost_per_unit
-total_branch_profit = round( data[is_product]["income"].sum() - total_branch_cost ,2 )
+total_branch_sales = data[is_element]["cantidad"].sum()
+total_branch_cost = data[is_element]["cost"].sum()
+total_branch_profit = round( data[is_element]["income"].sum() - total_branch_cost ,2 )
 branch_inventory_t_ratio = 0
 
 col1, col2, col3 = st.columns(3)
@@ -227,9 +266,9 @@ with col3:
 # -----------------------------------------------------------
 
 
-total_sales = global_data [is_global_product&is_in_period]["cantidad"].sum()
-total_cost = total_sales*cost_per_unit
-total_profit = round( global_data [is_global_product&is_in_period]["income"].sum() - total_cost ,2 )
+total_sales = global_data [is_global_element & is_in_period]["cantidad"].sum()
+total_cost = global_data [is_global_element & is_in_period]["cost"].sum()
+total_profit = round( global_data [is_global_element & is_in_period]["income"].sum() - total_cost ,2 )
 inventory_t_ratio = 0
 
 col1, col2, col3 = st.columns(3)

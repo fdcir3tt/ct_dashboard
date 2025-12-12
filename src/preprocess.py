@@ -3,6 +3,7 @@ import pandas as pd
 import json
 from src.data_loader import get_query,load_data
 import numpy as np
+import streamlit as st
 
 
 def get_existence(existences:str)->int:
@@ -41,6 +42,7 @@ def clean_data()->pd.DataFrame:
     
     return invoices
 
+@st.cache_data
 def process_data(update:bool=False)->pd.DataFrame:
     """
     Agarra el dataset limpio y listo para procesar para generar las variables 
