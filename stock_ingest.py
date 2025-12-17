@@ -2,29 +2,20 @@ import os
 import pandas as pd
 import logging
 import datetime
-from data_loader import load_product_codes,get_query 
+from src.data_loader import load_product_codes,get_query 
 from dotenv import load_dotenv
 from bson import BSON
 from pymongo import MongoClient , UpdateOne
 
 load_dotenv()
-
+today = datetime.datetime.today()
 # -----------------------------------------------------------
 # -----------------------------------------------------------
 id_fields = ["_id","existenciaId","codigo"]
 
-example_date = datetime.date.today()
-example_doc = {   "_id":123,
-                  "inventory":{"values":[1,2],
-                               "date_stored":example_date,
-                               "update_dates":[example_date]},
-                  "date_stored":example_date }
-example_client = MongoClient()
-
-Date = type( example_date )
-Document = type( example_doc )
-Documents = type ( {example_doc["_id"]:example_doc} )
-Client = type ( example_client)
+Date = datetime.datetime
+Document =  dict[str, any]
+Documents = dict[str, Document]
 
 # -----------------------------------------------------------
 # -----------------------------------------------------------
@@ -87,14 +78,17 @@ def connect_to_DB()-> MongoClient:
 # CONSULTA
 # -----------------------------------------------------------
 
-def get_documents() -> tuple[ Documents ,Documents ]:
+def get_documents(client:None) -> tuple[ Documents ,Documents ]:
     """
     Función que retorna conjunto de documentos extraídos de la colección de existencia
     
     :return: Conjunto de documentos extraídos de la colección de existencia e historial
     :rtype: tuple
     """
-    db = connect_to_DB()
+    if client:
+        db = client
+    else:
+        db = connect_to_DB()
 
     consult_info = {"EXISTENCE_COLLECTION":{"filters":{"almacenes.existencia": {"$gt": 0},
                                             "fields":{"codigo":1,"activo":1,"almacenes":1,"_id":1} }},
@@ -160,6 +154,24 @@ def delta_docs(new_doc: Document ,old_doc: Document )-> Document:
 
     return delta_doc
 
+def update_doc(ref_doc:Document,update_doc:Document)-> Document:
+    """
+    Función que recibe el documento de referencia y de actualización para generar un nuevo documento
+    actualizado.
+
+    :param ref_doc: Documento de referencia, el documento que se quiere actualizar.
+    :type ref_doc: Document
+    :param update_doc: Documento con información de actualización.
+    :type update_doc: Document
+    :return: Documento referencia con información de actualización añadida
+    :rtype: Document
+    """
+    updated_doc = ref_doc.copy()
+    for field,value in update_doc:
+        updated_doc[field].append({"valor":value,"fechaRegistro":today})
+        updated_doc["fechaUpdate"] = today
+    
+    return update_doc
 
 def compare_doc_size(ref_doc:Document,update_doc:Document)->tuple[float,bool]:
     """
@@ -175,17 +187,17 @@ def compare_doc_size(ref_doc:Document,update_doc:Document)->tuple[float,bool]:
     :rtype: tuple[float, bool]
     """
     threshold =  16 * (1024**2) # bytes
-    ref_bytes = BSON.encode(ref_doc)
-    update_bytes = BSON.encode(update_doc)
-
-    
+    ref_bytes = BSON.encode ( ref_doc )
     ref_size = len(ref_bytes)
-    update_size = len(update_bytes)
 
-    diff_size = threshold  - (ref_size + update_size)
+    updated_bytes = BSON.encode ( update_doc(ref_doc,update_doc) )
+    updated_size = len(updated_bytes)
+    
+
+    diff_size =  updated_size - ref_size 
 
     diff_size_MB = round ( diff_size / 1024**2 , 2 )
-    can_update = threshold > ref_size + update_size 
+    can_update = threshold > updated_size 
     return diff_size_MB, can_update
 
 
@@ -193,7 +205,7 @@ def compare_doc_size(ref_doc:Document,update_doc:Document)->tuple[float,bool]:
 # INGESTA Y ACTUALIZACIÓN DE DOCS
 # -----------------------------------------------------------
 
-def update_table(updates:Documents):
+def update_table(updates:Documents,client:None):
     """
     Función que recibe los documentos que se quieren actualizar y los documentos que contienen solo la
     información actualizada. Actualiza solo los cambios a la tabla de historial. 
@@ -205,6 +217,10 @@ def update_table(updates:Documents):
 
 
     """
+    if client:
+        db = client
+    else:
+        db = connect_to_DB()
 
     today = datetime.date.today()
     update_ops = []
@@ -229,7 +245,6 @@ def update_table(updates:Documents):
         )
     )
         
-    db = connect_to_DB()
     hist_table = os.getenv("EXISTENCE_HIST_COLLECTION")
     db[hist_table].bulk_write(update_ops, ordered=False)
 
@@ -243,8 +258,12 @@ def update_table(updates:Documents):
 # MAIN PIPELINE
 # -----------------------------------------------------------
 
-def main():
-    db = connect_to_DB()
+def main(client:None):
+
+    if client:
+        db = client
+    else:
+        db = connect_to_DB()
 
     exist_docs ,hist_docs = get_documents()
     product_codes = load_product_codes()
@@ -260,9 +279,9 @@ def main():
         # Comparación de información
         old_doc = {
                 "codigo":h["codigo"],
-                "costo":h["costo"][-1],
-                "activo":h["activo"][-1],
-                "almacen":h["almacen"][-1] }
+                "costo":h["costo"][-1]["valor"],
+                "activo":h["activo"][-1]["valor"],
+                "almacen":h["almacen"][-1]["valor"] }
         
         new_doc = {
                 "codigo":productId,
