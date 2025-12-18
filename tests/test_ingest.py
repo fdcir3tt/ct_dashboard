@@ -1,38 +1,31 @@
 import pytest
 import pandas as pd
 import os
-import shutil
-import re
 import datetime
 import mongomock
 import random
 from datetime import datetime, timedelta, timezone
 from bson import ObjectId
 from dotenv import load_dotenv
-from  stock_ingest import *
-from deepdiff import DeepDiff
+from  ingest import *
+
 
 load_dotenv()
 
 
+fixed_beginning = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+fixed_today = datetime(2025, 16, 12, 11, 27, 0, tzinfo=timezone.utc)
+random.seed(42)
 
 # -----------------------------------------------
 # BASE DE DATOS FALSA
 # -----------------------------------------------
 
-mongo_db = os.getenv("MONGO_DB")
-existence_name = os.getenv("EXISTENCE_COLLECTION") 
-historic_name = os.getenv("EXISTENCE_HIST_COLLECTION") 
-
-
-client = mongomock.MongoClient()
-db = client[mongo_db]
-existence_table = db[existence_name]
-historic_table = db[historic_name]
-
-fixed_beginning = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-fixed_today = datetime(2025, 16, 12, 11, 27, 0, tzinfo=timezone.utc)
-random.seed(42)
+# MONGO
+@pytest.fixture
+def mongo_db():
+    client = mongomock.MongoClient()
+    return client["test_db"]
 
 
 def random_date(start:datetime.datetime, end:datetime.datetime, seed =None)->datetime.datetime:
@@ -45,113 +38,129 @@ def random_date(start:datetime.datetime, end:datetime.datetime, seed =None)->dat
 
 
 
-e_docs = [ { "_id":ObjectId(f"64f1a2b3c4d5e6f70123450{i}"),
-             "codigo":f"PROD-0{i}",
-             "activo":random.choice([True, False]),
-             "fechaRegistro":fixed_beginning,
-             "listaPrecios":{ f"precio{k}":random.uniform(50,60) for k in range(1,11)},
-             "existencia":{"pedido":random.randint(0,54*160),"asignado":random.randint(0,54*160)},
-             "almacenes":[ { "almacen":f"{j}A","existencia":random.randint(10*i,100+10*i) } for j in range(54) ],
-             "codigoSAT":2000+i,
-             "updatedExistencia":random_date(fixed_beginning,fixed_today,seed=42),
-             "updateExistencia":random_date(fixed_beginning,fixed_today,seed=69) } for i in range(1,6)]
-
-existence_table.insert_many(e_docs)
-
-
-
-# -----------------------------------------------
-# SIMULACIÓN DE ACTUALIZACIONES 
-# -----------------------------------------------
-
-rngs=[random.Random(i) for i in range(10)]
-update_dates = sorted( [random_date(fixed_beginning,fixed_today,seed=j) for j in range(5)] )
-updates = [ {ObjectId(f"64f1a2b3c4d5e6f70123450{i}"):
-           {"_id":ObjectId(f"507f1f77bcf86cd79943901{i}"),
-             "codigo":f"PROD-0{i}",
-             "activo": rngs[i+j].choice([True, False]) ,
-             "costo": rngs[i+j].uniform(35,47), 
-             "almacenes":[ { f"{ rngs[i+j].randint(0,53) }A":rngs[i+j].randint(10,100) } for _ in range(10) ],
-             
-              } for i in range(1,6)}  for j in range(5)]
-
-# Tabla inicial
-h_dict = {  ObjectId(f"64f1a2b3c4d5e6f70123450{i}"):
-            {  "_id":ObjectId(f"64f1a2b3c4d5e6f70123450{i}"),
-                "existenciaId":ObjectId(f"64f1a2b3c4d5e6f70123450{i}"),
-                "codigo":f"PROD-0{i}",
-                "activo":[
-                    {"valor":e_docs[i]["activo"],"fechaRegistro":fixed_beginning}
-                    ],
-                "costo":[
-                    {"valor":random.uniform(35,47),"fechaRegistro":fixed_beginning}
-                    ],
-                "almacenes":[ 
-                    {"valor":e_docs[i]["almacenes"] ,"fechaRegistro":fixed_beginning } 
-                    ],
-                "fechaRegistro":fixed_beginning
-                } for i in range(1,6)}
-
-
-update_timeline = [  ]
-i = 0
-for update in updates:
-    update_date = update_dates[i]
-    for existenciaId,doc in update.items():
-        for field,value in doc:
-            h_dict[existenciaId][field].append({"valor":value,"fechaRegistro":update_date})
-            h_dict[existenciaId]["fechaUpdate"] = update_date
-    update_timeline.append(h_dict)
-
-h_docs =[ doc for _,doc in h_dict]
-historic_table.insert_many(h_docs)
-
-
-
-
 # -----------------------------------------------
 # PRUEBAS
 # -----------------------------------------------
 
-def test_get_documents():
-
-    def normalize(doc):
-        doc = dict(doc)
-        doc.pop("_id", None)
-        return doc
+def test_get_documents_filters_and_projects(mongo_db,monkeypatch):
+    existence = mongo_db["existence"]
     
-    existence_docs,historic_docs = get_documents()
 
-    # Comparación de información existencia
-    for got, expected in zip(existence_docs, e_docs):
-        assert normalize(got) == normalize(expected) ,"Los documentos recuperados deben contener el mismo contenido que los documentos referencia"
-
-    # Comparación de información histórica
-    for got, expected in zip(historic_docs, h_docs):
-        assert normalize(got) == normalize(expected),"Los documentos recuperados deben contener el mismo contenido que los documentos referencia"
-
-
-
-def test_delta_docs():
-    reference_docs = h_dict.values()
-    updated_docs = update_timeline[0]
-    updates_docs = updates[0].values()
+    existence.insert_many([
+        {"codigo": "PROD1", "activo": True, "almacenes": [{"almacen":"01A","existencia": 5}]},
+        {"codigo": "PROD2", "activo": True, "almacenes": [{"almacen":"03A","existencia": 0}]}
+    ])
     
+
+    monkeypatch.setenv("EXISTENCE_COLLECTION", "existence")
+
+
+    exist_docs = get_documents(mongo_db)
+
+    assert len(exist_docs) == 1
+    assert exist_docs[0]["codigo"] == "PROD1"
+    assert "_id" in exist_docs[0]
+
     
-    for reference,updated,update in zip(reference_docs,updated_docs,updates_docs):
-        existenceId = reference["existenciaId"]
-        got = delta_docs(reference,updated)
-        expect = update
-        assert got == expect , "Se espera que la differencia entre documentos sea la información de actualización"
-
-def test_compare_doc_size():
-    cant_update_doc = 
-    can_update = 
 
 
+def test_get_product_cost_dict(monkeypatch):
+    df = pd.DataFrame({
+        "codigo": ["PROD1", "PROD2"],
+        "costo": [10.0, 20.0]
+    })
 
-def test_update_table():
+    monkeypatch.setenv("ART_TABLE_NAME", "table")
+    monkeypatch.setenv("ARTICLE_COLUMN", "codigo")
+    monkeypatch.setenv("ARTICLE_COST", "costo")
+
+    result = get_product_cost_dict(lambda _: df)
+
+    assert result == {"PROD1": 10.0, "PROD2": 20.0}
+
+
+def test_make_observation():
+    now = datetime(2024, 1, 1, 12, 0, 0)
+    raw_doc = { "_id":ObjectId("64f1a2b3c4d5e6f701234501"),
+             "codigo":"PROD-01",
+             "activo":True,
+             "fechaRegistro":fixed_beginning,
+             "listaPrecios":{ 
+                f"precio{k}":k*10 for k in range(1,11)
+                },
+             "existencia":{
+                "pedido":5,
+                "asignado":5
+                },
+             "almacenes":[ 
+                { "almacen":f"{j}A","existencia":10 } for j in range(54) 
+                ],
+             "codigoSAT":2000,
+             "updatedExistencia":random_date(fixed_beginning,fixed_today,seed=42),
+             "updateExistencia":random_date(fixed_beginning,fixed_today,seed=69) }
+
+
+    productId = raw_doc["codigo"]
+    cost_dict = {"PROD-01":10}
+
+    result = make_observation(raw_doc, cost_dict, now)
+
+    assert result["timestamp"] == now
+    assert result["metaField"]["existenciaId"] == raw_doc["_id"]
+    assert result["metaField"]["codigo"] == "PROD-01"
+    assert result["activo"] is True
+    assert result["costo"] == 10
+
+    assert result["almacenes"]== { f"{j}A":10 for j in range(54)}
 
 
 
-def test_main():
+def test_log_collection_size(monkeypatch):
+    class FakeDB:
+        def command(self, *_):
+            return {
+                "count": 5,
+                "size": 100,
+                "storageSize": 120,
+                "totalSize": 150
+            }
+
+    logs = []
+
+    def fake_logger(msg):
+        logs.append(msg)
+
+    log_collection_size(FakeDB(), "test", fake_logger, num_inserted_docs=3)
+
+    assert "inserted=3" in logs[0]
+    assert "count=5" in logs[0]
+
+def test_main_happy_path(monkeypatch):
+    db = mongomock.MongoClient().db
+    db.history = db["history"]
+
+    monkeypatch.setenv("EXISTENCE_HIST_COLLECTION", "history")
+
+
+    fake_docs = [{"_id": 1, "codigo": "PROD1", "activo": True, "almacenes": []}]
+    fake_costs = {"PROD1": 10}
+
+    def fake_get_docs(db):
+        return fake_docs, []
+
+    def fake_make_obs(doc, costs, now):
+        return {"ok": True}
+
+    logs = []
+
+    main(
+        db=db,
+        now=datetime(2024, 1, 1),
+        get_docs_fn=fake_get_docs,
+        get_costs_fn=lambda: fake_costs,
+        make_obs_fn=fake_make_obs,
+        log_fn=lambda *args, **kwargs: logs.append("logged")
+    )
+
+    assert db.history.count_documents({}) == 1
+    assert logs == ["logged"]
