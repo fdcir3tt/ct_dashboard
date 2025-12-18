@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import logging
 import datetime
-from src.data_loader import load_product_codes,get_query 
+from data_loader import load_product_codes,get_query 
 from dotenv import load_dotenv
 from bson import BSON
 from pymongo import MongoClient , UpdateOne

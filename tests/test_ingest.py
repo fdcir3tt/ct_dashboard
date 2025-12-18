@@ -1,10 +1,9 @@
 import pytest
 import pandas as pd
 import os
-import datetime
 import mongomock
 import random
-from datetime import datetime, timedelta, timezone
+import datetime as dt
 from bson import ObjectId
 from dotenv import load_dotenv
 from  ingest import *
@@ -13,8 +12,8 @@ from  ingest import *
 load_dotenv()
 
 
-fixed_beginning = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-fixed_today = datetime(2025, 16, 12, 11, 27, 0, tzinfo=timezone.utc)
+fixed_beginning = dt.datetime(2024, 1, 1, 12, 0, 0, tzinfo=dt.timezone.utc)
+fixed_today = dt.datetime(2025, 12, 16, 11, 27, 0, tzinfo=dt.timezone.utc)
 random.seed(42)
 
 # -----------------------------------------------
@@ -28,12 +27,12 @@ def mongo_db():
     return client["test_db"]
 
 
-def random_date(start:datetime.datetime, end:datetime.datetime, seed =None)->datetime.datetime:
+def random_date(start:dt.datetime, end:dt.datetime, seed =None)->dt.datetime:
     rng = random.Random(seed)
     delta = end - start
     int_delta = delta.total_seconds()
     random_second = rng.randint(0, int(delta))
-    return start + timedelta(seconds=random_second)
+    return start + dt.timedelta(seconds=random_second)
 
 
 
