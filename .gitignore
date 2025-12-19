@@ -1,6 +1,8 @@
 # Directorios
 data/
 gadm41_MEX_shp/
+__pycache__/
+.pytest_cache/
 
 # Archivos
 .env
