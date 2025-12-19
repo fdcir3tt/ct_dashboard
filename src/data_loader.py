@@ -67,35 +67,27 @@ end_date = today
 
 def format_columns(df:pd.DataFrame):
 
-    # Renombramiento
-    name_dict_str= os.getenv('NAME_DICT')
-    name_dict = json.loads(name_dict_str)
-    inverse_name_dict = {v: k for k, v in name_dict.items()}
+    # Obtener diccionarios de entorno
+    name_dict = json.loads(os.getenv("NAME_DICT"))
+    type_dict = json.loads(os.getenv("TYPE_DICT"))
 
-    # Formatos de columnas
-    type_dict_str= os.getenv('TYPE_DICT')
-    type_dict = json.loads(type_dict_str)
+    df = df.rename(columns=name_dict)
 
-    correct_dtype = True
-    for c in df.columns:
+    # Asegurarse que los tipos coinciden
+    cast_dict = {}
+    for col, dtype in type_dict.items():
+        if col in df.columns:
+            if dtype == "string":
+                continue  
+            elif dtype.startswith("float"):
+                cast_dict[col] = "float64"
+            else:
+                cast_dict[col] = dtype
 
-        is_renamed = c in inverse_name_dict.keys()
-        if is_renamed:
-            expected_dtype = type_dict[ inverse_name_dict[c] ]
-        else:
-            expected_dtype = type_dict[c]
-            
-        is_correct_dtype = str(df[c].dtype)== expected_dtype
-        correct_dtype = correct_dtype & is_correct_dtype
-    
 
-    if not correct_dtype:
-        df = df.astype(type_dict)
+    if cast_dict:
+        df = df.astype(cast_dict)
 
-    if not is_renamed:
-        df  = df.rename(columns=name_dict)
-    
-    
     return df
 
 def build_query(start_date:datetime.datetime,end_date:datetime.datetime)->str:
@@ -288,12 +280,7 @@ max_workers: int = 4,temp_dir:str='./temp_chunks'
 
 
 
-#def load_data(start_date:str=start_date,end_date:str=end_date):
-#    df = pd.read_csv("data/facturas.csv")
-#    categories = pd.read_csv("data/categorias.csv")
-#    products = pd.read_csv("data/codigos_productos.csv")
-#    
-#    return df,categories,products
+
 
 def update_table(table:str,latest_update:str,save_dir:str="data"):
     """ 
@@ -308,13 +295,14 @@ def update_table(table:str,latest_update:str,save_dir:str="data"):
                            connection_str=conn_str,
                            file_format="parquet")
     
-    update_df = pd.read_parquet(f"{save_dir}/{table}_update.parquet")
+    update_df = pd.read_parquet(f"{save_dir}/{table}_update.parquet",dtype_backend="pyarrow")
     update_df = format_columns(update_df) 
 
-    outdated_df = pd.read_parquet(f"{save_dir}/{table}.parquet")
+    outdated_df = pd.read_parquet(f"{save_dir}/{table}.parquet",dtype_backend="pyarrow")
     outdated_df = format_columns(outdated_df)
 
     df = pd.concat([outdated_df, update_df], ignore_index=True)
+    df = df.drop_duplicates(subset=["productId","folio","fecha"])
     df.to_parquet(f"{save_dir}/{table}.parquet")
 
 

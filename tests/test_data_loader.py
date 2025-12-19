@@ -14,15 +14,20 @@ from data_loader import extract_table_parallel, update_table
 @pytest.fixture
 def old_data():
     return pd.DataFrame([{
-        "productId": f"PROD-{i}",
-        "value": i * 10 } for i in range(20) 
+        "id": f"PROD-{i}",
+        "folio":f"FOLIO-{i}",
+        "value": i * 10.0 ,
+        "fecha": datetime.date(2025,12,1)} for i in range(20)
+        
     ])
 
 @pytest.fixture
 def update_data():
     return pd.DataFrame([{
-        "productId": f"PROD-{i}",
-        "value": i * 30 } for i in range(20,40) 
+        "id": f"PROD-{i}",
+        "folio":f"FOLIO-{i}",
+        "value": i * 30.0 ,
+        "fecha": datetime.date(2025,12,5)} for i in range(20,40) 
     ])
 class FakeConn:
     def __init__(self, data):
@@ -59,13 +64,18 @@ def fake_read_sql(query, conn):
     return df.copy()
 
 def fake_read_parquet_factory(old_data, update_data):
-    """Returns a fake read_parquet function with closures"""
-    def fake_read_parquet(path):
+    def fake_read_parquet(path, *args, **kwargs):
         path = str(path)
         if "update" in path:
-            return update_data
-        return old_data
+            return update_data.copy()
+        else:
+            return old_data.copy()
     return fake_read_parquet
+
+def make_fake_extract_table_parallel(update_data):
+    def fake_extract_table_parallel(query, output_file, *args, **kwargs):
+        update_data.to_parquet(output_file)
+    return fake_extract_table_parallel
 
 
 # -----------------------------------------------------------
@@ -111,20 +121,29 @@ def test_update_table_partial(monkeypatch, tmp_path, old_data, update_data):
     
     monkeypatch.setattr("pyodbc.connect", lambda *a, **k: fake_conn)
     monkeypatch.setattr("pandas.read_sql", fake_read_sql)
-    monkeypatch.setattr("data_loader.pd.read_parquet", 
-                        fake_read_parquet_factory(old_data, update_data))
+    monkeypatch.setattr("data_loader.extract_table_parallel", make_fake_extract_table_parallel(update_data))
+    monkeypatch.setenv("TYPE_DICT", '{"id":"string","folio":"string","value":"float","fecha":"datetime64[ns]"}')
+    monkeypatch.setenv("NAME_DICT",'{"id":"productId","value":"price"}')
 
     # Primera actualización
     update_table(
         table="data_table",
-        latest_update=datetime.date(2024, 1, 2),
+        latest_update=datetime.date(2025, 12, 1),
         save_dir=str(tmp_path)
     )
 
     result = pd.read_parquet(table_path)
     expected = pd.concat([old_data, update_data], ignore_index=True).drop_duplicates()
-    assert_frame_equal(result.sort_values("productId").reset_index(drop=True),
-                       expected.sort_values("productId").reset_index(drop=True))
+   
+    expected = expected.rename(columns={"id":"productId","value":"price"})
+    expected = expected.astype({"productId":pd.StringDtype(storage="pyarrow"),
+                                "folio":pd.StringDtype(storage="pyarrow"),
+                                "price":"float",
+                                "fecha":"datetime64[ns]"})
+
+    assert_frame_equal(result.sort_values("folio").reset_index(drop=True),
+                       expected.sort_values("folio").reset_index(drop=True),
+                       check_dtype=False)
 
 def test_update_table_idempotent(monkeypatch, tmp_path, old_data, update_data):
     table_path = tmp_path / "data_table.parquet"
@@ -133,24 +152,31 @@ def test_update_table_idempotent(monkeypatch, tmp_path, old_data, update_data):
     fake_conn = FakeConn(update_data)
     monkeypatch.setattr("pyodbc.connect", lambda *a, **k: fake_conn)
     monkeypatch.setattr("pandas.read_sql", fake_read_sql)
-    monkeypatch.setattr("data_loader.pd.read_parquet", 
-                        fake_read_parquet_factory(old_data, update_data))
+    monkeypatch.setattr("data_loader.extract_table_parallel", make_fake_extract_table_parallel(update_data))
+    monkeypatch.setenv("TYPE_DICT", '{"id":"string","folio":"string","value":"float","fecha":"datetime64[ns]"}')
+    monkeypatch.setenv("NAME_DICT", '{"id":"productId","value":"price"}')
 
     # 2 actualizaciones
     update_table(
         table="data_table",
-        latest_update=datetime.date(2024, 1, 2),
+        latest_update=datetime.date(2025, 12, 1),
         save_dir=str(tmp_path)
     )
     update_table(
         table="data_table",
-        latest_update=datetime.date(2024, 1, 2),
+        latest_update=datetime.date(2025, 12, 1),
         save_dir=str(tmp_path)
     )
 
     result = pd.read_parquet(table_path)
     expected = pd.concat([old_data, update_data], ignore_index=True).drop_duplicates()
+    expected = expected.rename(columns={"id":"productId","value":"price"})
+    expected = expected.astype({"productId":pd.StringDtype(storage="pyarrow"),
+                                "folio":pd.StringDtype(storage="pyarrow"),
+                                "price":"float",
+                                "fecha":"datetime64[ns]"})
 
     # Asegurarse de duplicidad
-    assert_frame_equal(result.sort_values("productId").reset_index(drop=True),
-                       expected.sort_values("productId").reset_index(drop=True))
+    assert_frame_equal(result.sort_values("folio").reset_index(drop=True),
+                       expected.sort_values("folio").reset_index(drop=True),
+                       check_dtype=False)
