@@ -31,7 +31,7 @@ def random_date(start:dt.datetime, end:dt.datetime, seed =None)->dt.datetime:
     rng = random.Random(seed)
     delta = end - start
     int_delta = delta.total_seconds()
-    random_second = rng.randint(0, int(delta))
+    random_second = rng.randint(0, int(int_delta))
     return start + dt.timedelta(seconds=random_second)
 
 
@@ -47,7 +47,7 @@ def test_get_documents_filters_and_projects(mongo_db,monkeypatch):
 
     existence.insert_many([
         {"codigo": "PROD1", "activo": True, "almacenes": [{"almacen":"01A","existencia": 5}]},
-        {"codigo": "PROD2", "activo": True, "almacenes": [{"almacen":"03A","existencia": 0}]}
+        {"codigo": "PROD2", "activo": True, "almacenes": [{"almacen":"03A","existencia": 1}]}
     ])
     
 
@@ -56,7 +56,7 @@ def test_get_documents_filters_and_projects(mongo_db,monkeypatch):
 
     exist_docs = get_documents(mongo_db)
 
-    assert len(exist_docs) == 1
+    assert len(exist_docs) == 2
     assert exist_docs[0]["codigo"] == "PROD1"
     assert "_id" in exist_docs[0]
 
@@ -79,7 +79,7 @@ def test_get_product_cost_dict(monkeypatch):
 
 
 def test_make_observation():
-    now = datetime(2024, 1, 1, 12, 0, 0)
+    now = dt.datetime(2024, 1, 1, 12, 0, 0)
     raw_doc = { "_id":ObjectId("64f1a2b3c4d5e6f701234501"),
              "codigo":"PROD-01",
              "activo":True,
@@ -134,9 +134,9 @@ def test_log_collection_size(monkeypatch):
     assert "inserted=3" in logs[0]
     assert "count=5" in logs[0]
 
-def test_main_happy_path(monkeypatch):
-    db = mongomock.MongoClient().db
-    db.history = db["history"]
+def test_main_happy_path(mongo_db,monkeypatch):
+    
+    history = mongo_db["history"]
 
     monkeypatch.setenv("EXISTENCE_HIST_COLLECTION", "history")
 
@@ -144,22 +144,51 @@ def test_main_happy_path(monkeypatch):
     fake_docs = [{"_id": 1, "codigo": "PROD1", "activo": True, "almacenes": []}]
     fake_costs = {"PROD1": 10}
 
-    def fake_get_docs(db):
-        return fake_docs, []
+    calls = {"docs": 0, "costs": 0}
+    called = {}
+
+    def fake_get_docs(mongo_db):
+        calls["docs"] += 1
+        return fake_docs
+
+    def fake_get_costs():
+        calls["costs"] += 1
+        return fake_costs
 
     def fake_make_obs(doc, costs, now):
+        called["doc"] = doc
+        called["costs"] = costs
+        called["now"] = now
         return {"ok": True}
+
 
     logs = []
 
     main(
-        db=db,
-        now=datetime(2024, 1, 1),
+        database=mongo_db,
+        now=dt.datetime(2024, 1, 1),
         get_docs_fn=fake_get_docs,
-        get_costs_fn=lambda: fake_costs,
+        get_costs_fn=fake_get_costs,
         make_obs_fn=fake_make_obs,
         log_fn=lambda *args, **kwargs: logs.append("logged")
     )
 
-    assert db.history.count_documents({}) == 1
+    
+   
+    assert calls["docs"] == 1
+    assert calls["costs"] == 1
+
+    # Contenido
+    doc = history.find_one()
+    assert doc["ok"] is True
+    assert called["doc"] == fake_docs[0]
+    assert called["costs"] == fake_costs
+    assert called["now"] == dt.datetime(2024, 1, 1)
+
+
+
     assert logs == ["logged"]
+
+
+    assert history.count_documents({}) == 1,"Solo un documento debió ser insertado"
+    assert list(history.find()).__len__() == len(fake_docs)

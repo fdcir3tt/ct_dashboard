@@ -62,8 +62,8 @@ def get_documents(database:None) -> Documents:
 
     consult_info = {
         "EXISTENCE_COLLECTION":{
-            "filters":{"almacenes.existencia": {"$gt": 0},                                
-            "fields":{"codigo":1,"activo":1,"almacenes":1,"_id":1} }
+            "filters":{"almacenes.existencia": {"$gt": 0}},                                
+            "fields":{"codigo":1,"activo":1,"almacenes":1,"_id":1} 
             }          
         }
 
