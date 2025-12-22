@@ -16,6 +16,7 @@ id_fields = ["_id","existenciaId","codigo"]
 Date = datetime.datetime
 Document =  dict[str, any]
 Documents = list[Document]
+BATCH_SIZE = 500
 
 # -----------------------------------------------------------
 # -----------------------------------------------------------
@@ -39,7 +40,7 @@ def connect_to_DB()-> MongoClient:
     existence_table = os.getenv("EXISTENCE_COLLECTION")
     branches_table = os.getenv("BRANCHES_COLLECTION")
 
-    client = MongoClient(conn_uri)
+    client = MongoClient(conn_uri,compressors="zstd,snappy,zlib",maxPoolSize=5)
     db = client[mongo_db]
     return db
 
@@ -76,7 +77,7 @@ def get_documents(database:None) -> Documents:
 
 
     collection = db[table]
-    cursor = collection.find(filters, fields)
+    cursor = collection.find(filters, projection=fields,batch_size=BATCH_SIZE)
         
     result_docs= list(cursor) 
     return result_docs
@@ -189,13 +190,17 @@ def main(database,now,get_docs_fn=get_documents,get_costs_fn=get_product_cost_di
     # Extracción de información
     exist_docs = get_docs_fn(db)
     cost_dict = get_costs_fn()
-
-    # Generar observaciones 
-    insert_docs = [ make_obs_fn(doc,cost_dict,now) for doc in exist_docs ]
     
     # Ingesta
     hist_table = os.getenv("EXISTENCE_HIST_COLLECTION")
-    db[hist_table].insert_many(insert_docs)
+    insert_docs = []
+
+    # Procesamiento por chunks para reducir ancho de banda
+    for i in range(0, len(exist_docs), BATCH_SIZE):
+        chunk = exist_docs[i:i+BATCH_SIZE]
+        docs_to_insert = [make_obs_fn(doc, cost_dict, now) for doc in chunk]
+        db[hist_table].insert_many(docs_to_insert)
+        insert_docs.extend(docs_to_insert)
 
 
     # Loggeo
