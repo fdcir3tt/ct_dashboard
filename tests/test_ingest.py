@@ -165,7 +165,8 @@ def test_main_happy_path(mongo_db,monkeypatch):
     logs = []
 
     main(
-        database=mongo_db,
+        extract_database=mongo_db,
+        insert_database=mongo_db,
         now=dt.datetime(2024, 1, 1),
         get_docs_fn=fake_get_docs,
         get_costs_fn=fake_get_costs,
