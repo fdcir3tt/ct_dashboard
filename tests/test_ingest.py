@@ -104,9 +104,9 @@ def test_make_observation():
 
     result = make_observation(raw_doc, cost_dict, now)
 
-    assert result["timestamp"] == now
-    assert result["metaField"]["existenciaId"] == raw_doc["_id"]
-    assert result["metaField"]["codigo"] == "PROD-01"
+    assert result["fechaRegistro"] == now
+    assert result["productoReferencia"]["existenciaId"] == raw_doc["_id"]
+    assert result["productoReferencia"]["codigo"] == "PROD-01"
     assert result["activo"] is True
     assert result["costo"] == 10
 

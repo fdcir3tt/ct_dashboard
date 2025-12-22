@@ -119,8 +119,8 @@ def make_observation(raw_doc:Document,cost_dictionary:dict,now:datetime.datetime
         if stock > 0 :
             branch_inventories[branch]=stock
 
-    observation = {"timestamp":now,
-                   "metaField":{
+    observation = {"fechaRegistro":now,
+                   "productoReferencia":{
                         "existenciaId":raw_doc["_id"],
                         "codigo":productId
                     },
@@ -135,9 +135,14 @@ def make_observation(raw_doc:Document,cost_dictionary:dict,now:datetime.datetime
 # -----------------------------------------------------------
 # LOGS
 # -----------------------------------------------------------
+LOG_DIR = "log"
+os.makedirs(LOG_DIR, exist_ok=True)
+
+log_filename = datetime.datetime.now().strftime("historic_stats_%Y%m%d_%H%M%S.log")
+log_path = os.path.join(LOG_DIR, log_filename)
 
 logging.basicConfig(
-    filename='mongo_stats.log',
+    filename=log_path,
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
