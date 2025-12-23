@@ -22,7 +22,7 @@ LOG_DIR = "log"
 
 os.makedirs(LOG_DIR, exist_ok=True)
 
-log_filename = datetime.datetime.now().strftime("historic_stats_%Y%m%d_%H%M%S.log")
+log_filename = "historic_stats.log"
 log_path = os.path.join(LOG_DIR, log_filename)
 
 logging.basicConfig(
@@ -71,7 +71,7 @@ def get_documents(database:None) -> Documents:
     :return: Conjunto de documentos extraídos de la colección de existencia e historial
     :rtype: tuple
     """
-    if database:
+    if database is not None:
         db = database
     else:
         db = connect_to_DB(API_CONN,API_NAME)
@@ -113,7 +113,12 @@ def get_product_cost_dict(query_fn=get_query)-> dict :
                  FROM {table}
             """
     df = query_fn(query)
-    cost_dict = df.set_index(art_col).to_dict(orient="index")
+    if df is None or df.empty:
+        raise RuntimeError(
+            "No se pudo obtener costos de productos. "
+            "Revisa la conexión ODBC y variables de entorno."
+        )    
+    #cost_dict = df.set_index(art_col).to_dict(orient="index")
     return dict(zip(df[art_col], df[art_cost]))
 
 
@@ -141,7 +146,7 @@ def make_observation(raw_doc:Document,cost_dictionary:dict,now:datetime.datetime
                         "codigo":productId
                     },
                    "activo":raw_doc["activo"],
-                   "costo":cost_dictionary[productId],
+                   "costo":cost_dictionary.get(productId, 0),
                    "almacenes":branch_inventories,
     
     }
@@ -177,9 +182,6 @@ def log_collection_size(db, collection_name, logger=logging.info, num_inserted_d
 
 
 
-
-
-
 # -----------------------------------------------------------
 # MAIN PIPELINE
 # -----------------------------------------------------------
@@ -187,12 +189,12 @@ def log_collection_size(db, collection_name, logger=logging.info, num_inserted_d
 def main(extract_database=None,insert_database=None,now=datetime.datetime.now(),get_docs_fn=get_documents,get_costs_fn=get_product_cost_dict,make_obs_fn=make_observation,log_fn=log_collection_size):
 
      
-    if extract_database:
+    if extract_database is not None:
         extract_db = extract_database
     else:
         extract_db = connect_to_DB(API_CONN,API_NAME)
     
-    if insert_database:
+    if insert_database is not None:
         insert_db = insert_database
     else: 
         insert_db = connect_to_DB(HISTORIC_CONN,HIST_NAME)
@@ -206,16 +208,17 @@ def main(extract_database=None,insert_database=None,now=datetime.datetime.now(),
     insert_docs = []
     
     # Procesamiento por chunks para reducir ancho de banda
+    num_inserted_docs = 0
     for i in range(0, len(exist_docs), BATCH_SIZE):
         chunk = exist_docs[i:i+BATCH_SIZE]
         docs_to_insert = [make_obs_fn(doc, cost_dict, now) for doc in chunk]
         insert_db[hist_table].insert_many(docs_to_insert)
-        insert_docs.extend(docs_to_insert)
-
+        
+        num_inserted_docs += len(docs_to_insert)
 
     # Loggeo
-    num_inserted_docs = len(insert_docs)
-    log_fn(insert_db,hist_table,num_inserted_docs)
+    
+    log_fn(db=insert_db,collection_name=hist_table,num_inserted_docs=num_inserted_docs)
 
 
 
