@@ -274,10 +274,29 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
                   11:"Noviembre",
                   12:"Diciembre"}
     
-    
+    if data.empty:
+        plot_df = data
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig
+
+    if "fecha" not in data or element_column not in data:
+        plot_df = data
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        #fig.savefig("plots/almacen_ventas.png")
+        return fig
     
 
-    data["sales_velocity"] = data["sales_day"].rolling(window=2).mean()
+    data["sales_velocity"] = (
+    data["sales_day"]
+        .rolling(window=2)
+        .mean()
+        .interpolate(method="linear", limit_direction="both")
+)
+
     data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
 
     
@@ -290,6 +309,14 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
     # Filtro por productos o categorías
     in_selected = data[element_column].isin(selected_elements)
     df = data[in_selected].copy()
+
+    if df.empty:
+        plot_df = df
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig
+    
     month = month_dict[ df["month"].iloc[0] ]
     year = df["year"].iloc[0]
     
@@ -358,103 +385,26 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
         return fig,plot_df
     return fig
 
-    
-def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_column: str,start_date, end_date,val:bool=False,**kwargs):
-    """
-    Interactive choropleth heat map of Mexico with state selection.
-    """
-    if data.empty:
-        st.warning("Dataset vacío.")
-        return None
-
-    # --- Filter by date ---
-    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
-    start_date = pd.to_datetime(start_date)
-    end_date = pd.to_datetime(end_date)
-
-    data = data[(data["fecha"] >= start_date) & (data["fecha"] <= end_date)]
-
-    # --- Filtro de elemento ---
-    is_element = data[element_column] == main_element
-    df_filtered = data[is_element]
-    
-    # --- Agregación ---
-    total_sales_per_state = df_filtered.groupby("state")["cantidad"].sum().reset_index()
-
-    
-    mexico = load_mexico_shp()
-
-   
-    merged = mexico.merge(total_sales_per_state, on="state", how="left")
-    merged["cantidad"] = merged["cantidad"].fillna(0)
-
-
-    # --- Mapa de Folium ---
-    m = folium.Map(location=[23.6345, -102.5528],
-                   tiles=None, 
-                   zoom_start=5,
-                   zoom_control=False,     
-                   scrollWheelZoom=False,  
-                   dragging=False,         
-                   doubleClickZoom=False,  
-                   touchZoom=False,
-                   attr=None         
-)   
-    title_html = f'''
-     <h3 align="center" style="font-size:20px"><b>Ventas de {main_element} por Estado</b></h3>
-     '''
-    m.get_root().html.add_child(folium.Element(title_html))
-
-    # --- Choropleth  ---
-    folium.Choropleth(
-        geo_data=merged,
-        name="choropleth",
-        data=merged,
-        columns=["state", "cantidad"],
-        key_on="feature.properties.state",
-        fill_color="Blues",
-        fill_opacity=0.8,
-        line_opacity=0,
-        nan_fill_color="white",
-        legend_name="Ventas",
-    ).add_to(m)
-
-    # ---  Estados clickeables ---
-    folium.GeoJson(
-        merged,
-        tooltip=folium.GeoJsonTooltip(fields=["NAME_1", "cantidad"],
-                                      aliases=["Estado", "Ventas"]),
-        popup=folium.GeoJsonPopup(fields=["NAME_1"], aliases=["Estado"]),
-        name="Estados",
-        style_function=lambda x: {
-            "color": "gray",
-            "weight": 0.5,
-            "fillOpacity": 0  
-        }
-    ).add_to(m)
-
-    # Render map
-    map_data = st_folium(m, width=700, height=420)
-
-    # Extracción de click
-    selected_state = None
-    if map_data and "last_active_drawing" in map_data:
-        props = map_data["last_active_drawing"]
-        if props and "properties" in props:
-            selected_state = props["properties"]["NAME_1"]
-    if val:
-        merged[element_column] = main_element
-        return None,merged
-
-
 def sales_hist(data:pd.DataFrame,start_date,end_date,main_element:str,element_column:str,val:bool=False,**kwargs):
     """
     Función que recibe el dataframe de datos del periodo especificado y 
     gráfica las curvas de existencia del producto y ventas.
     """
     if data.empty:
-        print("Dataset vacío")
-        return None
+        plot_df = data
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig
+
+    if "fecha" not in data or element_column not in data:
+        plot_df = data
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        #fig.savefig("plots/almacen_ventas.png")
+        return fig
+    
     data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
@@ -464,6 +414,17 @@ def sales_hist(data:pd.DataFrame,start_date,end_date,main_element:str,element_co
     # Filtro por elemento
     is_element = data[element_column] == main_element
     data = data[is_element]
+
+    if data.empty:
+        plot_df = data
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig
+    
+
+    # Rellenar datos faltantes con 0
+    data = data.fillna(0)
 
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -512,6 +473,112 @@ def sales_hist(data:pd.DataFrame,start_date,end_date,main_element:str,element_co
         return fig,data
 
     return fig
+
+
+def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_column: str,start_date, end_date,val:bool=False,**kwargs):
+    """
+    Interactive choropleth heat map of Mexico with state selection.
+    """
+    if data.empty:
+        plot_df = data
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig
+
+    if "fecha" not in data or element_column not in data:
+        plot_df = data
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        #fig.savefig("plots/almacen_ventas.png")
+        return fig
+
+    # --- Filter by date ---
+    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
+
+    data = data[(data["fecha"] >= start_date) & (data["fecha"] <= end_date)]
+
+    # --- Filtro de elemento ---
+    is_element = data[element_column] == main_element
+    df_filtered = data[is_element]
+    if df_filtered.empty:
+        plot_df = df_filtered
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig,data
+    # --- Agregación ---
+    total_sales_per_state = df_filtered.groupby("state")["cantidad"].sum().reset_index()
+
+    
+    mexico = load_mexico_shp()
+
+   
+    merged = mexico.merge(total_sales_per_state, on="state", how="left")
+    merged["cantidad"] = merged["cantidad"].fillna(0)
+
+
+    # --- Mapa de Folium ---
+    m = folium.Map(location=[23.6345, -102.5528],
+                   tiles=None, 
+                   zoom_start=5,
+                   zoom_control=False,     
+                   scrollWheelZoom=False,  
+                   dragging=False,         
+                   doubleClickZoom=False,  
+                   touchZoom=False,
+                   attr=None         
+)   
+    title_html = f'''
+     <h3 align="center" style="font-size:20px"><b>Ventas de {main_element} por Estado</b></h3>
+     '''
+    m.get_root().html.add_child(folium.Element(title_html))
+    if val:
+        merged[element_column] = main_element
+    
+        return None,merged
+    # --- Choropleth  ---
+    folium.Choropleth(
+        geo_data=merged,
+        name="choropleth",
+        data=merged,
+        columns=["state", "cantidad"],
+        key_on="feature.properties.state",
+        fill_color="Blues",
+        fill_opacity=0.8,
+        line_opacity=0,
+        nan_fill_color="white",
+        legend_name="Ventas",
+    ).add_to(m)
+
+    # ---  Estados clickeables ---
+    folium.GeoJson(
+        merged,
+        tooltip=folium.GeoJsonTooltip(fields=["NAME_1", "cantidad"],
+                                      aliases=["Estado", "Ventas"]),
+        popup=folium.GeoJsonPopup(fields=["NAME_1"], aliases=["Estado"]),
+        name="Estados",
+        style_function=lambda x: {
+            "color": "gray",
+            "weight": 0.5,
+            "fillOpacity": 0  
+        }
+    ).add_to(m)
+
+    # Render map
+    map_data = st_folium(m, width=700, height=420)
+
+    # Extracción de click
+    selected_state = None
+    if map_data and "last_active_drawing" in map_data:
+        props = map_data["last_active_drawing"]
+        if props and "properties" in props:
+            selected_state = props["properties"]["NAME_1"]
+    
+
 
 
 def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,branch:str,type:str="productos",val:bool=False,**kwargs):
