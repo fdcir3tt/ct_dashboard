@@ -16,6 +16,10 @@ def load_mexico_shp():
     mexico["state"] = mexico["NAME_1"].str.upper()
     return mexico
 
+# -----------------------------------------------------------
+# AUXILIARES
+# -----------------------------------------------------------
+
 def remove_outliers(data: pd.DataFrame, column: str) -> pd.DataFrame:
     series = data[column]
     
@@ -126,6 +130,10 @@ def top_month(data:pd.DataFrame)->str:
     df = df.sort_values(by="avg_rate",ascending=False)
     return month_dict[df["month"].iloc[0]]
 
+# -----------------------------------------------------------
+# GRÄFICAS
+# -----------------------------------------------------------
+
 def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_column:str, start_date, end_date,val:bool=False,**kwargs)->Figure:
     """
     Grafica curva de ventas y regresa la figura.
@@ -175,6 +183,14 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     # Filtro por productos o categorías
     in_selected = data[element_column].isin(selected_elements)
     df = data[in_selected].copy()
+
+    if df.empty:
+        plot_df = df
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig
+    
     month = month_dict[ df["month"].iloc[0] ]
     year = df["year"].iloc[0]
     
@@ -343,8 +359,7 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
     return fig
 
     
-def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_column: str,
-                               start_date, end_date,val:bool=False,**kwargs):
+def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_column: str,start_date, end_date,val:bool=False,**kwargs):
     """
     Interactive choropleth heat map of Mexico with state selection.
     """
