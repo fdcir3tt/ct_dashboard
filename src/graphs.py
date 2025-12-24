@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
 from matplotlib.ticker import MaxNLocator
+from matplotlib.figure import Figure
 
 @st.cache_resource
 def load_mexico_shp():
@@ -125,7 +126,7 @@ def top_month(data:pd.DataFrame)->str:
     df = df.sort_values(by="avg_rate",ascending=False)
     return month_dict[df["month"].iloc[0]]
 
-def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_column:str, start_date, end_date):
+def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_column:str, start_date, end_date,val:bool=False,**kwargs)->Figure:
     """
     Grafica curva de ventas y regresa la figura.
     """
@@ -146,17 +147,20 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
 
     # --- Validaciones básicas ---
     if data.empty:
+        plot_df = data
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
         ax.axis("off")
         return fig
 
     if "fecha" not in data or element_column not in data:
+        plot_df = data
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
         ax.axis("off")
-        fig.savefig("plots/almacen_ventas.png")
+        #fig.savefig("plots/almacen_ventas.png")
         return fig
+    
 
     # --- Asegurar que las fechas SON datetime ---
     data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
@@ -198,7 +202,8 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
                 marker="o", color=colors[i])
         
     # === Recta de tendencia === #
-        # Convertir fechas a valores numéricos (ordinales)
+
+    # Convertir fechas a valores numéricos (ordinales)
         
         x = mdates.date2num(plot_df["fecha"])
         y = plot_df["sales_day"]
@@ -233,10 +238,13 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     plt.grid(False)
     plt.legend()
     plt.tight_layout()
-    fig.savefig("plots/almacen_ventas.png")
+    
+    if val:
+        return fig,plot_df
+    
     return fig
 
-def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,start_date,end_date):
+def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,start_date,end_date,val:bool=False,**kwargs):
     month_dict={  1:"Enero",
                   2:"Febrero",
                   3:"Marzo",
@@ -250,13 +258,10 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
                   11:"Noviembre",
                   12:"Diciembre"}
     
-    if data.empty:
-        print("Dataset vacío")
-        return None
+    
     
 
     data["sales_velocity"] = data["sales_day"].rolling(window=2).mean()
-
     data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
 
     
@@ -332,56 +337,14 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
     ax.grid(False)
     ax.legend()
     fig.tight_layout()
-    fig.savefig("plots/almacen_v_rapidez_ventas.png")
-
+    
+    if val:
+        return fig,plot_df
     return fig
 
-def sales_heat_map(data:pd.DataFrame,main_element:str,element_column:str,start_date,end_date):
-    """ 
-    Función que recibe el dataframe de datos del periodo especificado y 
-    grafíca las ventas sobre un mapa de calor en méxico.
-    """
-    if data.empty:
-        print("Dataset vacío")
-        return None
-    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
-    start_date = pd.to_datetime(start_date)
-    end_date   = pd.to_datetime(end_date)
-    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
-    data = data[is_in_period]
-
-    is_element=data[element_column]==main_element
-    df_filtered=data[is_element]
-
-    total_sales_per_state= df_filtered.groupby(["state"])["cantidad"].sum()
-    mexico_estados = gpd.read_file("gadm41_MEX_shp/gadm41_MEX_1.shp")
-    mexico_estados["state"] = mexico_estados["NAME_1"].str.upper()
-    mexico_estados = mexico_estados.merge(total_sales_per_state, left_on="state",right_on="state")
     
-    
-    # --- Graficar heatmap --- #
-    fig, ax = plt.subplots(1, 1, figsize=(12, 7))
-    mexico_estados.plot(
-        column="cantidad", 
-        cmap="Blues",        # paleta más atractiva
-        linewidth=0.5, 
-        edgecolor="white",    # bordes blancos suaves
-        legend=True, 
-        legend_kwds={'shrink': 0.6, 'label': "Ventas"}, 
-        ax=ax
-    )
-
-    # --- Estética --- #
-    ax.set_title(f"Ventas de {main_element} por estado ", fontsize=16, fontweight='bold')
-    ax.axis("off")
-    fig.savefig("plots/heatmap_ventas_mexico.png")
-    fig.patch.set_facecolor('lightgrey')  # fondo del mapa
-
-    return fig
-    
-
 def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_column: str,
-                               start_date, end_date):
+                               start_date, end_date,val:bool=False,**kwargs):
     """
     Interactive choropleth heat map of Mexico with state selection.
     """
@@ -397,8 +360,9 @@ def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_co
     data = data[(data["fecha"] >= start_date) & (data["fecha"] <= end_date)]
 
     # --- Filtro de elemento ---
-    df_filtered = data[data[element_column] == main_element]
-    branches = df_filtered[["state","sucursal"]].drop_duplicates()
+    is_element = data[element_column] == main_element
+    df_filtered = data[is_element]
+    
     # --- Agregación ---
     total_sales_per_state = df_filtered.groupby("state")["cantidad"].sum().reset_index()
 
@@ -407,9 +371,7 @@ def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_co
 
    
     merged = mexico.merge(total_sales_per_state, on="state", how="left")
-    #merged = merged.merge(branches, on="state", how="left")
     merged["cantidad"] = merged["cantidad"].fillna(0)
-    #merged["branches"] = merged.groupby("state")["sucursal"].unique().apply(lambda x: ", ".join(str(i) for i in x))
 
 
     # --- Mapa de Folium ---
@@ -465,11 +427,12 @@ def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_co
         props = map_data["last_active_drawing"]
         if props and "properties" in props:
             selected_state = props["properties"]["NAME_1"]
+    if val:
+        merged[element_column] = main_element
+        return None,merged
 
-   
 
-
-def sales_hist(data:pd.DataFrame,start_date,end_date):
+def sales_hist(data:pd.DataFrame,start_date,end_date,main_element:str,element_column:str,val:bool=False,**kwargs):
     """
     Función que recibe el dataframe de datos del periodo especificado y 
     gráfica las curvas de existencia del producto y ventas.
@@ -483,7 +446,10 @@ def sales_hist(data:pd.DataFrame,start_date,end_date):
     is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
     data = data[is_in_period]
 
-    
+    # Filtro por elemento
+    is_element = data[element_column] == main_element
+    data = data[is_element]
+
 
     fig, ax = plt.subplots(figsize=(10, 6))
     
@@ -526,11 +492,14 @@ def sales_hist(data:pd.DataFrame,start_date,end_date):
     ax.grid(axis='y', linestyle='--', alpha=0.7)
 
     fig.tight_layout()
-    fig.savefig("plots/hist_ventas_prod.png")
+    
+    if val:
+        return fig,data
+
     return fig
 
 
-def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="productos"):
+def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,branch:str,type:str="productos",val:bool=False,**kwargs):
     
     if data.empty:
         print("Dataset vacío")
@@ -558,17 +527,24 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="produc
 
     df_summary = (
         df_filtered
-            .groupby(type_selected)
+            .groupby([type_selected,"sucursal"],as_index=False)
             .agg(
                 total_sales=("cantidad", "sum"),
                 min_cost=("cost", "min")  
             )
     )
 
+    
+
     df_summary["annual_value"] = df_summary["total_sales"] * df_summary["min_cost"]
     df_summary = df_summary.sort_values("annual_value", ascending=False)
     df_summary["cumulative_val"] = df_summary["annual_value"].cumsum() / df_summary["annual_value"].sum()
     df_summary["prioridad"] = df_summary["cumulative_val"].apply(abc_class)
+
+    
+    
+    in_branch = df_summary["sucursal"] == branch
+    df_summary = df_summary[in_branch]
 
     color_map = {"Alta":"red", "Media":"blue", "Baja":"gray"}
 
@@ -601,7 +577,9 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,type:str="produc
     ax.invert_yaxis()
 
     fig.tight_layout()
-    fig.savefig(f"plots/{type}_abc_chart.png")
-
+    if val:
+        return fig,df_summary
+    
+    
     return fig
 
