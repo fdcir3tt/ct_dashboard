@@ -60,7 +60,7 @@ def connect_to_DB(conn_uri,db_name)-> MongoClient:
     return db
 
 # -----------------------------------------------------------
-# CONSULTA
+# AUXILIARES
 # -----------------------------------------------------------
 
 

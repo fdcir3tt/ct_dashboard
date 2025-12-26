@@ -134,7 +134,7 @@ def top_month(data:pd.DataFrame)->str:
 # GRÄFICAS
 # -----------------------------------------------------------
 
-def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_column:str, start_date, end_date,val:bool=False,**kwargs)->Figure:
+def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_column:str,branch:str ,start_date, end_date,val:bool=False,**kwargs)->Figure:
     """
     Grafica curva de ventas y regresa la figura.
     """
@@ -155,19 +155,19 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
 
     # --- Validaciones básicas ---
     if data.empty:
-        plot_df = data
+        
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
         ax.axis("off")
-        return fig
+        return (fig, data) if val else fig
 
     if "fecha" not in data or element_column not in data:
-        plot_df = data
+        
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
         ax.axis("off")
         #fig.savefig("plots/almacen_ventas.png")
-        return fig
+        return (fig, data) if val else fig
     
 
     # --- Asegurar que las fechas SON datetime ---
@@ -185,11 +185,21 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     df = data[in_selected].copy()
 
     if df.empty:
-        plot_df = df
+        
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
         ax.axis("off")
-        return fig
+        return (fig, df) if val else fig
+    
+    # Filtro por sucursal 
+    in_branch = df["sucursal"]==branch
+    df = df[in_branch]
+
+    if df.empty:
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return (fig, df) if val else fig
     
     month = month_dict[ df["month"].iloc[0] ]
     year = df["year"].iloc[0]
@@ -255,12 +265,9 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     plt.legend()
     plt.tight_layout()
     
-    if val:
-        return fig,plot_df
-    
-    return fig
+    return (fig, plot_df) if val else fig
 
-def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,start_date,end_date,val:bool=False,**kwargs):
+def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,branch:str,start_date,end_date,val:bool=False,**kwargs):
     month_dict={  1:"Enero",
                   2:"Febrero",
                   3:"Marzo",
@@ -275,19 +282,17 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
                   12:"Diciembre"}
     
     if data.empty:
-        plot_df = data
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
         ax.axis("off")
-        return fig
+        return (fig, data) if val else fig
 
     if "fecha" not in data or element_column not in data:
-        plot_df = data
+        
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
         ax.axis("off")
-        #fig.savefig("plots/almacen_ventas.png")
-        return fig
+        return (fig, data) if val else fig
     
 
     data["sales_velocity"] = (
@@ -311,11 +316,20 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
     df = data[in_selected].copy()
 
     if df.empty:
-        plot_df = df
+        
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
         ax.axis("off")
-        return fig
+        return (fig, df) if val else fig
+
+    # Filtro por sucursal 
+    in_branch = df["sucursal"]==branch
+    df = df[in_branch]
+    if df.empty:
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return (fig, df) if val else fig
     
     month = month_dict[ df["month"].iloc[0] ]
     year = df["year"].iloc[0]
@@ -381,29 +395,27 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
     ax.legend()
     fig.tight_layout()
     
-    if val:
-        return fig,plot_df
-    return fig
+    return (fig, plot_df) if val else fig
 
-def sales_hist(data:pd.DataFrame,start_date,end_date,main_element:str,element_column:str,val:bool=False,**kwargs):
+def sales_hist(data:pd.DataFrame,main_element:str,element_column:str,branch:str,start_date,end_date,val:bool=False,**kwargs):
     """
     Función que recibe el dataframe de datos del periodo especificado y 
     gráfica las curvas de existencia del producto y ventas.
     """
     if data.empty:
-        plot_df = data
+        
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
         ax.axis("off")
-        return fig
+        return (fig, data) if val else fig
 
     if "fecha" not in data or element_column not in data:
-        plot_df = data
+        
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
         ax.axis("off")
-        #fig.savefig("plots/almacen_ventas.png")
-        return fig
+       
+        return (fig, data) if val else fig
     
     data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
     start_date = pd.to_datetime(start_date)
@@ -413,28 +425,39 @@ def sales_hist(data:pd.DataFrame,start_date,end_date,main_element:str,element_co
 
     # Filtro por elemento
     is_element = data[element_column] == main_element
-    data = data[is_element]
+    df = data[is_element].copy()
 
-    if data.empty:
-        plot_df = data
+    if df.empty:
+        
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
         ax.axis("off")
-        return fig
+        return (fig, df) if val else fig
+    
+    # Filtro por sucursal 
+    in_branch = df["sucursal"]==branch
+    df = df[in_branch]
+
+    if df.empty:
+        
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return (fig, df) if val else fig
     
 
     # Rellenar datos faltantes con 0
-    data = data.fillna(0)
+    df = df.fillna(0)
 
 
     fig, ax = plt.subplots(figsize=(10, 6))
     
     # Bins alineados a enteros
-    min_val = int(data["cantidad"].min())
-    max_value = int(data["cantidad"].max())
+    min_val = int(df["cantidad"].min())
+    max_value = int(df["cantidad"].max())
     bins = range(min_val,max_value+10)
     
-    counts, bin_edges, patches = ax.hist(data["cantidad"], 
+    counts, bin_edges, patches = ax.hist(df["cantidad"], 
             bins=bins, 
             color='blue', 
             edgecolor='black')
@@ -469,10 +492,7 @@ def sales_hist(data:pd.DataFrame,start_date,end_date,main_element:str,element_co
 
     fig.tight_layout()
     
-    if val:
-        return fig,data
-
-    return fig
+    return (fig, df) if val else fig
 
 
 def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_column: str,start_date, end_date,val:bool=False,**kwargs):
@@ -480,36 +500,36 @@ def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_co
     Interactive choropleth heat map of Mexico with state selection.
     """
     if data.empty:
-        plot_df = data
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
         ax.axis("off")
         return fig
 
     if "fecha" not in data or element_column not in data:
-        plot_df = data
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
         ax.axis("off")
-        #fig.savefig("plots/almacen_ventas.png")
+        
         return fig
 
-    # --- Filter by date ---
+    # Filtro por fecha 
     data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
 
     data = data[(data["fecha"] >= start_date) & (data["fecha"] <= end_date)]
 
-    # --- Filtro de elemento ---
+    #  Filtro de elemento  
     is_element = data[element_column] == main_element
     df_filtered = data[is_element]
+
+    
     if df_filtered.empty:
-        plot_df = df_filtered
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
         ax.axis("off")
         return fig,data
+    
     # --- Agregación ---
     total_sales_per_state = df_filtered.groupby("state")["cantidad"].sum().reset_index()
 
@@ -520,7 +540,10 @@ def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_co
     merged = mexico.merge(total_sales_per_state, on="state", how="left")
     merged["cantidad"] = merged["cantidad"].fillna(0)
 
-
+    if val:
+        merged[element_column] = main_element
+    
+        return None,merged
     # --- Mapa de Folium ---
     m = folium.Map(location=[23.6345, -102.5528],
                    tiles=None, 
@@ -536,10 +559,7 @@ def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_co
      <h3 align="center" style="font-size:20px"><b>Ventas de {main_element} por Estado</b></h3>
      '''
     m.get_root().html.add_child(folium.Element(title_html))
-    if val:
-        merged[element_column] = main_element
     
-        return None,merged
     # --- Choropleth  ---
     folium.Choropleth(
         geo_data=merged,

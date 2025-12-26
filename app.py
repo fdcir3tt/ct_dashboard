@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import datetime
 import os
-import src.graphs as gr  
+from src import graphs as gr  
 from src.preprocess import process_data
 
 # -----------------------------------------------------------
@@ -50,15 +50,16 @@ data = gr.remove_outliers(data,"sales_day")
 # VALORES PREDETERMINADOS
 # -----------------------------------------------------------
 
-today = datetime.date.today()
+today = datetime.date.today() 
 start_date = datetime.date(today.year, today.month, 1)
-end_date = today
+end_date = today 
 start_date = pd.to_datetime(start_date)
 end_date   = pd.to_datetime(end_date)
 
 global_data["fecha"] = pd.to_datetime(global_data["fecha"], errors="coerce")
 data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
 
+# Producto con cantidad de unidades más vendidas dentro de periodo
 is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
 top_product= (
     data[is_in_period]
@@ -69,7 +70,7 @@ top_product= (
 product_list = list( data["productId"].unique() )
 top_product_index = product_list.index(top_product)
 
-
+# Sucursal en donde se vende más seguido el producto más vendido
 is_top_product= data["productId"]==top_product
 frequent_branch= (
     data[is_top_product]
@@ -77,7 +78,7 @@ frequent_branch= (
     .nunique() 
     .idxmax()
 )
-branch_list = list( data[is_top_product]["sucursal"].unique() )
+branch_list = list( data["sucursal"].unique() )
 frequent_branch_index = branch_list.index(frequent_branch)
 
 
@@ -150,7 +151,7 @@ if data.empty:
     print("Dataset vacío")
         
 
-os.makedirs("plots", exist_ok=True)
+
 
 
 # -----------------------------------------------------------
@@ -160,25 +161,30 @@ os.makedirs("plots", exist_ok=True)
 period_sales = gr.period_sales(data=data,
                                selected_elements=selected_elements,
                                element_column=element_column,
+                               branch=branch,
                                start_date=fecha_inicio,end_date=fecha_fin)
+
 sales_velocity = gr.sales_velocity(data=data,
                                    selected_elements=selected_elements,
                                    element_column=element_column,
+                                   branch=branch,
                                    start_date=fecha_inicio,end_date=fecha_fin)
 
 
-histogram = gr.sales_hist(data=data[is_element][["cantidad","fecha"]],
+histogram = gr.sales_hist(data=data,
+                          main_element=main_element,
+                          element_column=element_column,
+                          branch=branch,
                           start_date=fecha_inicio,end_date=fecha_fin)
-heat_map = gr.sales_heat_map(data=global_data,
-                             main_element=main_element,
-                             element_column=element_column,
-                             start_date=fecha_inicio,end_date=fecha_fin)
 
 
-product_priorities = gr.abc_bar_chart(global_data[in_branch&is_in_period],
-                                      fecha_inicio,fecha_fin,type="productos")
-category_priorities = gr.abc_bar_chart(global_data[in_branch&is_in_period],
-                                       fecha_inicio,fecha_fin,type="categorias")
+product_priorities = gr.abc_bar_chart(data=global_data,
+                                      branch=branch,
+                                      start_date=fecha_inicio,end_date=fecha_fin,type="productos")
+
+category_priorities = gr.abc_bar_chart(data=global_data,
+                                      branch=branch,
+                                      start_date=fecha_inicio,end_date=fecha_fin,type="categorias")
 
 # -----------------------------------------------------------
 # VENTAS Y RÁPIDEZ DE VENTAS
@@ -240,8 +246,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.pyplot(histogram)
 with col2:
-    #st.pyplot(heat_map)
-    
+
     state = gr.interactive_sales_heat_map(
         data=global_data,
         main_element=main_element,
