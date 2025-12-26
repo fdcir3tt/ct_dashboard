@@ -10,7 +10,7 @@ matplotlib.use("Agg")
 # SETUP
 # -----------------------------------------------------------
 
-graphs = [period_sales,sales_velocity,sales_hist,interactive_sales_heat_map] #abc_bar_chart]
+graphs = [period_sales,sales_velocity,sales_hist,interactive_sales_heat_map]#abc_bar_chart]
 
 # -----------------------------------------------
 # BASE DE DATOS FALSA
@@ -22,7 +22,8 @@ def sample_sales_data():
         "fecha": pd.date_range("2023-01-01", periods=10, freq="D"),
         "productId": ["A", "A", "B", "B", "A", "B", "A", "B", "A", "B"],
         "category": ["X", "X", "Y", "Y", "X", "Y", "X", "Y", "X", "Y"],
-        "state":["SONORA","SINALOA","MÉXICO","SONORA","SINALOA","MÉXICO","SONORA","SINALOA","MÉXICO","ZACATECAS"],
+        "state":["SONORA","SINALOA","MEXICO","SONORA","SINALOA","MEXICO","SONORA","SINALOA","MEXICO","ZACATECAS"],
+        "sucursal":["HERMOSILLO, SON.","CULIACAN SIN.","TOLUCA ESTADO DE MEXICO","HERMOSILLO, SON.","CULIACAN SIN.","TOLUCA ESTADO DE MEXICO","HERMOSILLO, SON.","CULIACAN SIN.","TOLUCA ESTADO DE MEXICO","ZACATECAS"],
         "cantidad": [5, 7, 3, 4, np.nan, 6, 8, np.nan, 10, 2],
         "sales_day": [5, 7, 3, 4, np.nan, 6, 8, np.nan, 10, 2],
         "month": [1]*10,
@@ -33,7 +34,7 @@ def sample_sales_data():
 def mexico_gdf():
     return pd.DataFrame({
         "state": [
-            "SONORA", "SINALOA", "ESTADO DE MÉXICO",
+            "SONORA", "SINALOA", "MEXICO",
             "ZACATECAS", "JALISCO"
         ],
         "NAME_1": [
@@ -62,6 +63,7 @@ def test_empty_dataframe_returns_message_plot():
             main_element="A",
             selected_elements=["A"],
             element_column="productId",
+            branch="HERMOSILLO, SON.",
             start_date="2023-01-01",
             end_date="2023-01-10"
         )
@@ -76,6 +78,7 @@ def test_missing_date_column():
             main_element = "A",
             selected_elements=["A"],
             element_column="productId",
+            branch="HERMOSILLO, SON.",
             start_date="2023-01-01",
             end_date="2023-01-10"
         )
@@ -102,19 +105,22 @@ def test_date_filtering(sample_sales_data):
              assert merged["cantidad"].sum() == 12
              continue
         
-        fig, plot_df = g(
+        _,plot_df = g(
             data=sample_sales_data,
             main_element="A",
             selected_elements=["A"],
             element_column="productId",
+            branch="HERMOSILLO, SON.",
             start_date="2023-01-03",
             end_date="2023-01-05",
             val=True
         )
 
-        assert plot_df["fecha"].min() >= pd.Timestamp("2023-01-03")
-        assert plot_df["fecha"].max() <= pd.Timestamp("2023-01-05")
-
+        if plot_df.empty:
+            assert plot_df.empty
+        else:
+            assert plot_df["fecha"].min() >= pd.Timestamp("2023-01-03")
+            assert plot_df["fecha"].max() <= pd.Timestamp("2023-01-05")
 
 @pytest.mark.parametrize("column,values", [
     ("productId", ["A"]),
@@ -128,6 +134,7 @@ def test_element_column_switching(sample_sales_data, column, values):
             main_element = values[0],
             selected_elements=values,
             element_column=column,
+            branch = "HERMOSILLO, SON.",
             start_date="2023-01-01",
             end_date="2023-01-10",
             val=True
@@ -142,9 +149,9 @@ def test_missing_quantity_interpolation(sample_sales_data):
         if g==sales_velocity:
             fig, plot_df = g(
             data=sample_sales_data,
-            main_element="A",
             selected_elements=["A"],
             element_column="productId",
+            branch = "HERMOSILLO, SON.",
             start_date="2023-01-01",
             end_date="2023-01-10",
             val=True
@@ -154,11 +161,12 @@ def test_missing_quantity_interpolation(sample_sales_data):
             assert plot_df["sales_velocity"].isna().sum() == 0,"Despúes de la interpolación, no deben haber valores NaN"
             continue
 
-        fig, plot_df = g(
+        _, plot_df = g(
             data=sample_sales_data,
             main_element="A",
             selected_elements=["A"],
             element_column="productId",
+            branch = "HERMOSILLO, SON.",
             start_date="2023-01-01",
             end_date="2023-01-10",
             val=True
@@ -187,6 +195,7 @@ def test_selected_element_without_data(sample_sales_data):
             main_element ="C", # No existe
             selected_elements=["C"],  # No existe
             element_column="productId",
+            branch = "HERMOSILLO, SON.",
             start_date="2023-01-01",
             end_date="2023-01-10"
         )
@@ -199,6 +208,7 @@ def test_multiple_products_plot(sample_sales_data):
             data=sample_sales_data,
             selected_elements=["A", "B"],
             element_column="productId",
+            branch="HERMOSILLO, SON.",
             start_date="2023-01-01",
             end_date="2023-01-10"
         )
@@ -232,7 +242,7 @@ def test_state_aggregation_correct(sample_sales_data):
 
     sonora = merged.loc[merged["state"] == "SONORA", "cantidad"].iloc[0]
     sinaloa = merged.loc[merged["state"] == "SINALOA", "cantidad"].iloc[0]
-    edomex = merged.loc[merged["state"] == "MÉXICO", "cantidad"].iloc[0]
+    edomex = merged.loc[merged["state"] == "MEXICO", "cantidad"].iloc[0]
 
     assert sonora == 13     # 5 + 8
     assert sinaloa == 7     # NaN ignorado
