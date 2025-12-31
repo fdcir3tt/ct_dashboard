@@ -242,10 +242,10 @@ def test_value_ranges():
     same_sales_total = total_sales_product.sum() == total_sales_category.sum()
 
     positive_ranges = ( df["price"] > 0 )&( df["cost"] > 0 )&( df["cantidad"] > 0 )
-    #assert positive_ranges.all(),"Los precios,costos y cantidades deben ser valores positivos"
+    assert positive_ranges.all(),"Los precios,costos y cantidades deben ser valores positivos"
 
     market_consistency = df["price"] > df ["cost"]
-    #assert market_consistency.all(),"El precio por unidad debe ser mayor al costo"
+    assert market_consistency.all(),"El precio por unidad debe ser mayor al costo"
     
     valid_period = ( df["fecha"] >=pd.to_datetime( datetime.date(2020, 1, 1)) ) & ( df["fecha"] <= end_date )
     assert valid_period.all(),"Fechas deben caer dentro del periodo 2020 hasta la actualidad"
