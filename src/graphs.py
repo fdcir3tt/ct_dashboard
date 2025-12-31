@@ -3,6 +3,7 @@ import geopandas as gpd
 import numpy as np
 import folium
 import streamlit as st
+import json
 from streamlit_folium import st_folium
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -41,7 +42,7 @@ def top_n(data:pd.DataFrame,type:str="producto",criteria:str="ventas_diarias",n:
     type_dict= {"producto":"productId",
                 "categoria":"category",
                 "sucursal":"branch",
-                "cliente":"client"}
+                "cliente":"clientId"}
 
     criteria_dict={"ventas_diarias":"sales_day",
                    "ventas_mensuales":"sales_month",
@@ -495,7 +496,7 @@ def sales_hist(data:pd.DataFrame,main_element:str,element_column:str,branch:str,
     return (fig, df) if val else fig
 
 
-def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_column: str,start_date, end_date,val:bool=False,**kwargs):
+def interactive_sales_heat_map(data: pd.DataFrame,main_element: str, element_column: str,start_date, end_date,val:bool=False,**kwargs):
     """
     Interactive choropleth heat map of Mexico with state selection.
     """
@@ -541,9 +542,12 @@ def interactive_sales_heat_map(data: pd.DataFrame, main_element: str, element_co
     merged["cantidad"] = merged["cantidad"].fillna(0)
 
     if val:
+        
         merged[element_column] = main_element
-    
+        
         return None,merged
+
+
     # --- Mapa de Folium ---
     m = folium.Map(location=[23.6345, -102.5528],
                    tiles=None, 

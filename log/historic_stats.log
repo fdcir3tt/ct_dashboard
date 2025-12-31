@@ -6,3 +6,5 @@
 2025-12-23 09:40:17,299 - INFO - inserted=6416 Stats 'tbl_existenciasHistorial': count=None size=4387127 storage=929792 total=929792
 2025-12-24 06:00:17,131 - INFO - inserted=6416 Stats 'tbl_existenciasHistorial': count=None size=8774254 storage=1536000 total=1536000
 2025-12-26 06:00:07,883 - INFO - inserted=6416 Stats 'tbl_existenciasHistorial': count=None size=13161381 storage=1523712 total=1523712
+2025-12-29 06:00:07,510 - INFO - inserted=6416 Stats 'tbl_existenciasHistorial': count=None size=17548508 storage=1867776 total=1867776
+2025-12-31 06:00:06,524 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17579040 storage=2482176 total=2482176

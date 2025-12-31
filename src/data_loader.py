@@ -78,9 +78,10 @@ def format_columns(df:pd.DataFrame):
     for col, dtype in type_dict.items():
         if col in df.columns:
             if dtype == "string":
+                cast_dict[col] = "large_string[pyarrow]"
                 continue  
             elif dtype.startswith("float"):
-                cast_dict[col] = "float64"
+                cast_dict[col] = "halffloat[pyarrow]"
             else:
                 cast_dict[col] = dtype
 
@@ -303,7 +304,7 @@ def update_table(table:str,latest_update:str,save_dir:str="data"):
 
     df = pd.concat([outdated_df, update_df], ignore_index=True)
     df = df.drop_duplicates(subset=["productId","folio","fecha"])
-    df.to_parquet(f"{save_dir}/{table}.parquet")
+    df.to_parquet(f"{save_dir}/{table}.parquet",engine="pyarrow",index=False)
 
 
 def load_product_codes():

@@ -204,7 +204,7 @@ with col2:
 cost_per_unit = data["cost"].iloc[0]
 price_range =( data["price"].min() , data["price"].max() )
 category = data[is_element]["category"].iloc[0]
-top_clients = list ( gr.top_n(data[is_element],type="cliente")["client"] )
+top_clients = list ( gr.top_n(data[is_element],type="cliente")["clientId"] )
 
 clients_str=''
 for client in top_clients:
