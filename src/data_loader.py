@@ -81,7 +81,7 @@ def format_columns(df:pd.DataFrame):
                 cast_dict[col] = "large_string[pyarrow]"
                 continue  
             elif dtype.startswith("float"):
-                cast_dict[col] = "halffloat[pyarrow]"
+                cast_dict[col] = "float[pyarrow]"
             else:
                 cast_dict[col] = dtype
 

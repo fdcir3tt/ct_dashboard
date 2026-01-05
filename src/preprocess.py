@@ -30,7 +30,7 @@ def clean_data()->pd.DataFrame:
     branches = branches[["nemonico","sucursal","homoclave"]]
 
 
-    invoices['SUCURSAL']= invoices['folio'].str.extract(r'([A-Za-z]+)')
+    invoices['SUCURSAL']= invoices['folio'].str.extract( r'(?P<SUCURSAL>[A-Za-z]+)' )
     
     product_codes = product_codes.astype({'PRODUCTO':'string'}) 
     invoices = invoices.merge(product_codes, left_on="productId",right_on='PRODUCTO', how='inner')
