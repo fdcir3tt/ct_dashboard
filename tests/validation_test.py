@@ -188,8 +188,15 @@ def test_top_product():
                    end_date=fecha_fin,
                    type ="productos",
                    val=True)
+        
+        if g==abc_bar_chart:
+            top_products.add(
+                        dummy_df[["productId","annual_value"]]
+                        .iloc[0]["productId"]
+                        )
+            continue
         top_products.add(
-                        dummy_df[is_in_period]
+                        dummy_df
                         .groupby("productId")["cantidad"]
                         .sum()
                         .idxmax()
@@ -197,7 +204,6 @@ def test_top_product():
     assert len(top_products)==1 ,"Todas las gráficas deben coincidir en el producto con más unidades vendidas"
     assert top_products[0]==top_product ,"Todas las gráficas deben coincidir en el producto con más unidades vendidas cálculado al principio"
           
-
 
 
 def test_null():
@@ -216,7 +222,7 @@ def test_formats():
     reference_dtypes={"productId":"large_string[pyarrow]",
                         "quantity":"int32[pyarrow]",
                         "date":"timestamp[ns][pyarrow]",
-                        "price":"halffloat[pyarrow]",
+                        "price":"float[pyarrow]",
                         "clientId":"large_string[pyarrow]",
                         "folio":"large_string[pyarrow]"}
         
