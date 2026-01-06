@@ -19,28 +19,22 @@
 
 ## Datos Procesados
 
-| **Nombre**                            | **Descripción**                                                    | **Variable**         | **Formato de variable** |
-| ------------------------------------- | ------------------------------------------------------------------ | -------------------- | ----------------------- |
-| **código**                            | Código identificador de producto                                       | `productId`          | Texto / String          |
-| **código sustituto**                  | Código del producto que reemplazará al actual                      | `productId_subst`    | Texto / String          |
-| **categoría**                         | Categoría a la que pertenece el producto                           | `category`           | Texto / String          |
-| **sucursal**                         | Sucursal en la que se vendió el producto                           | `branch`           | Texto / String          |
-| **estado**                         | Estado en el que se vendió el producto                           | `state`           | Texto / String          |
-| **ventas diarias (producto)**         | Cantidad de unidades vendidas por día del producto                 | `sales_day`          | Numérico / Entero       |
-| **ventas mensuales (producto)**       | Cantidad total de unidades vendidas en el mes                      | `sales_month`        | Numérico / Entero       |
-| **ventas totales(producto)**         | Ventas totales del producto                 | `total_sales`       |
-| **ganancia total (producto)**         | Ingreso neto obtenido por las ventas del producto                  | `total_profit`       | Numérico / Decimal      |
-| **costo total (producto)**            | Costo total de producción o adquisición del producto               | `total_cost`         | Numérico / Decimal      |
-| **cliente frecuente**                 | Cliente que compra con mayor recurrencia el producto               | `freq_client`        | Texto / String          |
-| **frecuencia de venta (producto)**    | Promedio de días entre cada venta del producto                     | `sales_freq`         | Numérico / Decimal      |
-| **fecha de última venta (producto)**  | Fecha de la venta más reciente del producto                        | `last_sale_date`     | Fecha (YYYY-MM-DD)      |
-| **mes**  | Mes de la venta realizada                         | `month`     | Texto / String      |
-| **año**  | Año de la venta realizada                        | `year`     | Texto / String      |
-| **ventas diarias (categoría)**        | Total de unidades vendidas por día dentro de la categoría          | `cat_sales_day`      | Numérico / Entero       |
-| **ventas mensuales (categoría)**      | Total de unidades vendidas en el mes dentro de la categoría        | `cat_sales_month`    | Numérico / Entero       |
-| **ventas totales(categoría)**         | Ventas totales de la categoría                 | `total_cat_sales`       |
-| **ganancia total (categoría)**        | Ingreso neto total obtenido de todos los productos de la categoría | `total_cat_profit`   | Numérico / Decimal      |
-| **costo total (categoría)**           | Suma total de los costos de los productos dentro de la categoría   | `total_cat_cost`     | Numérico / Decimal      |
-| **fecha de última venta (categoría)** | Fecha de la venta más reciente dentro de la categoría              | `last_cat_sale_date` | Fecha (YYYY-MM-DD)      |
-| **frecuencia de venta (categoría)**   | Promedio de días entre ventas de la categoría                      | `cat_sales_freq`     | Numérico / Decimal      |
-
+| **Nombre**                            | **Descripción**                                                    | **Variable**         | **Formato de variable** | **Fuente**
+| ------------------------------------- | ------------------------------------------------------------------ | -------------------- | ----------------------- | ----------------------- |
+| **código de producto**                | Código identificador de producto                                   | `productId`          | Texto / String          | DWH                     | 
+| **folio de venta**                    | Código identificador de folio de factura de venta                  | `folio`              | Texto / String          | DWH                     |
+| **código de cliente**                 | Código identificador de cliente                                    | `clientId`           | Texto / String          | DWH                     |
+| **categoría de producto**             | Categoría a la que pertenece el producto                           | `category`           | Texto / String          | ct_online2              |
+| **sucursal**                          | Sucursal en la que se vendió el producto                           | `branch`             | Texto / String          | DWH                     |
+| **estado**                            | Estado en el que se vendió el producto                             | `state`              | Texto / String          | DWH                     |
+| **precio de producto**                | Precio por unidad de producto (pesos mexicanos)                    | `price`              | Texto / String          | DWH                     |
+| **cantidad (producto)**               | Cantidad de unidades vendidas por factura del producto             | `quantity`           | Numérico / Entero       | DWH                     |
+| **existencia (producto)**             | Cantidad de unidades en almacenamiento de producto por sucursal    | `existence`          | Array                   | CT_API_Publica/CT_Historico |
+| **fecha de registro**                 | Fecha de registro de información de almacenamiento                 | `register_date`      | Fecha datetime64[ns] (YYYY-MM-DD) | CT_API_Publica/CT_Historico |
+| **inventario (producto)**             | Cantidad total de unidades en almacenamiento de producto           | `total_stock`        | Numérico / Entero       | CT_API_Publica/CT_Historico |
+| **ventas diarias (producto)**         | Cantidad de unidades vendidas por día del producto                 | `sales_day`          | Numérico / Entero       | DWH                     |
+| **ingreso total (producto)**          | Ingreso neto obtenido por las ventas del producto                  | `income`             | Numérico / Decimal      | DWH                     |
+| **costo (producto)**                  | Costo total de producción o adquisición del producto               | `cost`               | Numérico / Decimal      |  DWH/CT_Historico       |
+| **fecha**                             | Fecha de la venta realizada                                        | `date`               | Fecha datetime64[ns] (YYYY-MM-DD) | DWH           |
+| **mes**                               | Mes de la venta realizada                                          | `month`              | Texto / String          | DWH                     |
+| **año**                               | Año de la venta realizada                                          | `year`               | Texto / String          | DWH                     |
