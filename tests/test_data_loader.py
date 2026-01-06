@@ -13,6 +13,9 @@ from data_loader import extract_table_parallel, update_table
 # -----------------------------------------------
 @pytest.fixture
 def old_data():
+    """
+    Dataframe de prueba basal
+    """
     return pd.DataFrame([{
         "id": f"PROD-{i}",
         "folio":f"FOLIO-{i}",
@@ -23,6 +26,9 @@ def old_data():
 
 @pytest.fixture
 def update_data():
+    """
+    Dataframe de datos nuevos que sirven para actualizar dataset basal
+    """
     return pd.DataFrame([{
         "id": f"PROD-{i}",
         "folio":f"FOLIO-{i}",
@@ -48,7 +54,12 @@ class FakeConn:
 #  AYUDA
 # -----------------------------------------------
 
-def fake_read_sql(query, conn):
+def fake_read_sql(query, conn)->pd.DataFrame:
+    """
+    Función que simula el comportamiento de extraer datos a partir de una consulta
+    :param query: Consulta que se quiere realizar
+    :param conn: Conexión a base de datos SQL Microsoft Server
+    """
     df = conn.data
     if "COUNT(*)" in query:
         return pd.DataFrame({"NROWS": [len(df)]})
@@ -63,7 +74,12 @@ def fake_read_sql(query, conn):
 
     return df.copy()
 
-def fake_read_parquet_factory(old_data, update_data):
+def fake_read_parquet_factory(old_data, update_data)->pd.DataFrame:
+    """
+    Simula la extracción de un dataset, dependiendo de que tipo se especifíque ya sea el viejo o el de actualización.
+    :param old_data: Dataframe de pandas que sirve como proxy del dataset desactualizado.
+    :param update_data: Dataframe de pandas que sirve como proxy de un dataset con información actualizada.
+    """
     def fake_read_parquet(path, *args, **kwargs):
         path = str(path)
         if "update" in path:
@@ -73,6 +89,11 @@ def fake_read_parquet_factory(old_data, update_data):
     return fake_read_parquet
 
 def make_fake_extract_table_parallel(update_data):
+    """
+    Parcheo de función de extracción en paralelo. Guarda el dataset de actualización en directorio especificado
+    
+    :param update_data: Dataframe de pandas que sirve como proxy de un dataset con información actualizada.
+    """
     def fake_extract_table_parallel(query, output_file, *args, **kwargs):
         update_data.to_parquet(output_file)
     return fake_extract_table_parallel
@@ -84,6 +105,19 @@ def make_fake_extract_table_parallel(update_data):
 
 @pytest.mark.parametrize("chunk_percent", [10, 25, 50, 100])
 def test_no_data_loss(monkeypatch, tmp_path, old_data,chunk_percent):
+    """
+    Prueba diseñada para verificar si los métodos de extracción de datos no pierden información al momento de ser ejecutados.
+
+    
+    :param monkeypatch: Herramienta para parcheo de funciones con fines de pruebas 
+    :type monkeypatch: MonkeyPatch
+    :param tmp_path: Ruta donde se guarda el dataset proxy
+    :type tmp_path: Path
+    :param old_data: Dataframe proxy de dataset viejo
+    :type old_data: DataFrame
+    :param chunk_percent: Porcentaje de dataset que los chunks usan para ajustar su tamaño al extraer información
+    :type chunk_percent: Literal[10, 25, 50, 100]
+    """
     fake_conn = FakeConn(old_data)
     monkeypatch.setattr("pyodbc.connect", lambda *args, **kwargs: fake_conn)
     monkeypatch.setattr("pandas.read_sql", fake_read_sql)
@@ -103,17 +137,30 @@ def test_no_data_loss(monkeypatch, tmp_path, old_data,chunk_percent):
     result = pd.read_parquet(output_file)
     
     # Numero de filas
-    assert len(result) == len(old_data)
+    assert len(result) == len(old_data),"El número de filas de la extracción debe ser estrictamente igual"
     # Numero de columnas
-    assert list(result.columns) == list(old_data.columns)
+    assert list(result.columns) == list(old_data.columns),"Las columnas del dataset extraído debe ser igual al del origen"
 
     # Contenido,igualdad
-    assert_frame_equal(result.reset_index(drop=True), old_data.reset_index(drop=True))
+    assert_frame_equal(result.reset_index(drop=True), old_data.reset_index(drop=True)),"El contenido del dataset extraído debe ser igual al del origen"
+
 
 
 
 
 def test_update_table_partial(monkeypatch, tmp_path, old_data, update_data):
+    """
+    Prueba diseñada para verificar si los métodos de actualización de datos funcionan adecuadamente
+    
+    :param monkeypatch: Herramienta para parcheo de funciones con fines de pruebas 
+    :type monkeypatch: MonkeyPatch
+    :param tmp_path: Ruta de dataset proxy
+    :type tmp_path: Path
+    :param old_data: Dataframe proxy de dataset viejo
+    :type old_data: DataFrame
+    :param update_data: Dataframe proxy de dataset de actualización
+    :type update_data: DataFrame
+    """
     table_path = tmp_path / "data_table.parquet"
     old_data.to_parquet(table_path)
 
@@ -143,9 +190,22 @@ def test_update_table_partial(monkeypatch, tmp_path, old_data, update_data):
 
     assert_frame_equal(result.sort_values("folio").reset_index(drop=True),
                        expected.sort_values("folio").reset_index(drop=True),
-                       check_dtype=False)
+                       check_dtype=False),"Resultado debe tener el mismo contenido que la concatenación de los datos viejos y actualizados"
 
 def test_update_table_idempotent(monkeypatch, tmp_path, old_data, update_data):
+    """
+    Prueba diseñada para verificar que la actualización de tablas sea idempotente. Es decir, al aplicar el método n veces
+    dara el mismo resultado que aplicar el método por una vez.
+    
+    :param monkeypatch: Herramienta para parcheo de funciones con fines de pruebas
+    :type monkeypatch: MonkeyPatch
+    :param tmp_path: Ruta de dataset proxy
+    :type tmp_path: Path
+    :param old_data: Dataframe proxy de dataset viejo
+    :type old_data: DataFrame
+    :param update_data: Dataframe proxy de dataset de actualización
+    :type update_data: DataFrame
+    """
     table_path = tmp_path / "data_table.parquet"
     old_data.to_parquet(table_path)
 
@@ -179,4 +239,4 @@ def test_update_table_idempotent(monkeypatch, tmp_path, old_data, update_data):
     # Asegurarse de duplicidad
     assert_frame_equal(result.sort_values("folio").reset_index(drop=True),
                        expected.sort_values("folio").reset_index(drop=True),
-                       check_dtype=False)
+                       check_dtype=False),"Resultado debe tener el mismo contenido que la concatenación de los datos viejos y actualizados"
