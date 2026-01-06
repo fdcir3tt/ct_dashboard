@@ -8,3 +8,8 @@
 2025-12-26 06:00:07,883 - INFO - inserted=6416 Stats 'tbl_existenciasHistorial': count=None size=13161381 storage=1523712 total=1523712
 2025-12-29 06:00:07,510 - INFO - inserted=6416 Stats 'tbl_existenciasHistorial': count=None size=17548508 storage=1867776 total=1867776
 2025-12-31 06:00:06,524 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17579040 storage=2482176 total=2482176
+2026-01-02 06:00:05,831 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17609572 storage=2486272 total=2486272
+2026-01-03 06:00:05,792 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17640104 storage=2482176 total=2482176
+2026-01-04 06:00:05,821 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17670636 storage=2486272 total=2486272
+2026-01-05 06:00:06,095 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17701168 storage=2486272 total=2486272
+2026-01-06 06:00:06,064 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17731700 storage=2494464 total=2494464
