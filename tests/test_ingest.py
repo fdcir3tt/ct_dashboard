@@ -23,11 +23,17 @@ random.seed(42)
 # MONGO
 @pytest.fixture
 def mongo_db():
+    """
+    Base falsa de prueba
+    """
     client = mongomock.MongoClient()
     return client["test_db"]
 
 
 def random_date(start:dt.datetime, end:dt.datetime, seed =None)->dt.datetime:
+    """
+    Escoge una fecha aleatoria dentro del periodo seleccionado
+    """
     rng = random.Random(seed)
     delta = end - start
     int_delta = delta.total_seconds()
@@ -42,6 +48,9 @@ def random_date(start:dt.datetime, end:dt.datetime, seed =None)->dt.datetime:
 # -----------------------------------------------
 
 def test_get_documents_filters_and_projects(mongo_db,monkeypatch):
+    """
+    Prueba que verifica si la extracción de documentos de colecciones de la base de datos funciona correctamente
+    """
     existence = mongo_db["existence"]
     
 
@@ -56,14 +65,17 @@ def test_get_documents_filters_and_projects(mongo_db,monkeypatch):
 
     exist_docs = get_documents(mongo_db)
 
-    assert len(exist_docs) == 2
-    assert exist_docs[0]["codigo"] == "PROD1"
-    assert "_id" in exist_docs[0]
+    assert len(exist_docs) == 2,"Solo existen 2 documentos dentro de la colección falsa"
+    assert exist_docs[0]["codigo"] == "PROD1" , "La información de los documentos extraídos debe ser la esperada"
+    assert "_id" in exist_docs[0],"Los documentos extraídos deben tener un campo identificador '_id' "
 
     
 
 
 def test_get_product_cost_dict(monkeypatch):
+    """
+    Prueba que verifica que el método de extracción de costos de los productos sea correcto
+    """
     df = pd.DataFrame({
         "codigo": ["PROD1", "PROD2"],
         "costo": [10.0, 20.0]
@@ -75,10 +87,13 @@ def test_get_product_cost_dict(monkeypatch):
 
     result = get_product_cost_dict(lambda _: df)
 
-    assert result == {"PROD1": 10.0, "PROD2": 20.0}
+    assert result == {"PROD1": 10.0, "PROD2": 20.0},"Los costos extraídos deben ser los esperados"
 
 
 def test_make_observation():
+    """
+    Prueba que verifica que la generación de observaciones 
+    """
     now = dt.datetime(2024, 1, 1, 12, 0, 0)
     raw_doc = { "_id":ObjectId("64f1a2b3c4d5e6f701234501"),
              "codigo":"PROD-01",
@@ -104,13 +119,13 @@ def test_make_observation():
 
     result = make_observation(raw_doc, cost_dict, now)
 
-    assert result["fechaRegistro"] == now
-    assert result["productoReferencia"]["existenciaId"] == raw_doc["_id"]
-    assert result["productoReferencia"]["codigo"] == "PROD-01"
-    assert result["activo"] is True
-    assert result["costo"] == 10
-
-    assert result["almacenes"]== { f"{j}A":10 for j in range(54)}
+    # Campos correctos
+    assert result["fechaRegistro"] == now,"La fecha de registro debe ser la misma que la de extracción de documentos"
+    assert result["productoReferencia"]["existenciaId"] == raw_doc["_id"],"El campo debe contener el id del documento origen"
+    assert result["productoReferencia"]["codigo"] == "PROD-01","El campo debe contener el código del producto"
+    assert result["activo"] is True,"Campo debe coincidir con la información de origen"
+    assert result["costo"] == 10,"Campo debe coincidir con la información de origen"
+    assert result["almacenes"]== { f"{j}A":10 for j in range(54)},"Campo debe coincidir con la información de origen"
 
 
 
@@ -135,7 +150,9 @@ def test_log_collection_size(monkeypatch):
     assert "count=5" in logs[0]
 
 def test_main_happy_path(mongo_db,monkeypatch):
-    
+    """
+    Prueba que verifica si el script de ingesta funciona de forma adecuada
+    """
     history = mongo_db["history"]
 
     monkeypatch.setenv("EXISTENCE_HIST_COLLECTION", "history")
@@ -176,8 +193,8 @@ def test_main_happy_path(mongo_db,monkeypatch):
 
     
    
-    assert calls["docs"] == 1
-    assert calls["costs"] == 1
+    assert calls["docs"] == 1,"Método de extracción de documentos solo debe ser llamado una vez"
+    assert calls["costs"] == 1,"Método de extracción de costos solo debe ser llamado una vez"
 
     # Contenido
     doc = history.find_one()
@@ -188,8 +205,8 @@ def test_main_happy_path(mongo_db,monkeypatch):
 
 
 
-    assert logs == ["logged"]
+    assert logs == ["logged"],"Debe llevarse a cabo el logeo de los resultados de la inserción"
 
 
     assert history.count_documents({}) == 1,"Solo un documento debió ser insertado"
-    assert list(history.find()).__len__() == len(fake_docs)
+    assert list(history.find()).__len__() == len(fake_docs),"Deben haber la misma cantidad de documentos falsos de inserción que la cantidad de documentos insertados"

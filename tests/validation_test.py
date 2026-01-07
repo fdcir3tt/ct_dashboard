@@ -175,7 +175,7 @@ def test_same_element_shown():
 
 def test_top_product():
     """
-    
+    Prueba que verifica si todas las gráficas coinciden en el producto más vendido
     """
     top_products = set()
     for g in graphs:
@@ -207,10 +207,16 @@ def test_top_product():
 
 
 def test_null():
+    """
+    Prueba para verificar si hay valores nulos o no dentro de los datasets
+    """
     df = load_invoices()
     assert not ( df.isna().any().any() ) ,"No deben existir campos vacíos en el dataset de facturas de venta"
 
 def test_formats():
+    """
+    Prueba que verifica si las columnas de los datasets cumplen con los formatos establecidos
+    """
     df = load_invoices()
     reference_input = {"productId":["ACC1243"],
                         "quantity":[5],

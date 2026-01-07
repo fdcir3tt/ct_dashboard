@@ -14,7 +14,7 @@ from data_loader import extract_table_parallel, update_table
 @pytest.fixture
 def old_data():
     """
-    Dataframe de prueba basal
+    Dataframe de dataset basal
     """
     return pd.DataFrame([{
         "id": f"PROD-{i}",
