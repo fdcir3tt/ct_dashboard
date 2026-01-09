@@ -1,0 +1,8 @@
+__pycache__/
+.git/
+.venv/
+.streamlit/
+tests/
+*.log
+data/processed.parquet
+data/facturas.parquet

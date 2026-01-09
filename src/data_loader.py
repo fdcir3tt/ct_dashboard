@@ -366,15 +366,24 @@ def load_invoices(source_file:str,file_format:str,start_date:str=start_date,end_
     extraer. Revisa si esta actualizada la base con ese periodo para no hacer la consulta completa. 
     """
     if file_format=="csv":
-        current_df = pd.read_csv("data/facturas.csv")
-        current_df = format_columns(current_df)
+        if os.path.exists("data/facturas.csv"):
+            current_df = pd.read_csv("data/facturas.csv")
+            current_df = format_columns(current_df)
+        else:
+            current_df = pd.DataFrame()
     if file_format=="parquet":
-        current_df = pd.read_parquet("data/facturas.parquet")
-        current_df = format_columns(current_df)
+        if os.path.exists("data/facturas.parquet"):
+            current_df = pd.read_parquet("data/facturas.parquet")
+            current_df = format_columns(current_df)
+        else:
+            current_df = pd.DataFrame()
+
     if current_df.empty:
         query = build_query(start_date,end_date)
         extract_table_parallel(query= query ,output_file= source_file ,connection_str= conn_str)
-    
+        current_df = pd.read_parquet(source_file)
+        current_df = format_columns(current_df)
+        current_df.to_parquet(source_file,engine="pyarrow",index=False)
 
     latest_period = current_df["fecha"].max().date()
     not_updated = latest_period < end_date
