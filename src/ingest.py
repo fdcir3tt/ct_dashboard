@@ -64,7 +64,7 @@ def connect_to_DB(conn_uri,db_name)-> MongoClient:
 # -----------------------------------------------------------
 
 
-def get_documents(database:None) -> Documents:
+def get_documents(database:None,collection:str,filters:dict,projection:dict) -> Documents:
     """
     Función que regresa lista de documentos extraídos de la colección de existencia
     
@@ -76,23 +76,9 @@ def get_documents(database:None) -> Documents:
     else:
         db = connect_to_DB(API_CONN,API_NAME)
 
-    consult_info = {
-        "EXISTENCE_COLLECTION":{
-            "filters":{"almacenes.existencia": {"$gt": 0}},                                
-            "fields":{"codigo":1,"activo":1,"almacenes":1,"_id":1} 
-            }          
-        }
 
-    
-    table = os.getenv("EXISTENCE_COLLECTION")  
-
-    info = consult_info["EXISTENCE_COLLECTION"]
-    filters = info["filters"]
-    fields = info["fields"]
-
-
-    collection = db[table]
-    cursor = collection.find(filters, projection=fields,batch_size=BATCH_SIZE)
+    collection = db[collection]
+    cursor = collection.find(filters, projection=projection,batch_size=BATCH_SIZE)
         
     result_docs= list(cursor) 
     return result_docs
@@ -200,12 +186,25 @@ def main(extract_database=None,insert_database=None,now=datetime.datetime.now(),
         insert_db = connect_to_DB(HISTORIC_CONN,HIST_NAME)
     
     # Extracción de información
-    exist_docs = get_docs_fn(extract_db)
+
+    consult_info = {
+        "EXISTENCE_COLLECTION":{
+            "filters":{"almacenes.existencia": {"$gt": 0}},                                
+            "fields":{"codigo":1,"activo":1,"almacenes":1,"_id":1} 
+            }          
+        }
+    collection = os.getenv("EXISTENCE_COLLECTION")  
+
+    info = consult_info["EXISTENCE_COLLECTION"]
+    filters = info["filters"]
+    projection = info["fields"]
+
+    exist_docs = get_docs_fn(extract_db,collection,filters,projection)
     cost_dict = get_costs_fn()
     
     # Ingesta
     hist_table = os.getenv("EXISTENCE_HIST_COLLECTION")
-    insert_docs = []
+    
     
     # Procesamiento por chunks para reducir ancho de banda
     num_inserted_docs = 0

@@ -62,8 +62,19 @@ def test_get_documents_filters_and_projects(mongo_db,monkeypatch):
 
     monkeypatch.setenv("EXISTENCE_COLLECTION", "existence")
 
+    consult_info = {
+        "EXISTENCE_COLLECTION":{
+            "filters":{"almacenes.existencia": {"$gt": 0}},                                
+            "fields":{"codigo":1,"activo":1,"almacenes":1,"_id":1} 
+            }          
+        }
+    collection = os.getenv("EXISTENCE_COLLECTION")  
 
-    exist_docs = get_documents(mongo_db)
+    info = consult_info["EXISTENCE_COLLECTION"]
+    filters = info["filters"]
+    projection = info["fields"]
+
+    exist_docs = get_documents(mongo_db,collection,filters,projection)
 
     assert len(exist_docs) == 2,"Solo existen 2 documentos dentro de la colección falsa"
     assert exist_docs[0]["codigo"] == "PROD1" , "La información de los documentos extraídos debe ser la esperada"
@@ -164,7 +175,7 @@ def test_main_happy_path(mongo_db,monkeypatch):
     calls = {"docs": 0, "costs": 0}
     called = {}
 
-    def fake_get_docs(mongo_db):
+    def fake_get_docs(mongo_db,*args):
         calls["docs"] += 1
         return fake_docs
 
