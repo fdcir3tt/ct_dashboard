@@ -303,7 +303,7 @@ def update_table(table:str,latest_update:str,save_dir:str="data"):
     outdated_df = format_columns(outdated_df)
 
     df = pd.concat([outdated_df, update_df], ignore_index=True)
-    df = df.drop_duplicates(subset=["productId","folio","fecha"])
+    df = df.drop_duplicates(subset=["productId","folio","date"])
     df.to_parquet(f"{save_dir}/{table}.parquet",engine="pyarrow",index=False)
 
 
@@ -385,7 +385,7 @@ def load_invoices(source_file:str,file_format:str,start_date:str=start_date,end_
         current_df = format_columns(current_df)
         current_df.to_parquet(source_file,engine="pyarrow",index=False)
 
-    latest_period = current_df["fecha"].max().date()
+    latest_period = current_df["date"].max().date()
     not_updated = latest_period < end_date
     if not_updated:
         update_table(table="facturas",latest_update=latest_period)

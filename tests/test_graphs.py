@@ -19,12 +19,12 @@ graphs = [period_sales,sales_velocity,sales_hist,interactive_sales_heat_map]#abc
 @pytest.fixture
 def sample_sales_data():
     return pd.DataFrame({
-        "fecha": pd.date_range("2023-01-01", periods=10, freq="D"),
+        "date": pd.date_range("2023-01-01", periods=10, freq="D"),
         "productId": ["A", "A", "B", "B", "A", "B", "A", "B", "A", "B"],
         "category": ["X", "X", "Y", "Y", "X", "Y", "X", "Y", "X", "Y"],
         "state":["SONORA","SINALOA","MEXICO","SONORA","SINALOA","MEXICO","SONORA","SINALOA","MEXICO","ZACATECAS"],
         "sucursal":["HERMOSILLO, SON.","CULIACAN SIN.","TOLUCA ESTADO DE MEXICO","HERMOSILLO, SON.","CULIACAN SIN.","TOLUCA ESTADO DE MEXICO","HERMOSILLO, SON.","CULIACAN SIN.","TOLUCA ESTADO DE MEXICO","ZACATECAS"],
-        "cantidad": [5, 7, 3, 4, np.nan, 6, 8, np.nan, 10, 2],
+        "quantity": [5, 7, 3, 4, np.nan, 6, 8, np.nan, 10, 2],
         "sales_day": [5, 7, 3, 4, np.nan, 6, 8, np.nan, 10, 2],
         "month": [1]*10,
         "year": [2023]*10
@@ -80,7 +80,7 @@ def test_missing_date_column():
     """
     Prueba que verifica si gráficas manejan correctamente datasets sin columna de fecha
     """
-    df = pd.DataFrame({"productId": ["A"], "cantidad": [10]})
+    df = pd.DataFrame({"productId": ["A"], "quantity": [10]})
     for g in graphs:
         fig = g(
             data=df,
@@ -114,7 +114,7 @@ def test_date_filtering(sample_sales_data):
             # 2023-01-02 (SINALOA) → 7
             # 2023-01-03 (B) → ignorado
             # 2023-01-04 (B) → ignorado
-             assert merged["cantidad"].sum() == 12
+             assert merged["quantity"].sum() == 12
              continue
         
         _,plot_df = g(
@@ -131,8 +131,8 @@ def test_date_filtering(sample_sales_data):
         if plot_df.empty:
             assert plot_df.empty
         else:
-            assert plot_df["fecha"].min() >= pd.Timestamp("2023-01-03")
-            assert plot_df["fecha"].max() <= pd.Timestamp("2023-01-05")
+            assert plot_df["date"].min() >= pd.Timestamp("2023-01-03")
+            assert plot_df["date"].max() <= pd.Timestamp("2023-01-05")
 
 @pytest.mark.parametrize("column,values", [
     ("productId", ["A"]),
@@ -254,9 +254,9 @@ def test_state_aggregation_correct(sample_sales_data):
         val=True
     )
 
-    sonora = df.loc[df["state"] == "SONORA", "cantidad"].iloc[0]
-    sinaloa = df.loc[df["state"] == "SINALOA", "cantidad"].iloc[0]
-    edomex = df.loc[df["state"] == "MEXICO", "cantidad"].iloc[0]
+    sonora = df.loc[df["state"] == "SONORA", "quantity"].iloc[0]
+    sinaloa = df.loc[df["state"] == "SINALOA", "quantity"].iloc[0]
+    edomex = df.loc[df["state"] == "MEXICO", "quantity"].iloc[0]
 
     assert sonora == 13     # 5 + 8
     assert sinaloa == 7     # NaN ignorado
@@ -276,7 +276,7 @@ def test_states_with_no_sales_are_zero(sample_sales_data):
     )
 
     jalisco_sales = df.loc[
-        df["state"] == "JALISCO", "cantidad"
+        df["state"] == "JALISCO", "quantity"
     ].iloc[0]
 
     assert jalisco_sales == 0
@@ -298,5 +298,5 @@ def test_category_switching(sample_sales_data):
     # SONORA: 5 + 8 = 13
     # SINALOA: 7
     # MÉXICO: 10
-    assert merged["cantidad"].sum() == 30
+    assert merged["quantity"].sum() == 30
 

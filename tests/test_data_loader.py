@@ -20,7 +20,7 @@ def old_data():
         "id": f"PROD-{i}",
         "folio":f"FOLIO-{i}",
         "value": i * 10.0 ,
-        "fecha": datetime.date(2025,12,1)} for i in range(20)
+        "date": datetime.date(2025,12,1)} for i in range(20)
         
     ])
 
@@ -33,7 +33,7 @@ def update_data():
         "id": f"PROD-{i}",
         "folio":f"FOLIO-{i}",
         "value": i * 30.0 ,
-        "fecha": datetime.date(2025,12,5)} for i in range(20,40) 
+        "date": datetime.date(2025,12,5)} for i in range(20,40) 
     ])
 class FakeConn:
     def __init__(self, data):
@@ -169,7 +169,7 @@ def test_update_table_partial(monkeypatch, tmp_path, old_data, update_data):
     monkeypatch.setattr("pyodbc.connect", lambda *a, **k: fake_conn)
     monkeypatch.setattr("pandas.read_sql", fake_read_sql)
     monkeypatch.setattr("data_loader.extract_table_parallel", make_fake_extract_table_parallel(update_data))
-    monkeypatch.setenv("TYPE_DICT", '{"id":"string","folio":"string","value":"float","fecha":"datetime64[ns]"}')
+    monkeypatch.setenv("TYPE_DICT", '{"id":"string","folio":"string","value":"float","date":"datetime64[ns]"}')
     monkeypatch.setenv("NAME_DICT",'{"id":"productId","value":"price"}')
 
     # Primera actualización
@@ -186,7 +186,7 @@ def test_update_table_partial(monkeypatch, tmp_path, old_data, update_data):
     expected = expected.astype({"productId":pd.StringDtype(storage="pyarrow"),
                                 "folio":pd.StringDtype(storage="pyarrow"),
                                 "price":"float",
-                                "fecha":"datetime64[ns]"})
+                                "date":"datetime64[ns]"})
 
     assert_frame_equal(result.sort_values("folio").reset_index(drop=True),
                        expected.sort_values("folio").reset_index(drop=True),
@@ -213,7 +213,7 @@ def test_update_table_idempotent(monkeypatch, tmp_path, old_data, update_data):
     monkeypatch.setattr("pyodbc.connect", lambda *a, **k: fake_conn)
     monkeypatch.setattr("pandas.read_sql", fake_read_sql)
     monkeypatch.setattr("data_loader.extract_table_parallel", make_fake_extract_table_parallel(update_data))
-    monkeypatch.setenv("TYPE_DICT", '{"id":"string","folio":"string","value":"float","fecha":"datetime64[ns]"}')
+    monkeypatch.setenv("TYPE_DICT", '{"id":"string","folio":"string","value":"float","date":"datetime64[ns]"}')
     monkeypatch.setenv("NAME_DICT", '{"id":"productId","value":"price"}')
 
     # 2 actualizaciones
@@ -234,7 +234,7 @@ def test_update_table_idempotent(monkeypatch, tmp_path, old_data, update_data):
     expected = expected.astype({"productId":pd.StringDtype(storage="pyarrow"),
                                 "folio":pd.StringDtype(storage="pyarrow"),
                                 "price":"float",
-                                "fecha":"datetime64[ns]"})
+                                "date":"datetime64[ns]"})
 
     # Asegurarse de duplicidad
     assert_frame_equal(result.sort_values("folio").reset_index(drop=True),

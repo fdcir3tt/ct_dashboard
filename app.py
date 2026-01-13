@@ -40,9 +40,9 @@ st.markdown('<div class="main-header"> Inventario CT International</div>', unsaf
 # -----------------------------------------------------------
 
 global_data = process_data (update=True)
-global_data["income"] = global_data["price"] * global_data["cantidad"]
+global_data["income"] = global_data["price"] * global_data["quantity"]
 data = global_data.copy()
-data["sales_day"]   = data.groupby(["productId", "fecha"])["cantidad"].transform("sum")
+data["sales_day"]   = data.groupby(["productId", "date"])["quantity"].transform("sum")
 data = gr.remove_outliers(data,"sales_day")
 
 
@@ -56,14 +56,14 @@ end_date = today
 start_date = pd.to_datetime(start_date)
 end_date   = pd.to_datetime(end_date)
 
-global_data["fecha"] = pd.to_datetime(global_data["fecha"], errors="coerce")
-data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+global_data["date"] = pd.to_datetime(global_data["date"], errors="coerce")
+data["date"] = pd.to_datetime(data["date"], errors="coerce")
 
 # Producto con cantidad de unidades más vendidas dentro de periodo
-is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
+is_in_period = ( start_date <= data["date"] ) & ( data["date"] <= end_date )
 top_product= (
     data[is_in_period]
-    .groupby("productId")["cantidad"]
+    .groupby("productId")["quantity"]
     .sum()
     .idxmax()
 )
@@ -74,7 +74,7 @@ top_product_index = product_list.index(top_product)
 is_top_product= data["productId"]==top_product
 frequent_branch= (
     data[is_top_product]
-    .groupby("sucursal")["fecha"]
+    .groupby("sucursal")["date"]
     .nunique() 
     .idxmax()
 )
@@ -84,7 +84,7 @@ frequent_branch_index = branch_list.index(frequent_branch)
 
 top_category= (
     data[is_in_period]
-    .groupby("category")["cantidad"]
+    .groupby("category")["quantity"]
     .sum()
     .idxmax()
 )
@@ -132,16 +132,16 @@ is_category = data["category"].isin(categories)
 in_branch = global_data["sucursal"] == branch
 in_elements= global_data[element_column].isin(selected_elements)
 is_global_element = global_data[element_column]==main_element
-is_in_period = ( fecha_inicio <= global_data["fecha"] ) & ( global_data["fecha"] <= fecha_fin )
+is_in_period = ( fecha_inicio <= global_data["date"] ) & ( global_data["date"] <= fecha_fin )
 
 data = global_data [in_branch & in_elements & is_in_period].copy()
 is_element = data[element_column]== main_element
 
-data["sales_day"]   = data.groupby([element_column, "fecha"])["cantidad"].transform("sum")
-data["fecha"] = pd.to_datetime(data["fecha"])
-data["month"] = data["fecha"].dt.month
-data["year"] = data["fecha"].dt.year
-data["income"] = data["price"] * data["cantidad"]
+data["sales_day"]   = data.groupby([element_column, "date"])["quantity"].transform("sum")
+data["date"] = pd.to_datetime(data["date"])
+data["month"] = data["date"].dt.month
+data["year"] = data["date"].dt.year
+data["income"] = data["price"] * data["quantity"]
 
 
 if outliers=="Sí":
@@ -261,7 +261,7 @@ with col2:
 # -----------------------------------------------------------
 
 
-total_branch_sales = data[is_element]["cantidad"].sum()
+total_branch_sales = data[is_element]["quantity"].sum()
 total_branch_cost = data[is_element]["cost"].sum()
 total_branch_profit = round( data[is_element]["income"].sum() - total_branch_cost ,2 )
 branch_inventory_t_ratio = 0
@@ -281,7 +281,7 @@ with col3:
 # -----------------------------------------------------------
 
 
-total_sales = global_data [is_global_element & is_in_period]["cantidad"].sum()
+total_sales = global_data [is_global_element & is_in_period]["quantity"].sum()
 total_cost = global_data [is_global_element & is_in_period]["cost"].sum()
 total_profit = round( global_data [is_global_element & is_in_period]["income"].sum() - total_cost ,2 )
 inventory_t_ratio = 0

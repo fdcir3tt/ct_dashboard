@@ -17,6 +17,18 @@ def load_mexico_shp():
     mexico["state"] = mexico["NAME_1"].str.upper()
     return mexico
 
+month_dict={  1:"Enero",
+                  2:"Febrero",
+                  3:"Marzo",
+                  4:"Abril",
+                  5:"Mayo",
+                  6:"Junio",
+                  7:"Julio",
+                  8:"Agosto",
+                  9:"Septiembre",
+                  10:"Octubre",
+                  11:"Noviembre",
+                  12:"Diciembre"}
 # -----------------------------------------------------------
 # AUXILIARES
 # -----------------------------------------------------------
@@ -77,12 +89,12 @@ def frequency(data:pd.DataFrame,type:str="cliente")->pd.DataFrame:
                 "mes":"month"}
     
     column = type_dict[type]
-    data["fecha"] = pd.to_datetime(data["fecha"])
-    start = data["fecha"].min().day
-    end = data["fecha"].max().day
+    data["date"] = pd.to_datetime(data["date"])
+    start = data["date"].min().day
+    end = data["date"].max().day
 
     period_length = end - start
-    df = data[[column,"fecha"]].value_counts().to_frame("count")
+    df = data[[column,"date"]].value_counts().to_frame("count")
     df["total"] = df.groupby(level=column)["count"].transform("sum") 
     df["avg_rate"] = df["total"]/period_length
     df = df.reset_index()
@@ -105,27 +117,16 @@ def top_day(data:pd.DataFrame)->str:
                   5:"Sábado",
                   6:"Domingo"}
     
-    data["fecha"] = pd.to_datetime(data["fecha"])
-    data["weekday"]=data["fecha"].dt.weekday
+    data["date"] = pd.to_datetime(data["date"])
+    data["weekday"]=data["date"].dt.weekday
     df = frequency(data,type="dia")
     df = df.sort_values(by="avg_rate",ascending=False)
     return weekday_dict[df["weekday"].iloc[0]]
 
 def top_month(data:pd.DataFrame)->str:
-    month_dict={  1:"Enero",
-                  2:"Febrero",
-                  3:"Marzo",
-                  4:"Abril",
-                  5:"Mayo",
-                  6:"Junio",
-                  7:"Julio",
-                  8:"Agosto",
-                  9:"Septiembre",
-                  10:"Octubre",
-                  11:"Noviembre",
-                  12:"Diciembre"}
+
     
-    data["fecha"] = pd.to_datetime(data["fecha"])
+    data["date"] = pd.to_datetime(data["date"])
     
     df = frequency(data,type="mes")
     df = df.sort_values(by="avg_rate",ascending=False)
@@ -139,20 +140,6 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     """
     Grafica curva de ventas y regresa la figura.
     """
-    month_dict={  1:"Enero",
-                  2:"Febrero",
-                  3:"Marzo",
-                  4:"Abril",
-                  5:"Mayo",
-                  6:"Junio",
-                  7:"Julio",
-                  8:"Agosto",
-                  9:"Septiembre",
-                  10:"Octubre",
-                  11:"Noviembre",
-                  12:"Diciembre"}
-    
-
 
     # --- Validaciones básicas ---
     if data.empty:
@@ -162,7 +149,7 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
         ax.axis("off")
         return (fig, data) if val else fig
 
-    if "fecha" not in data or element_column not in data:
+    if "date" not in data or element_column not in data:
         
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
@@ -172,13 +159,13 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     
 
     # --- Asegurar que las fechas SON datetime ---
-    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
 
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
 
     # Filtro por rango de fechas
-    in_period = (data["fecha"] >= start_date) & (data["fecha"] <= end_date)
+    in_period = (data["date"] >= start_date) & (data["date"] <= end_date)
     data = data[in_period]
 
     # Filtro por productos o categorías
@@ -208,7 +195,7 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     
     # Líneas interpoladas
     
-    df["sales_day"]   = df.groupby([element_column, "fecha"])["cantidad"].transform("sum")
+    df["sales_day"]   = df.groupby([element_column, "date"])["quantity"].transform("sum")
     df["sales_day"] = df["sales_day"].interpolate(method="linear")
     
         
@@ -222,17 +209,17 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
         is_element = df[element_column]==id
         plot_df = df[is_element]
         if plot_df.empty:
-            ax.plot(plot_df["fecha"], plot_df["sales_day"], label= id+" (no hay datos)",
+            ax.plot(plot_df["date"], plot_df["sales_day"], label= id+" (no hay datos)",
                 marker="o", color=no_data_color)
             continue
-        ax.plot(plot_df["fecha"], plot_df["sales_day"], label= id,
+        ax.plot(plot_df["date"], plot_df["sales_day"], label= id,
                 marker="o", color=colors[i])
         
     # === Recta de tendencia === #
 
     # Convertir fechas a valores numéricos (ordinales)
         
-        x = mdates.date2num(plot_df["fecha"])
+        x = mdates.date2num(plot_df["date"])
         y = plot_df["sales_day"]
 
         # Ajuste lineal
@@ -288,7 +275,7 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
         ax.axis("off")
         return (fig, data) if val else fig
 
-    if "fecha" not in data or element_column not in data:
+    if "date" not in data or element_column not in data:
         
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
@@ -303,12 +290,12 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
         .interpolate(method="linear", limit_direction="both")
 )
 
-    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
 
     
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
-    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
+    is_in_period = ( start_date <= data["date"] ) & ( data["date"] <= end_date )
     data = data[is_in_period]
 
 
@@ -349,16 +336,16 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
         is_element = df[element_column]==id
         plot_df = df[is_element]
         if plot_df.empty:
-            ax.plot(plot_df["fecha"], plot_df["sales_velocity"], label= id+" (no hay datos)",
+            ax.plot(plot_df["date"], plot_df["sales_velocity"], label= id+" (no hay datos)",
                 marker="o", color=no_data_color)
             continue
-        ax.plot(plot_df["fecha"], plot_df["sales_velocity"], label= id,
+        ax.plot(plot_df["date"], plot_df["sales_velocity"], label= id,
                 marker="o", color=colors[i])
         
     # === Recta de tendencia === #
         # Convertir fechas a valores numéricos (ordinales)
         
-        x = mdates.date2num(plot_df["fecha"])
+        x = mdates.date2num(plot_df["date"])
         y = plot_df["sales_velocity"]
 
         # Ajuste lineal
@@ -410,7 +397,7 @@ def sales_hist(data:pd.DataFrame,main_element:str,element_column:str,branch:str,
         ax.axis("off")
         return (fig, data) if val else fig
 
-    if "fecha" not in data or element_column not in data:
+    if "date" not in data or element_column not in data:
         
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
@@ -418,10 +405,10 @@ def sales_hist(data:pd.DataFrame,main_element:str,element_column:str,branch:str,
        
         return (fig, data) if val else fig
     
-    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
-    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
+    is_in_period = ( start_date <= data["date"] ) & ( data["date"] <= end_date )
     data = data[is_in_period]
 
     # Filtro por elemento
@@ -454,11 +441,11 @@ def sales_hist(data:pd.DataFrame,main_element:str,element_column:str,branch:str,
     fig, ax = plt.subplots(figsize=(10, 6))
     
     # Bins alineados a enteros
-    min_val = int(df["cantidad"].min())
-    max_value = int(df["cantidad"].max())
+    min_val = int(df["quantity"].min())
+    max_value = int(df["quantity"].max())
     bins = range(min_val,max_value+10)
     
-    counts, bin_edges, patches = ax.hist(df["cantidad"], 
+    counts, bin_edges, patches = ax.hist(df["quantity"], 
             bins=bins, 
             color='blue', 
             edgecolor='black')
@@ -506,7 +493,7 @@ def interactive_sales_heat_map(data: pd.DataFrame,main_element: str, element_col
         ax.axis("off")
         return fig
 
-    if "fecha" not in data or element_column not in data:
+    if "date" not in data or element_column not in data:
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
         ax.axis("off")
@@ -514,11 +501,11 @@ def interactive_sales_heat_map(data: pd.DataFrame,main_element: str, element_col
         return fig
 
     # Filtro por fecha 
-    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
 
-    data = data[(data["fecha"] >= start_date) & (data["fecha"] <= end_date)]
+    data = data[(data["date"] >= start_date) & (data["date"] <= end_date)]
 
     #  Filtro de elemento  
     is_element = data[element_column] == main_element
@@ -532,14 +519,14 @@ def interactive_sales_heat_map(data: pd.DataFrame,main_element: str, element_col
         return fig,data
     
     # --- Agregación ---
-    total_sales_per_state = df_filtered.groupby("state")["cantidad"].sum().reset_index()
+    total_sales_per_state = df_filtered.groupby("state")["quantity"].sum().reset_index()
 
     
     mexico = load_mexico_shp()
 
    
     merged = mexico.merge(total_sales_per_state, on="state", how="left")
-    merged["cantidad"] = merged["cantidad"].fillna(0)
+    merged["quantity"] = merged["quantity"].fillna(0)
 
     if val:
         
@@ -569,7 +556,7 @@ def interactive_sales_heat_map(data: pd.DataFrame,main_element: str, element_col
         geo_data=merged,
         name="choropleth",
         data=merged,
-        columns=["state", "cantidad"],
+        columns=["state", "quantity"],
         key_on="feature.properties.state",
         fill_color="Blues",
         fill_opacity=0.8,
@@ -581,7 +568,7 @@ def interactive_sales_heat_map(data: pd.DataFrame,main_element: str, element_col
     # ---  Estados clickeables ---
     folium.GeoJson(
         merged,
-        tooltip=folium.GeoJsonTooltip(fields=["NAME_1", "cantidad"],
+        tooltip=folium.GeoJsonTooltip(fields=["NAME_1", "quantity"],
                                       aliases=["Estado", "Ventas"]),
         popup=folium.GeoJsonPopup(fields=["NAME_1"], aliases=["Estado"]),
         name="Estados",
@@ -623,9 +610,9 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,branch:str,type:
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
 
-    data["fecha"] = pd.to_datetime(data["fecha"], errors="coerce")
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
 
-    is_in_period = ( start_date <= data["fecha"] ) & ( data["fecha"] <= end_date )
+    is_in_period = ( start_date <= data["date"] ) & ( data["date"] <= end_date )
     df_filtered = data[is_in_period]
 
 
@@ -635,7 +622,7 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,branch:str,type:
         df_filtered
             .groupby([type_selected,"sucursal"],as_index=False)
             .agg(
-                total_sales=("cantidad", "sum"),
+                total_sales=("quantity", "sum"),
                 min_cost=("cost", "min")  
             )
     )
