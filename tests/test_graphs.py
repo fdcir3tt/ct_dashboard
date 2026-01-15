@@ -2,7 +2,8 @@ import pytest
 import pandas as pd
 import numpy as np
 from matplotlib.figure import Figure
-from graphs import *
+from src.graphs import *
+from src.data_loader import *
 import matplotlib
 matplotlib.use("Agg")
 
@@ -10,7 +11,8 @@ matplotlib.use("Agg")
 # SETUP
 # -----------------------------------------------------------
 
-graphs = [period_sales,sales_velocity,sales_hist,interactive_sales_heat_map]#abc_bar_chart]
+graphs = [period_sales,period_inventory,sales_velocity,sales_hist,interactive_sales_heat_map]#abc_bar_chart]
+
 
 # -----------------------------------------------
 # BASE DE DATOS FALSA
@@ -24,6 +26,7 @@ def sample_sales_data():
         "category": ["X", "X", "Y", "Y", "X", "Y", "X", "Y", "X", "Y"],
         "state":["SONORA","SINALOA","MEXICO","SONORA","SINALOA","MEXICO","SONORA","SINALOA","MEXICO","ZACATECAS"],
         "sucursal":["HERMOSILLO, SON.","CULIACAN SIN.","TOLUCA ESTADO DE MEXICO","HERMOSILLO, SON.","CULIACAN SIN.","TOLUCA ESTADO DE MEXICO","HERMOSILLO, SON.","CULIACAN SIN.","TOLUCA ESTADO DE MEXICO","ZACATECAS"],
+        "existence":[{'01A':20,'04A':25,'30A':25,'38A':25},{'01A':20,'04A':18,'30A':25,'38A':25},{'01A':25,'04A':25,'30A':22,'38A':25},{'01A':21,'04A':25,'30A':22,'38A':25},np.nan,{'01A':21,'04A':25,'30A':16,'38A':25},{'01A':16,'04A':18,'30A':25,'38A':25},np.nan,{'01A':16,'04A':18,'30A':15,'38A':25},{'01A':21,'04A':25,'30A':16,'38A':23}],
         "quantity": [5, 7, 3, 4, np.nan, 6, 8, np.nan, 10, 2],
         "sales_day": [5, 7, 3, 4, np.nan, 6, 8, np.nan, 10, 2],
         "month": [1]*10,
@@ -49,7 +52,7 @@ def mexico_gdf():
 
 @pytest.fixture(autouse=True)
 def mock_external_dependencies(monkeypatch, mexico_gdf):
-    monkeypatch.setattr("graphs.load_mexico_shp", lambda: mexico_gdf)
+    monkeypatch.setattr("src.graphs.load_mexico_shp", lambda: mexico_gdf)
     monkeypatch.setattr("streamlit_folium.st_folium", lambda *args, **kwargs: {})
 
 
@@ -189,7 +192,10 @@ def test_missing_quantity_interpolation(sample_sales_data):
             end_date="2023-01-10",
             val=True
         )
-
+        if g==period_inventory:
+            
+            assert plot_df["stock"].isna().sum() == 0,"Despúes de la interpolación, no deben haber valores NaN"
+            continue
     
         assert plot_df["sales_day"].isna().sum() == 0,"Despúes de la interpolación, no deben haber valores NaN"
 

@@ -9,24 +9,24 @@ import pyarrow as pa
 from dotenv import load_dotenv
 import shutil
 import datetime
+from pymongo import MongoClient 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
 
+# -----------------------------------------------------------
+# SETUP 
+# -----------------------------------------------------------
 
-## Conexión
-driver=os.getenv("DWH_DRIVER")
-ip=os.getenv("DWH_IP")
-uid=os.getenv("DWH_UID")
-pwd=os.getenv("DWH_PASSWORD")
+BATCH_SIZE = 500
+HISTORIC_CONN = os.getenv("HIST_MONGO_URI")
+HIST_NAME= os.getenv("HIST_MONGO_DB")
+API_CONN = os.getenv("API_MONGO_URI")
+API_NAME = os.getenv("API_MONGO_DB")
 
-conn_str = (
-    f'DRIVER={{{driver}}};'
-    f'SERVER={ ip };'  # SQL server Ip
-    'DATABASE=DWH;'  # Nombre de base
-    f'UID={uid};'  # User id
-    f'PWD={pwd}'   # Password
-)
+Date = datetime.datetime
+Document =  dict[str, any]
+Documents = list[Document]
 
 ## Columnas Factura
 
@@ -44,15 +44,35 @@ art_col = os.getenv("ARTICLE_COLUMN")
 art_desc = os.getenv("ARTICLE_DESCRIPTION")
 art_cost = os.getenv("ARTICLE_COST")
 
-## Conexión 
+
+today = datetime.date.today()
+start_date = datetime.date(today.year, today.month, 1)
+end_date = today
+
+
+# -----------------------------------------------------------
+# CONEXIÓN
+# -----------------------------------------------------------
+driver=os.getenv("DWH_DRIVER")
+ip=os.getenv("DWH_IP")
+uid=os.getenv("DWH_UID")
+pwd=os.getenv("DWH_PASSWORD")
+
+conn_str = (
+    f'DRIVER={{{driver}}};'
+    f'SERVER={ ip };'  # SQL server Ip
+    'DATABASE=DWH;'  # Nombre de base
+    f'UID={uid};'  # User id
+    f'PWD={pwd}'   # Password
+)
+
+
 ip=os.getenv("CDB_IP")
 user=os.getenv("CDB_UID")
 password=os.getenv("CDB_PASSWORD")
 database=os.getenv('CDB_DATABASE')
 category_table=os.getenv('CDB_CATEGORY_TABLE')
 product_table=os.getenv('CDB_PRODUCT_TABLE')
-
-
 
 conn_mysql = mysql.connector.connect(
     host=ip,
@@ -61,35 +81,23 @@ conn_mysql = mysql.connector.connect(
     database=database
 )
 
-today = datetime.date.today()
-start_date = datetime.date(today.year, today.month, 1)
-end_date = today
 
-def format_columns(df:pd.DataFrame):
+def connect_to_DB(conn_uri,db_name)-> MongoClient:
+    """
+    Docstring for connect_to_DB
+    
+    :return: Cliente de mongoDB
+    :rtype: Any
+    """
 
-    # Obtener diccionarios de entorno
-    name_dict = json.loads(os.getenv("NAME_DICT"))
-    type_dict = json.loads(os.getenv("TYPE_DICT"))
+    client = MongoClient(conn_uri,compressors="zstd,snappy,zlib",maxPoolSize=5)
+    db = client[db_name]
 
-    df = df.rename(columns=name_dict)
+    return db
 
-    # Asegurarse que los tipos coinciden
-    cast_dict = {}
-    for col, dtype in type_dict.items():
-        if col in df.columns:
-            if dtype == "string":
-                cast_dict[col] = "large_string[pyarrow]"
-                continue  
-            elif dtype.startswith("float"):
-                cast_dict[col] = "float[pyarrow]"
-            else:
-                cast_dict[col] = dtype
-
-
-    if cast_dict:
-        df = df.astype(cast_dict)
-
-    return df
+# -----------------------------------------------------------
+# QUERIES
+# -----------------------------------------------------------
 
 def build_query(start_date:datetime.datetime,end_date:datetime.datetime)->str:
     """
@@ -117,8 +125,6 @@ def build_query(start_date:datetime.datetime,end_date:datetime.datetime)->str:
             """
     return query
 
-
-
 def get_query(query:str,connection_str:str=conn_str)->pd.DataFrame:    
     try:
         
@@ -131,6 +137,87 @@ def get_query(query:str,connection_str:str=conn_str)->pd.DataFrame:
 
     except pyodbc.Error as e:
         print(f"Error al intentar conectarse a la base de datos: {e}")
+
+
+def get_documents(database:None,collection:str,filters:dict=None,projection:dict=None) -> Documents:
+    """
+    Función que regresa lista de documentos extraídos de la colección de existencia
+    
+    :return: Conjunto de documentos extraídos de la colección de existencia e historial
+    :rtype: tuple
+    """
+    if database is not None:
+        db = database
+    else:
+        db = connect_to_DB(API_CONN,API_NAME)
+
+
+    collection = db[collection]
+    cursor = collection.find(filters, projection=projection,batch_size=BATCH_SIZE)
+        
+    result_docs= list(cursor) 
+    return result_docs
+
+
+def get_product_cost_dict(query_fn=get_query)-> dict :
+    """
+    Función que consulta el datawarehouse para conseguir los costos de productos y los regresa
+    como diccionario.
+    
+    :return: Regresa un diccionario donde las llaves son el código del producto (productId) y los valores el costo correspondiente
+    :rtype: dict
+    """
+    table = os.getenv("ART_TABLE_NAME")
+    art_col = os.getenv("ARTICLE_COLUMN")
+    art_cost = os.getenv("ARTICLE_COST")
+
+    query = f""" SELECT {art_col},{art_cost} 
+                 FROM {table}
+            """
+    df = query_fn(query)
+    if df is None or df.empty:
+        raise RuntimeError(
+            "No se pudo obtener costos de productos. "
+            "Revisa la conexión ODBC y variables de entorno."
+        )    
+    #cost_dict = df.set_index(art_col).to_dict(orient="index")
+    return dict(zip(df[art_col], df[art_cost]))
+
+
+
+
+
+
+def format_columns(df:pd.DataFrame):
+
+    # Obtener diccionarios de entorno
+    name_dict = json.loads(os.getenv("NAME_DICT"))
+    type_dict = json.loads(os.getenv("TYPE_DICT"))
+
+    df = df.rename(columns=name_dict)
+
+    # Asegurarse que los tipos coinciden
+    cast_dict = {}
+    for col, dtype in type_dict.items():
+        if col in df.columns:
+            if dtype == "string":
+                cast_dict[col] = "large_string[pyarrow]"
+                continue  
+            elif dtype.startswith("float"):
+                cast_dict[col] = "float[pyarrow]"
+            else:
+                cast_dict[col] = dtype
+
+
+    if cast_dict:
+        df = df.astype(cast_dict)
+
+    return df
+
+
+# -----------------------------------------------------------
+# EXTRACCIÓN
+# -----------------------------------------------------------
 
 
 def get_last_processed_offset(offset_file: str) -> int:
@@ -280,15 +367,14 @@ max_workers: int = 4,temp_dir:str='./temp_chunks'
         print(f" Error crítico: {e}")
 
 
-
-
-
 def update_table(table:str,latest_update:str,save_dir:str="data"):
     """ 
     Se especifica cual de las tablas de datos ocupa actualizarse y el último periodo
     que tiene registrado para no generar una consulta grande.
 
     """
+    if latest_update==today:
+        return None
     query = build_query (start_date=latest_update,end_date=today)
 
     extract_table_parallel(query=query,
@@ -306,6 +392,9 @@ def update_table(table:str,latest_update:str,save_dir:str="data"):
     df = df.drop_duplicates(subset=["productId","folio","date"])
     df.to_parquet(f"{save_dir}/{table}.parquet",engine="pyarrow",index=False)
 
+# -----------------------------------------------------------
+# CARGA
+# -----------------------------------------------------------
 
 def load_product_codes():
     desc_data_file_exists = os.path.exists("data/codigos_productos.csv")
@@ -398,6 +487,49 @@ def load_invoices(source_file:str,file_format:str,start_date:str=start_date,end_
     
     return df
 
+@st.cache_data
+def load_inventory()->pd.DataFrame:
+
+    conn_uri = os.getenv("HIST_MONGO_URI")
+    db_name = os.getenv("HIST_MONGO_DB")
+
+    database = connect_to_DB(conn_uri,db_name)
+
+    hist_collection = os.getenv("EXISTENCE_HIST_COLLECTION")
+    docs = get_documents(database,hist_collection)
+
+    df = pd.DataFrame(data=docs)
+    df["productId"]= df["productoReferencia"].apply( lambda x:x['codigo'])
+
+    df = df.drop(columns=["activo",'_id','productoReferencia']).rename(columns={"fechaRegistro":"date","costo":"cost","almacenes":"existence"})
+    df["date"] = df['date'].dt.strftime('%Y-%m-%d')
+    df["date"] = pd.to_datetime(df["date"])
+
+    return df
+
+@st.cache_data
+def load_storage()->dict:
+    conn_uri = os.getenv("API_MONGO_URI")
+    db_name = os.getenv("API_MONGO_DB")
+
+    database = connect_to_DB(conn_uri,db_name)
+
+    collection = os.getenv("BRANCHES_COLLECTION")
+    docs = get_documents(database,collection)
+
+    branches = pd.DataFrame(docs)
+    branches = branches[["nemonico","sucursal"]]
+    branches = branches.set_index("nemonico")["sucursal"].to_dict()
+
+    branch_storage={}
+    for key,branch in branches.items():
+        if branch in branch_storage.keys():
+            branch_storage[branch].append(key)
+            continue
+
+        branch_storage[branch]=[key]
+
+    return branch_storage
 
 def load_data(output_file:str,file_format:str,start_date:str=start_date,end_date:str=end_date)->tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
     """

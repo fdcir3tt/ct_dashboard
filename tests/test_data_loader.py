@@ -3,7 +3,7 @@ import re
 import pandas as pd
 import datetime
 from pandas.testing import assert_frame_equal
-from data_loader import extract_table_parallel, update_table
+from src.data_loader import extract_table_parallel, update_table
 
 
 
@@ -168,7 +168,7 @@ def test_update_table_partial(monkeypatch, tmp_path, old_data, update_data):
     
     monkeypatch.setattr("pyodbc.connect", lambda *a, **k: fake_conn)
     monkeypatch.setattr("pandas.read_sql", fake_read_sql)
-    monkeypatch.setattr("data_loader.extract_table_parallel", make_fake_extract_table_parallel(update_data))
+    monkeypatch.setattr("src.data_loader.extract_table_parallel", make_fake_extract_table_parallel(update_data))
     monkeypatch.setenv("TYPE_DICT", '{"id":"string","folio":"string","value":"float","date":"datetime64[ns]"}')
     monkeypatch.setenv("NAME_DICT",'{"id":"productId","value":"price"}')
 
@@ -212,7 +212,7 @@ def test_update_table_idempotent(monkeypatch, tmp_path, old_data, update_data):
     fake_conn = FakeConn(update_data)
     monkeypatch.setattr("pyodbc.connect", lambda *a, **k: fake_conn)
     monkeypatch.setattr("pandas.read_sql", fake_read_sql)
-    monkeypatch.setattr("data_loader.extract_table_parallel", make_fake_extract_table_parallel(update_data))
+    monkeypatch.setattr("src.data_loader.extract_table_parallel", make_fake_extract_table_parallel(update_data))
     monkeypatch.setenv("TYPE_DICT", '{"id":"string","folio":"string","value":"float","date":"datetime64[ns]"}')
     monkeypatch.setenv("NAME_DICT", '{"id":"productId","value":"price"}')
 

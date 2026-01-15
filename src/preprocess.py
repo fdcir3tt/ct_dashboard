@@ -1,8 +1,7 @@
 import os
 import pandas as pd
 import json
-from src.data_loader import get_query,load_data
-import numpy as np
+from src.data_loader import load_data
 import streamlit as st
 
 

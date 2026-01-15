@@ -3,7 +3,7 @@ import geopandas as gpd
 import numpy as np
 import folium
 import streamlit as st
-import json
+from src.data_loader import load_storage
 from streamlit_folium import st_folium
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -16,6 +16,8 @@ def load_mexico_shp():
     mexico = gpd.read_file("gadm41_MEX_shp/gadm41_MEX_1.shp")
     mexico["state"] = mexico["NAME_1"].str.upper()
     return mexico
+
+branch_storage = load_storage()
 
 month_dict={  1:"Enero",
                   2:"Febrero",
@@ -237,6 +239,127 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
         i+=1
         
     ax.set_title(f"Ventas diarias de {month},{year}", fontsize=16, fontweight="bold")
+    ax.set_xlabel("Fecha")
+    ax.set_ylabel("Cantidad")
+
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    
+    
+
+    # Eje X limpio
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    plt.xticks(rotation=45, ha="right")
+
+    plt.grid(False)
+    plt.legend()
+    plt.tight_layout()
+    
+    return (fig, plot_df) if val else fig
+
+def period_inventory(data: pd.DataFrame, selected_elements: list[str] ,element_column:str,branch:str ,start_date, end_date,val:bool=False,**kwargs)->Figure:
+    """
+    Grafica curva de inventario y regresa la figura.
+    """
+    
+    # --- Validaciones básicas ---
+    if data.empty:
+        
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return (fig, data) if val else fig
+
+    if "date" not in data or element_column not in data:
+        
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        #fig.savefig("plots/almacen_ventas.png")
+        return (fig, data) if val else fig
+    
+
+    # --- Asegurar que las fechas SON datetime ---
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+
+    start_date = pd.to_datetime(start_date)
+    end_date   = pd.to_datetime(end_date)
+
+    # Filtro por rango de fechas
+    in_period = (data["date"] >= start_date) & (data["date"] <= end_date)
+    data = data[in_period]
+
+    # Filtro por productos o categorías
+    in_selected = data[element_column].isin(selected_elements)
+    df = data[in_selected].copy()
+
+    if df.empty:
+        
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return (fig, df) if val else fig
+    
+    
+    # Inventario por sucursal
+    
+    storages = branch_storage[branch] 
+    df["stock"] = 0
+    for s in storages:
+        df["stock"] = df["existence"].apply(lambda x: sum(x[s] for s in storages if isinstance(x, dict) and s in x))
+
+    if df.empty:
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return (fig, df) if val else fig
+    
+    month = month_dict[ df["month"].iloc[0] ]
+    year = df["year"].iloc[0]
+    
+    
+    # Líneas interpoladas
+    df["stock"] = df["stock"].interpolate(method="linear")
+    
+        
+    fig, ax = plt.subplots(figsize=(12, 6))
+    plt.style.use("seaborn-v0_8")
+    
+    colors = ["#e63947","#39e6c9","#0400ff","#e43d0a"]
+    no_data_color = "#ee08db"
+    i = 0
+    for id in selected_elements:
+        is_element = df[element_column]==id
+        plot_df = df[is_element]
+        if plot_df.empty:
+            ax.plot(plot_df["date"], plot_df["stock"], label= id+" (no hay datos)",
+                marker="o", color=no_data_color)
+            continue
+        ax.plot(plot_df["date"], plot_df["stock"], label= id,
+                marker="o", color=colors[i])
+        
+    # === Recta de tendencia === #
+
+    # Convertir fechas a valores numéricos (ordinales)
+        
+        x = mdates.date2num(plot_df["date"])
+        y = plot_df["stock"]
+
+        # Ajuste lineal
+        coeffs = np.polyfit(x, y, 1)  # pendiente y ordenada
+        trend_fn = np.poly1d(coeffs)
+
+        # Recta suavizada para graficar
+        x_smooth = np.linspace(x.min(), x.max(), 200)
+        y_smooth = trend_fn(x_smooth)
+
+        # Graficar recta de tendencia
+        ax.plot(mdates.num2date(x_smooth), y_smooth,
+                color=colors[i], linewidth=2, linestyle="--",
+                label="Tendencia")
+        i+=1
+        
+    ax.set_title(f"Existencia diaria de {month},{year}", fontsize=16, fontweight="bold")
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Cantidad")
 

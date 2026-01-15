@@ -2,8 +2,7 @@ from dotenv import load_dotenv
 import os
 import datetime
 import pandas as pd
-import json
-from graphs import *
+from src.graphs import *
 
 load_dotenv()
 data_columns = os.getenv("SALES_DATA_COLUMNS")
@@ -17,11 +16,11 @@ mono_graphs =[period_sales,sales_velocity,sales_hist]
 # -----------------------------------------------------------
 
 df = pd.read_parquet("data/processed.parquet")
-df["income"] = df["price"] * df["cantidad"]
+df["income"] = df["price"] * df["quantity"]
 
 def load_invoices():
     df = pd.read_parquet("data/facturas.parquet",engine="pyarrow",dtype_backend="pyarrow")
-    df = df.rename(columns={"fecha":"date","cantidad":"quantity"})
+    
     return df
 
 def load_products():
@@ -49,14 +48,14 @@ start_date = pd.to_datetime(start_date)
 end_date   = pd.to_datetime(end_date)
 
 
-df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
 
 # Producto con más unidades vendidas
-is_in_period = ( start_date <= df["fecha"] ) & ( df["fecha"] <= end_date )
+is_in_period = ( start_date <= df["date"] ) & ( df["date"] <= end_date )
 top_product= (
     df[is_in_period]
-    .groupby("productId")["cantidad"]
+    .groupby("productId")["quantity"]
     .sum()
     .idxmax()
 )
@@ -67,7 +66,7 @@ top_product_index = product_list.index(top_product)
 is_top_product= df["productId"]==top_product
 frequent_branch= (
     df[is_top_product]
-    .groupby("sucursal")["fecha"]
+    .groupby("sucursal")["date"]
     .nunique() 
     .idxmax()
 )
@@ -77,7 +76,7 @@ frequent_branch_index = branch_list.index(frequent_branch)
 # Categoría con más unidades vendidas
 top_category= (
     df[is_in_period]
-    .groupby("category")["cantidad"]
+    .groupby("category")["quantity"]
     .sum()
     .idxmax()
 )
@@ -96,14 +95,14 @@ fecha_fin   = pd.to_datetime(fecha_fin)
 is_category = df["category"]==top_category
 is_category = df["productId"]==top_product
 in_branch = df["sucursal"] == frequent_branch
-is_in_period = ( fecha_inicio <= df["fecha"] ) & ( df["fecha"] <= fecha_fin )
+is_in_period = ( fecha_inicio <= df["date"] ) & ( df["date"] <= fecha_fin )
 
-df["sales_day"]   = df.groupby(["productId", "fecha"])["cantidad"].transform("sum")
-df["category_sales_day"]   = df.groupby(["category", "fecha"])["cantidad"].transform("sum")
-df["fecha"] = pd.to_datetime(df["fecha"])
-df["month"] = df["fecha"].dt.month
-df["year"] = df["fecha"].dt.year
-df["income"] = df["price"] * df["cantidad"]
+df["sales_day"]   = df.groupby(["productId", "date"])["quantity"].transform("sum")
+df["category_sales_day"]   = df.groupby(["category", "date"])["quantity"].transform("sum")
+df["date"] = pd.to_datetime(df["date"])
+df["month"] = df["date"].dt.month
+df["year"] = df["date"].dt.year
+df["income"] = df["price"] * df["quantity"]
 
 # -----------------------------------------------------------
 # PRUEBAS
@@ -118,8 +117,8 @@ def test_total_sales_consistency():
     sales = set()
     total_branch_sales = set()
     is_product = df["productId"]==top_product
-    is_in_period = ( fecha_inicio <= df["fecha"] ) & ( df["fecha"] <= fecha_fin )
-    total_sales = df[is_product & is_in_period]["cantidad"].sum()
+    is_in_period = ( fecha_inicio <= df["date"] ) & ( df["date"] <= fecha_fin )
+    total_sales = df[is_product & is_in_period]["quantity"].sum()
     sales.add(total_sales)
     for g in graphs:
         _,dummy_df = g(data=df,
@@ -138,13 +137,13 @@ def test_total_sales_consistency():
             total_branch_sales.add(branch_sales)
             continue
         if g==interactive_sales_heat_map:
-            total_sales = dummy_df["cantidad"].sum()
+            total_sales = dummy_df["quantity"].sum()
             sales.add(total_sales)
             continue
 
         in_branch = dummy_df["sucursal"]==frequent_branch
         
-        branch_sales = dummy_df[in_branch]["cantidad"].sum()
+        branch_sales = dummy_df[in_branch]["quantity"].sum()
         total_branch_sales.add(branch_sales)
 
     assert len(sales)==1 ,"Todas las gráficas deben coincidir en la venta total del producto a nivel global"
@@ -197,7 +196,7 @@ def test_top_product():
             continue
         top_products.add(
                         dummy_df
-                        .groupby("productId")["cantidad"]
+                        .groupby("productId")["quantity"]
                         .sum()
                         .idxmax()
                         )
@@ -253,19 +252,19 @@ def test_value_ranges():
     total_sales_product = merged_df.groupby("productId")["quantity"].sum()
     same_sales_total = total_sales_product.sum() == total_sales_category.sum()
 
-    positive_ranges = ( df["price"] > 0 )&( df["cost"] > 0 )&( df["cantidad"] > 0 )
+    positive_ranges = ( df["price"] > 0 )&( df["cost"] > 0 )&( df["quantity"] > 0 )
     assert positive_ranges.all(),"Los precios,costos y cantidades deben ser valores positivos"
 
     market_consistency = df["price"] > df ["cost"]
     assert market_consistency.all(),"El precio por unidad debe ser mayor al costo"
     
-    valid_period = ( df["fecha"] >=pd.to_datetime( datetime.date(2020, 1, 1)) ) & ( df["fecha"] <= end_date )
+    valid_period = ( df["date"] >=pd.to_datetime( datetime.date(2020, 1, 1)) ) & ( df["date"] <= end_date )
     assert valid_period.all(),"Fechas deben caer dentro del periodo 2020 hasta la actualidad"
     
 
-    df["sales_day"] = df.groupby("productId")["cantidad"].transform("sum")
+    df["sales_day"] = df.groupby("productId")["quantity"].transform("sum")
     df["sales_speed"] = df["sales_speed"] = (
-    df.groupby("productId")["cantidad"]
+    df.groupby("productId")["quantity"]
       .rolling(window=3, min_periods=1)
       .mean()
       .reset_index(level=0, drop=True)

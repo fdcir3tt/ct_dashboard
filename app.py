@@ -3,7 +3,8 @@ import pandas as pd
 import numpy as np
 import datetime
 import os
-from src import graphs as gr  
+from src.graphs import *
+from src.data_loader import *
 from src.preprocess import process_data
 
 # -----------------------------------------------------------
@@ -41,11 +42,12 @@ st.markdown('<div class="main-header"> Inventario CT International</div>', unsaf
 
 global_data = process_data (update=True)
 global_data["income"] = global_data["price"] * global_data["quantity"]
+
 data = global_data.copy()
 data["sales_day"]   = data.groupby(["productId", "date"])["quantity"].transform("sum")
-data = gr.remove_outliers(data,"sales_day")
+data = remove_outliers(data,"sales_day")
 
-
+inventory = load_inventory()
 # -----------------------------------------------------------
 # VALORES PREDETERMINADOS
 # -----------------------------------------------------------
@@ -158,31 +160,38 @@ if data.empty:
 # GRÁFICAS
 # -----------------------------------------------------------
 
-period_sales = gr.period_sales(data=data,
+period_sales = period_sales(data=data,
                                selected_elements=selected_elements,
                                element_column=element_column,
                                branch=branch,
                                start_date=fecha_inicio,end_date=fecha_fin)
 
-sales_velocity = gr.sales_velocity(data=data,
+period_inventory = period_inventory(data=inventory,
+                               selected_elements=selected_elements,
+                               element_column=element_column,
+                               branch=branch,
+                               start_date=fecha_inicio,end_date=fecha_fin)
+
+
+sales_velocity = sales_velocity(data=data,
                                    selected_elements=selected_elements,
                                    element_column=element_column,
                                    branch=branch,
                                    start_date=fecha_inicio,end_date=fecha_fin)
 
 
-histogram = gr.sales_hist(data=data,
+histogram = sales_hist(data=data,
                           main_element=main_element,
                           element_column=element_column,
                           branch=branch,
                           start_date=fecha_inicio,end_date=fecha_fin)
 
 
-product_priorities = gr.abc_bar_chart(data=global_data,
+product_priorities = abc_bar_chart(data=global_data,
                                       branch=branch,
                                       start_date=fecha_inicio,end_date=fecha_fin,type="productos")
 
-category_priorities = gr.abc_bar_chart(data=global_data,
+category_priorities = abc_bar_chart(data=global_data,
                                       branch=branch,
                                       start_date=fecha_inicio,end_date=fecha_fin,type="categorias")
 
@@ -195,7 +204,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.pyplot(period_sales)
 with col2:
-    st.pyplot(sales_velocity)
+    st.pyplot(period_inventory)
 
 # -----------------------------------------------------------
 # INFO DE PRODUCTO
@@ -204,15 +213,15 @@ with col2:
 cost_per_unit = data["cost"].iloc[0]
 price_range =( data["price"].min() , data["price"].max() )
 category = data[is_element]["category"].iloc[0]
-top_clients = list ( gr.top_n(data[is_element],type="cliente")["clientId"] )
+top_clients = list ( top_n(data[is_element],type="cliente")["clientId"] )
 
 clients_str=''
 for client in top_clients:
     clients_str+=client+','
 clients_str = clients_str[:-1]
 
-top_day = gr.top_day(data[is_element])
-top_month = gr.top_month(data[is_element])
+top_day = top_day(data[is_element])
+top_month = top_month(data[is_element])
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -247,7 +256,7 @@ with col1:
     st.pyplot(histogram)
 with col2:
 
-    state = gr.interactive_sales_heat_map(
+    state = interactive_sales_heat_map(
         data=global_data,
         main_element=main_element,
         element_column=element_column,

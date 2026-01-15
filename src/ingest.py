@@ -2,10 +2,10 @@ import os
 import pandas as pd
 import logging
 import datetime
-from data_loader import load_product_codes,get_query 
+from src.data_loader import *
 from dotenv import load_dotenv
 from bson import BSON
-from pymongo import MongoClient , UpdateOne
+
 
 
 # -----------------------------------------------------------
@@ -38,74 +38,6 @@ id_fields = ["_id","existenciaId","codigo"]
 Date = datetime.datetime
 Document =  dict[str, any]
 Documents = list[Document]
-
-
-# -----------------------------------------------------------
-# CONEXIÓN
-# -----------------------------------------------------------
-
-
-
-def connect_to_DB(conn_uri,db_name)-> MongoClient:
-    """
-    Docstring for connect_to_DB
-    
-    :return: Cliente de mongoDB
-    :rtype: Any
-    """
-
-    client = MongoClient(conn_uri,compressors="zstd,snappy,zlib",maxPoolSize=5)
-    db = client[db_name]
-
-    return db
-
-# -----------------------------------------------------------
-# AUXILIARES
-# -----------------------------------------------------------
-
-
-def get_documents(database:None,collection:str,filters:dict,projection:dict) -> Documents:
-    """
-    Función que regresa lista de documentos extraídos de la colección de existencia
-    
-    :return: Conjunto de documentos extraídos de la colección de existencia e historial
-    :rtype: tuple
-    """
-    if database is not None:
-        db = database
-    else:
-        db = connect_to_DB(API_CONN,API_NAME)
-
-
-    collection = db[collection]
-    cursor = collection.find(filters, projection=projection,batch_size=BATCH_SIZE)
-        
-    result_docs= list(cursor) 
-    return result_docs
-
-def get_product_cost_dict(query_fn=get_query)-> dict :
-    """
-    Función que consulta el datawarehouse para conseguir los costos de productos y los regresa
-    como diccionario.
-    
-    :return: Regresa un diccionario donde las llaves son el código del producto (productId) y los valores el costo correspondiente
-    :rtype: dict
-    """
-    table = os.getenv("ART_TABLE_NAME")
-    art_col = os.getenv("ARTICLE_COLUMN")
-    art_cost = os.getenv("ARTICLE_COST")
-
-    query = f""" SELECT {art_col},{art_cost} 
-                 FROM {table}
-            """
-    df = query_fn(query)
-    if df is None or df.empty:
-        raise RuntimeError(
-            "No se pudo obtener costos de productos. "
-            "Revisa la conexión ODBC y variables de entorno."
-        )    
-    #cost_dict = df.set_index(art_col).to_dict(orient="index")
-    return dict(zip(df[art_col], df[art_cost]))
 
 
 # -----------------------------------------------------------
@@ -159,11 +91,6 @@ def log_collection_size(db, collection_name, logger=logging.info, num_inserted_d
         msg = f"inserted={num_inserted_docs} " + msg
 
     logger(msg)
-
-
-
-
-
 
 
 

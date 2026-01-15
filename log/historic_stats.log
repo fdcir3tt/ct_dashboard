@@ -13,3 +13,7 @@
 2026-01-04 06:00:05,821 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17670636 storage=2486272 total=2486272
 2026-01-05 06:00:06,095 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17701168 storage=2486272 total=2486272
 2026-01-06 06:00:06,064 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17731700 storage=2494464 total=2494464
+2026-01-07 06:00:05,859 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17762232 storage=2494464 total=2494464
+2026-01-12 08:20:58,017 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17792764 storage=2502656 total=2502656
+2026-01-13 06:00:06,524 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17823296 storage=2502656 total=2502656
+2026-01-15 08:59:12,611 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17853801 storage=2510848 total=2510848
