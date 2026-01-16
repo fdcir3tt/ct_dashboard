@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import datetime
-import os
 from src.graphs import *
 from src.data_loader import *
 from src.preprocess import process_data
@@ -160,20 +158,20 @@ if data.empty:
 # GRÁFICAS
 # -----------------------------------------------------------
 
-period_sales = period_sales(data=data,
+period_sales_fig = period_sales(data=data,
                                selected_elements=selected_elements,
                                element_column=element_column,
                                branch=branch,
                                start_date=fecha_inicio,end_date=fecha_fin)
 
-period_inventory = period_inventory(data=inventory,
+period_inventory_fig = period_inventory(data=inventory,
                                selected_elements=selected_elements,
                                element_column=element_column,
                                branch=branch,
                                start_date=fecha_inicio,end_date=fecha_fin)
 
 
-sales_velocity = sales_velocity(data=data,
+sales_velocity_fig = sales_velocity(data=data,
                                    selected_elements=selected_elements,
                                    element_column=element_column,
                                    branch=branch,
@@ -202,9 +200,9 @@ category_priorities = abc_bar_chart(data=global_data,
 
 col1, col2 = st.columns(2)
 with col1:
-    st.pyplot(period_sales)
+    st.pyplot(period_sales_fig)
 with col2:
-    st.pyplot(period_inventory)
+    st.pyplot(period_inventory_fig)
 
 # -----------------------------------------------------------
 # INFO DE PRODUCTO
@@ -270,8 +268,8 @@ with col2:
 # -----------------------------------------------------------
 
 
-total_branch_sales = data[is_element]["quantity"].sum()
-total_branch_cost = data[is_element]["cost"].sum()
+total_branch_sales = round ( data[is_element]["quantity"].sum() ,2 )
+total_branch_cost = round ( data[is_element]["cost"].sum() ,2 )
 total_branch_profit = round( data[is_element]["income"].sum() - total_branch_cost ,2 )
 branch_inventory_t_ratio = 0
 
@@ -290,8 +288,8 @@ with col3:
 # -----------------------------------------------------------
 
 
-total_sales = global_data [is_global_element & is_in_period]["quantity"].sum()
-total_cost = global_data [is_global_element & is_in_period]["cost"].sum()
+total_sales = round( global_data [is_global_element & is_in_period]["quantity"].sum() , 2 )
+total_cost = round( global_data [is_global_element & is_in_period]["cost"].sum() , 2 )
 total_profit = round( global_data [is_global_element & is_in_period]["income"].sum() - total_cost ,2 )
 inventory_t_ratio = 0
 

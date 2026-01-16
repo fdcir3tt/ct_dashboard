@@ -314,6 +314,9 @@ def period_inventory(data: pd.DataFrame, selected_elements: list[str] ,element_c
         ax.axis("off")
         return (fig, df) if val else fig
     
+    df["month"] = df["date"].dt.month
+    df["year"] = df["date"].dt.year
+
     month = month_dict[ df["month"].iloc[0] ]
     year = df["year"].iloc[0]
     
@@ -379,18 +382,6 @@ def period_inventory(data: pd.DataFrame, selected_elements: list[str] ,element_c
     return (fig, plot_df) if val else fig
 
 def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,branch:str,start_date,end_date,val:bool=False,**kwargs):
-    month_dict={  1:"Enero",
-                  2:"Febrero",
-                  3:"Marzo",
-                  4:"Abril",
-                  5:"Mayo",
-                  6:"Junio",
-                  7:"Julio",
-                  8:"Agosto",
-                  9:"Septiembre",
-                  10:"Octubre",
-                  11:"Noviembre",
-                  12:"Diciembre"}
     
     if data.empty:
         fig, ax = plt.subplots(figsize=(8, 4))
