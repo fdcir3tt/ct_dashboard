@@ -7,6 +7,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pyarrow as pa
 from dotenv import load_dotenv
+import requests
 import shutil
 import datetime
 from pymongo import MongoClient 
@@ -23,6 +24,7 @@ HISTORIC_CONN = os.getenv("HIST_MONGO_URI")
 HIST_NAME= os.getenv("HIST_MONGO_DB")
 API_CONN = os.getenv("API_MONGO_URI")
 API_NAME = os.getenv("API_MONGO_DB")
+EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY")
 
 Date = datetime.datetime
 Document =  dict[str, any]
@@ -43,6 +45,8 @@ table = os.getenv("ART_TABLE_NAME")
 art_col = os.getenv("ARTICLE_COLUMN")
 art_desc = os.getenv("ARTICLE_DESCRIPTION")
 art_cost = os.getenv("ARTICLE_COST")
+art_cost_coin = os.getenv("ARTICLE_COST_COIN")
+art_price_coin = os.getenv("ARTICLE_PRICE_COIN")
 
 
 today = datetime.date.today()
@@ -184,8 +188,38 @@ def get_product_cost_dict(query_fn=get_query)-> dict :
     return dict(zip(df[art_col], df[art_cost]))
 
 
+def get_usd_rate_time_series(start:datetime.datetime=datetime.datetime(today.year,today.month,1),end:datetime.datetime=today) ->pd.DataFrame: 
+    
+    url = "https://api.fxratesapi.com/timeseries"
 
+    params = {
+        "api_key": EXCHANGE_API_KEY,
+        "start_date":start.strftime("%Y-%m-%d"),
+        "end_date": end.strftime("%Y-%m-%d"),
+        "base": "USD",
+        "currencies": "MXN",
+        "accuracy": "day",
+        "amount": 1,
+        "places": 6,
+        "format": "json"
+    }
 
+    response = requests.get(url=url,params=params, timeout=10)
+    response.raise_for_status()
+    data = response.json()
+    rates = data["rates"]
+    
+    exchange_rates={}
+    for date,info in rates.items():
+        exchange_rates[date]=info["MXN"]
+
+    df = pd.DataFrame(data=exchange_rates.items(),columns=["date","exchange_rate"])
+    df = df.set_index("date")
+    return df
+
+# -----------------------------------------------------------
+# TRANSFORMACIONES
+# -----------------------------------------------------------
 
 
 def format_columns(df:pd.DataFrame):
@@ -397,19 +431,19 @@ def update_table(table:str,latest_update:str,save_dir:str="data"):
 # -----------------------------------------------------------
 
 def load_product_codes():
-    desc_data_file_exists = os.path.exists("data/codigos_productos.csv")
+    desc_data_file_exists = os.path.exists("data/codigos_productos.parquet")
     if desc_data_file_exists:
-        df = pd.read_csv('data/codigos_productos.csv')
+        df = pd.read_parquet('data/codigos_productos.parquet')
         df = df.drop(columns='Unnamed: 0')
     else:
         query = f""" 
-                    SELECT {art_col},{art_desc},{art_cost}
+                    SELECT {art_col},{art_desc},{art_cost},{art_cost_coin},{art_price_coin}
                     FROM {table}
         """
 
         df = get_query(query)
-        df = df.rename(columns={art_col:'PRODUCTO',art_desc:'DESCRIPCION'})
-        df.to_csv('data/codigos_productos.csv')
+        df = df.rename(columns={art_col:'PRODUCTO',art_desc:'DESCRIPCION',art_cost_coin:'MONEDA_COMPRA',art_price_coin:'MONEDA_VENTA'})
+        df.to_parquet('data/codigos_productos.parquet',index=False)
 
     return df
 
