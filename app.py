@@ -254,14 +254,13 @@ with col1:
     st.pyplot(histogram)
 with col2:
 
-    state = interactive_sales_heat_map(
-        data=global_data,
-        main_element=main_element,
-        element_column=element_column,
-        start_date=fecha_inicio,
-        end_date=fecha_fin
-    )
-
+    st.components.v1.html(interactive_sales_heat_map(
+            data=global_data,
+            main_element=main_element,
+            element_column=element_column,
+            start_date=fecha_inicio,
+            end_date=fecha_fin
+        ), height=600)
 
 # -----------------------------------------------------------
 # KPIs (SUCURSAL)
@@ -275,11 +274,11 @@ branch_inventory_t_ratio = 0
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.markdown(f'<div class="metric-card"><h3>Ventas Totales</h3><h2>{total_branch_sales}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card"><h3>Ventas Totales</h3><h2>{total_branch_sales:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 with col2:
-    st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>${total_branch_profit}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>${total_branch_profit:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 with col3:
-    st.markdown(f'<div class="metric-card"><h3>Costo Total</h3><h2>${total_branch_cost}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card"><h3>Costo Total</h3><h2>${total_branch_cost:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 
 
 
@@ -295,11 +294,11 @@ inventory_t_ratio = 0
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.markdown(f'<div class="metric-card"><h3>Ventas Totales</h3><h2>{total_sales}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card"><h3>Ventas Totales</h3><h2>{total_sales:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 with col2:
-    st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>${total_profit}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card"><h3>Ganancia Total</h3><h2>${total_profit:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 with col3:
-    st.markdown(f'<div class="metric-card"><h3>Costo Total</h3><h2>${total_cost}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card"><h3>Costo Total</h3><h2>${total_cost:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 
 
 

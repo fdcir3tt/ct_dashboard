@@ -14,6 +14,9 @@ from matplotlib.figure import Figure
 @st.cache_resource
 def load_mexico_shp():
     mexico = gpd.read_file("data/raw/gadm41_MEX_shp/gadm41_MEX_1.shp")
+    mexico["geometry"] = mexico["geometry"].simplify(
+        tolerance=0.01, preserve_topology=True
+    )
     mexico["state"] = mexico["NAME_1"].str.upper()
     return mexico
 
@@ -596,7 +599,7 @@ def sales_hist(data:pd.DataFrame,main_element:str,element_column:str,branch:str,
     
     return (fig, df) if val else fig
 
-
+@st.cache_data
 def interactive_sales_heat_map(data: pd.DataFrame,main_element: str, element_column: str,start_date, end_date,val:bool=False,**kwargs):
     """
     Interactive choropleth heat map of Mexico with state selection.
@@ -702,7 +705,7 @@ def interactive_sales_heat_map(data: pd.DataFrame,main_element: str, element_col
         props = map_data["last_active_drawing"]
         if props and "properties" in props:
             selected_state = props["properties"]["NAME_1"]
-    
+    return m._repr_html_()
 
 
 
@@ -720,6 +723,8 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,branch:str,type:
         else:
             return "Baja"
         
+    # Filtros
+
     type_selected = type_dict[type]
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
@@ -727,9 +732,8 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,branch:str,type:
     data["date"] = pd.to_datetime(data["date"], errors="coerce")
 
     is_in_period = ( start_date <= data["date"] ) & ( data["date"] <= end_date )
-    df_filtered = data[is_in_period]
-
-
+    in_branch = data["sucursal"] == branch
+    df_filtered = data[is_in_period&in_branch]
 
 
     df_summary = (
@@ -741,8 +745,6 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,branch:str,type:
             )
     )
 
-    
-
     df_summary["annual_value"] = df_summary["total_sales"] * df_summary["min_cost"]
     df_summary = df_summary.sort_values("annual_value", ascending=False)
     df_summary["cumulative_val"] = df_summary["annual_value"].cumsum() / df_summary["annual_value"].sum()
@@ -750,8 +752,8 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,branch:str,type:
 
     
     
-    in_branch = df_summary["sucursal"] == branch
-    df_summary = df_summary[in_branch]
+    
+    
 
     color_map = {"Alta":"red", "Media":"blue", "Baja":"gray"}
 
