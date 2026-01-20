@@ -426,15 +426,15 @@ def update_table(table:str,latest_update:str,save_dir:str="data"):
     df = df.drop_duplicates(subset=["productId","folio","date"])
     df.to_parquet(f"{save_dir}/{table}.parquet",engine="pyarrow",index=False)
 
+    shutil.rmtree(f"{save_dir}/{table}_update.parquet")
 # -----------------------------------------------------------
 # CARGA
 # -----------------------------------------------------------
 
 def load_product_codes():
-    desc_data_file_exists = os.path.exists("data/codigos_productos.parquet")
+    desc_data_file_exists = os.path.exists("data/raw/codigos_productos.parquet")
     if desc_data_file_exists:
-        df = pd.read_parquet('data/codigos_productos.parquet')
-        df = df.drop(columns='Unnamed: 0')
+        df = pd.read_parquet('data/raw/codigos_productos.parquet')
     else:
         query = f""" 
                     SELECT {art_col},{art_desc},{art_cost},{art_cost_coin},{art_price_coin}
@@ -443,14 +443,16 @@ def load_product_codes():
 
         df = get_query(query)
         df = df.rename(columns={art_col:'PRODUCTO',art_desc:'DESCRIPCION',art_cost_coin:'MONEDA_COMPRA',art_price_coin:'MONEDA_VENTA'})
-        df.to_parquet('data/codigos_productos.parquet',index=False)
+        df["MONEDA_COMPRA" ] = df["MONEDA_COMPRA"].astype("int8[pyarrow]")
+        df["MONEDA_VENTA"] = df["MONEDA_VENTA"].astype("int8[pyarrow]")
+        df.to_parquet('data/raw/codigos_productos.parquet',index=False)
 
     return df
 
 def load_categories():
-    categories_exist = os.path.exists("data/categorias.parquet")
+    categories_exist = os.path.exists("data/raw/categorias.parquet")
     if categories_exist:
-        df = pd.read_parquet("data/categorias.parquet")
+        df = pd.read_parquet("data/raw/categorias.parquet")
         
     else:
         cursor = conn_mysql.cursor(dictionary=True)  # devuelve resultados como diccionarios
@@ -462,14 +464,14 @@ def load_categories():
         conn_mysql.close()
 
         df = pd.DataFrame(rows_category)
-        df.to_parquet("data/categorias.parquet")
+        df.to_parquet("data/raw/categorias.parquet")
     return df
 
 def load_products():
-    products_exist = os.path.exists("data/productos.parquet")
+    products_exist = os.path.exists("data/raw/productos.parquet")
     if products_exist:
         
-        df = pd.read_parquet("data/productos.parquet")
+        df = pd.read_parquet("data/raw/productos.parquet")
         
     else:
         cursor = conn_mysql.cursor(dictionary=True)  # devuelve resultados como diccionarios
@@ -480,26 +482,21 @@ def load_products():
         conn_mysql.close()
 
         df = pd.DataFrame(rows_products)
-        df.to_parquet("data/productos.parquet") 
+        df.to_parquet("data/raw/productos.parquet") 
     return df 
 
-def load_invoices(source_file:str,file_format:str,start_date:str=start_date,end_date:str=end_date)->pd.DataFrame:
+def load_invoices(start_date:str=start_date,end_date:str=end_date)->pd.DataFrame:
     """
     Recibe nombre de salida del archivo, su formato y el periodo de las facturas que se quieren
     extraer. Revisa si esta actualizada la base con ese periodo para no hacer la consulta completa. 
     """
-    if file_format=="csv":
-        if os.path.exists("data/facturas.csv"):
-            current_df = pd.read_csv("data/facturas.csv")
-            current_df = format_columns(current_df)
-        else:
-            current_df = pd.DataFrame()
-    if file_format=="parquet":
-        if os.path.exists("data/facturas.parquet"):
-            current_df = pd.read_parquet("data/facturas.parquet")
-            current_df = format_columns(current_df)
-        else:
-            current_df = pd.DataFrame()
+    
+    source_file = "data/raw/facturas.parquet"
+    if os.path.exists("data/raw/facturas.parquet"):
+        current_df = pd.read_parquet("data/raw/facturas.parquet")
+        current_df = format_columns(current_df)
+    else:
+        current_df = pd.DataFrame()
 
     if current_df.empty:
         query = build_query(start_date,end_date)
@@ -511,13 +508,11 @@ def load_invoices(source_file:str,file_format:str,start_date:str=start_date,end_
     latest_period = current_df["date"].max().date()
     not_updated = latest_period < end_date
     if not_updated:
-        update_table(table="facturas",latest_update=latest_period)
+        update_table(save_dir="data/raw",table="facturas",latest_update=latest_period)
 
 
-    if file_format=="csv":
-        df = pd.read_csv(source_file)
-    if file_format=="parquet":
-        df = pd.read_parquet(source_file)
+    
+    df = pd.read_parquet(source_file)
     
     return df
 
@@ -565,10 +560,10 @@ def load_storage()->dict:
 
     return branch_storage
 
-def load_data(output_file:str,file_format:str,start_date:str=start_date,end_date:str=end_date)->tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
+def load_data(output_file:str,start_date:str=start_date,end_date:str=end_date)->tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
     """
     Función que recibe fecha de inicio y final de periodo junto con ruta de salida
-    especifícada. Extrae los datos necesarios, los guarda en un archivo csv y los 
+    especifícada. Extrae los datos necesarios, los guarda en un archivo parquet y los 
     carga en un dataframe de pandas.
     
     """
@@ -580,7 +575,7 @@ def load_data(output_file:str,file_format:str,start_date:str=start_date,end_date
     products= load_products()
     
     # Facturas
-    invoices = load_invoices(source_file=output_file,file_format=file_format,start_date=start_date,end_date=end_date)
+    invoices = load_invoices(source_file=output_file,start_date=start_date,end_date=end_date)
 
     return invoices,categories,products,product_codes
 

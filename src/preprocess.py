@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import json
-from src.data_loader import load_data
+from src.data_loader import load_data,load_categories,load_products
 import streamlit as st
 
 
@@ -24,8 +24,8 @@ def clean_data()->pd.DataFrame:
     """
     # Limpieza / Filtros
 
-    invoices,categories,products,product_codes= load_data(output_file="data/facturas.parquet",file_format="parquet")
-    branches = pd.read_csv("data/almacen.csv")
+    invoices,categories,products,product_codes= load_data(output_file="data/raw/facturas.parquet")
+    branches = pd.read_csv("data/raw/almacen.csv")
     branches = branches[["nemonico","sucursal","homoclave"]]
 
 
@@ -49,7 +49,7 @@ def process_data(update:bool=False)->pd.DataFrame:
     útiles/relevantes en el dashboard. 
 
     """
-    existence= pd.read_csv("data/existencia.csv")
+    existence= pd.read_csv("data/raw/existencia.csv")
     existence["almacenes"] = existence["almacenes"].str.replace("'", '"')
     existence["total_stock"] =  existence["almacenes"].apply(lambda x: get_existence(x) )
 
@@ -63,13 +63,13 @@ def process_data(update:bool=False)->pd.DataFrame:
 
     
 
-    data_exists= os.path.exists("data/processed.parquet")
+    data_exists= os.path.exists("data/processed/facturas_ventas.parquet")
     if (data_exists)&(not update):
-        df=pd.read_parquet("data/processed.parquet")
+        df=pd.read_parquet("data/processed/facturas_ventas.parquet")
         return df
     else:
-        categories = pd.read_parquet("data/categorias.parquet")
-        products = pd.read_parquet("data/productos.parquet")
+        categories = load_categories()
+        products = load_products()
 
         products = products.merge(categories,how="left",on="idCategoria")
         products = products [["clave","nombre"]]
@@ -90,6 +90,6 @@ def process_data(update:bool=False)->pd.DataFrame:
         df = df.merge(existence,how="inner",left_on="productId",right_on="codigo")
         
         df = df.rename(columns={"ART_COS":"cost"})
-        df.to_parquet('data/processed.parquet',index=False)
+        df.to_parquet('data/processed/facturas_ventas.parquet',index=False)
 
     return df

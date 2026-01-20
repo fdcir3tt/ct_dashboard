@@ -3,7 +3,7 @@ import os
 import datetime
 import pandas as pd
 from src.graphs import *
-
+from src.data_loader import *
 load_dotenv()
 data_columns = os.getenv("SALES_DATA_COLUMNS")
 
@@ -15,27 +15,9 @@ mono_graphs =[period_sales,sales_velocity,sales_hist]
 # CARGA DE DATOS
 # -----------------------------------------------------------
 
-df = pd.read_parquet("data/processed.parquet")
+df = pd.read_parquet("data/processed/facturas_ventas.parquet")
 df["income"] = df["price"] * df["quantity"]
 
-def load_invoices():
-    df = pd.read_parquet("data/facturas.parquet",engine="pyarrow",dtype_backend="pyarrow")
-    
-    return df
-
-def load_products():
-    categories = pd.read_parquet("data/categorias.parquet")
-    products = pd.read_parquet("data/productos.parquet")
-
-    products = products.merge(categories,how="left",on="idCategoria")
-    products = products [["clave","nombre"]]
-    products = products.rename(columns={"nombre":"category"})
-    return products
-
-def load_categories():
-    categories = pd.read_parquet("data/categorias.parquet")
-    categories = categories [["nombre"]]
-    return categories
 
 # -----------------------------------------------------------
 # VALORES PREDETERMINADOS
@@ -225,8 +207,8 @@ def test_formats():
                         "folio":["HMO2993"],}
         
     reference_dtypes={"productId":"large_string[pyarrow]",
-                        "quantity":"int32[pyarrow]",
-                        "date":"timestamp[ns][pyarrow]",
+                        "quantity":"int32",
+                        "date":"datetime64[ns]",
                         "price":"float[pyarrow]",
                         "clientId":"large_string[pyarrow]",
                         "folio":"large_string[pyarrow]"}
@@ -245,8 +227,12 @@ def test_value_ranges():
     """
     invoices = load_invoices()
     products = load_products()
+    categories = load_categories()
+
+    products = products.merge(categories,how="left",on="idCategoria")
+    products = products [["clave","nombre"]]
+    products = products.rename(columns={"nombre":"category"})
     merged_df = invoices.merge(products,how = "left",left_on="productId",right_on="clave")
-    
     
     total_sales_category = merged_df.groupby("category")["quantity"].sum()
     total_sales_product = merged_df.groupby("productId")["quantity"].sum()
