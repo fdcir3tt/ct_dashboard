@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import json
-from src.data_loader import load_data,load_categories,load_products
+from src.data_loader import get_usd_rate_time_series,load_categories,load_products,load_invoices,load_product_codes
 import streamlit as st
 
 
@@ -22,25 +22,36 @@ def clean_data()->pd.DataFrame:
     Función que carga datos y los limpia y prepara para el procesamiento.
 
     """
-    # Limpieza / Filtros
+    # Carga
 
-    invoices,categories,products,product_codes= load_data(output_file="data/raw/facturas.parquet")
+    invoices = load_invoices()
+    product_codes =load_product_codes()
+    exchange_rates = get_usd_rate_time_series()
     branches = pd.read_csv("data/raw/almacen.csv")
-    branches = branches[["nemonico","sucursal","homoclave"]]
-
-
-    invoices['branchId']= invoices['folio'].str.extract( r'(?P<branchId>[A-Za-z]+)' )
     
-    #product_codes = product_codes.astype({'productId':'string'}) 
-    invoices = invoices.merge(product_codes,on="productId", how='inner')
+    # Normalizar precios a MXN
+    df = invoices.merge(product_codes[["productId","sell_coin","buy_coin","cost"]],how="inner",on="productId")
+    df = df.merge(exchange_rates,how="inner",on="date")
 
-    is_sale= (invoices["quantity"] > 0)&( invoices["price"] > 0 ) # Solo nos interesan casos donde sí hubo venta
-    is_hardware = invoices["cost"] > 0
-    invoices = invoices[is_sale & is_hardware]
-
-    invoices = invoices.merge(branches,how="inner",left_on="branchId",right_on="homoclave")
     
-    return invoices
+    df["price"] = df["price"] * (
+        1 - df["sell_coin"] + df["exchange_rate"] * df["sell_coin"]
+    )
+    df["cost"] = df["cost"] * (
+        1 - df["buy_coin"] + df["exchange_rate"] * df["buy_coin"]
+    )
+    df= df.drop(columns=["sell_coin","buy_coin","exchange_rate"])
+
+    # Filtros
+    is_sale= (df["quantity"] > 0)&( df["price"] > 0 ) # Solo nos interesan casos donde sí hubo venta
+    is_hardware = df["cost"] > 0
+    df = df[is_sale & is_hardware]
+
+    # Sucursales
+    df['branchId']= df['folio'].str.extract( r'(?P<branchId>[A-Za-z]+)' )
+    df = df.merge(branches[["nemonico","sucursal","homoclave"]],how="inner",left_on="branchId",right_on="homoclave")
+    
+    return df
 
 @st.cache_data
 def process_data(update:bool=False)->pd.DataFrame:

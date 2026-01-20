@@ -208,8 +208,8 @@ with col2:
 # INFO DE PRODUCTO
 # -----------------------------------------------------------
 
-cost_per_unit = data["cost"].iloc[0]
-price_range =( data["price"].min() , data["price"].max() )
+cost_per_unit = round(data["cost"].iloc[0],2)
+price_range =( round(data["price"].min(),2) , round( data["price"].max(),2) )
 category = data[is_element]["category"].iloc[0]
 top_clients = list ( top_n(data[is_element],type="cliente")["clientId"] )
 
