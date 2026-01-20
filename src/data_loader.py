@@ -5,7 +5,6 @@ import mysql.connector
 import streamlit as st
 import pandas as pd
 import pyarrow.parquet as pq
-import pyarrow as pa
 from dotenv import load_dotenv
 import requests
 import shutil
@@ -211,9 +210,12 @@ def get_usd_rate_time_series(start:datetime.datetime=datetime.datetime(today.yea
     
     exchange_rates={}
     for date,info in rates.items():
-        exchange_rates[date]=info["MXN"]
+        date = datetime.datetime.fromisoformat(date)
+        exchange_rates[date.strftime("%Y-%m-%d")]=info["MXN"]
+        
 
     df = pd.DataFrame(data=exchange_rates.items(),columns=["date","exchange_rate"])
+    df["date"]=df["date"].astype("datetime64[ns]")
     df = df.set_index("date")
     return df
 
@@ -442,9 +444,10 @@ def load_product_codes():
         """
 
         df = get_query(query)
-        df = df.rename(columns={art_col:'PRODUCTO',art_desc:'DESCRIPCION',art_cost_coin:'MONEDA_COMPRA',art_price_coin:'MONEDA_VENTA'})
-        df["MONEDA_COMPRA" ] = df["MONEDA_COMPRA"].astype("int8[pyarrow]")
-        df["MONEDA_VENTA"] = df["MONEDA_VENTA"].astype("int8[pyarrow]")
+        df = df.rename(columns={art_col:'productId',art_desc:'description',art_cost:'cost',art_cost_coin:'buy_coin',art_price_coin:'sell_coin'})
+        df["buy_coin" ] = df["buy_coin"].astype("int8[pyarrow]")
+        df["sell_coin"] = df["sell_coin"].astype("int8[pyarrow]")
+        df = df.astype({'productId':'string'}) 
         df.to_parquet('data/raw/codigos_productos.parquet',index=False)
 
     return df
@@ -575,7 +578,7 @@ def load_data(output_file:str,start_date:str=start_date,end_date:str=end_date)->
     products= load_products()
     
     # Facturas
-    invoices = load_invoices(source_file=output_file,start_date=start_date,end_date=end_date)
+    invoices = load_invoices()
 
     return invoices,categories,products,product_codes
 

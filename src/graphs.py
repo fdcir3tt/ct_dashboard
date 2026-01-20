@@ -13,7 +13,7 @@ from matplotlib.figure import Figure
 
 @st.cache_resource
 def load_mexico_shp():
-    mexico = gpd.read_file("gadm41_MEX_shp/gadm41_MEX_1.shp")
+    mexico = gpd.read_file("data/raw/gadm41_MEX_shp/gadm41_MEX_1.shp")
     mexico["state"] = mexico["NAME_1"].str.upper()
     return mexico
 

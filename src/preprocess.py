@@ -29,16 +29,16 @@ def clean_data()->pd.DataFrame:
     branches = branches[["nemonico","sucursal","homoclave"]]
 
 
-    invoices['SUCURSAL']= invoices['folio'].str.extract( r'(?P<SUCURSAL>[A-Za-z]+)' )
+    invoices['branchId']= invoices['folio'].str.extract( r'(?P<branchId>[A-Za-z]+)' )
     
-    product_codes = product_codes.astype({'PRODUCTO':'string'}) 
-    invoices = invoices.merge(product_codes, left_on="productId",right_on='PRODUCTO', how='inner')
+    #product_codes = product_codes.astype({'productId':'string'}) 
+    invoices = invoices.merge(product_codes,on="productId", how='inner')
 
     is_sale= (invoices["quantity"] > 0)&( invoices["price"] > 0 ) # Solo nos interesan casos donde sí hubo venta
-    is_hardware = invoices["ART_COS"] > 0
+    is_hardware = invoices["cost"] > 0
     invoices = invoices[is_sale & is_hardware]
 
-    invoices = invoices.merge(branches,how="inner",left_on="SUCURSAL",right_on="homoclave")
+    invoices = invoices.merge(branches,how="inner",left_on="branchId",right_on="homoclave")
     
     return invoices
 
@@ -88,8 +88,6 @@ def process_data(update:bool=False)->pd.DataFrame:
 
         # Existencia
         df = df.merge(existence,how="inner",left_on="productId",right_on="codigo")
-        
-        df = df.rename(columns={"ART_COS":"cost"})
         df.to_parquet('data/processed/facturas_ventas.parquet',index=False)
 
     return df
