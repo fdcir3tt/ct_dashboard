@@ -641,7 +641,7 @@ def render_sales_heat_map(merged: pd.DataFrame, main_element: str)->tuple[folium
         tiles=None,
         zoom_start=4,
         zoom_control=True,
-        scrollWheelZoom=False,
+        scrollWheelZoom=True,
         dragging=True,
         doubleClickZoom=False,
         touchZoom=False,

@@ -49,6 +49,7 @@ art_price_coin = os.getenv("ARTICLE_PRICE_COIN")
 
 
 today = datetime.date.today()
+yesterday = today - datetime.timedelta(days=1)
 start_date = datetime.date(today.year, today.month, 1)
 end_date = today
 
@@ -186,37 +187,115 @@ def get_product_cost_dict(query_fn=get_query)-> dict :
     #cost_dict = df.set_index(art_col).to_dict(orient="index")
     return dict(zip(df[art_col], df[art_cost]))
 
+def get_usd_to_mxn(date:datetime.datetime)->float:
+    year = date.year
+    month = date.month
+    day = date.day
+    today = datetime.datetime.today()
 
-def get_usd_rate_time_series(start:datetime.datetime=datetime.datetime(today.year,today.month,1),end:datetime.datetime=today) ->pd.DataFrame: 
-    
-    url = "https://api.fxratesapi.com/timeseries"
+    url = "https://api.fxratesapi.com/historical"
 
     params = {
         "api_key": EXCHANGE_API_KEY,
-        "start_date":start.strftime("%Y-%m-%d"),
-        "end_date": end.strftime("%Y-%m-%d"),
+        "date": f"{year}-{month}-{day}",
         "base": "USD",
         "currencies": "MXN",
-        "accuracy": "day",
+        "resolution": "1d",
         "amount": 1,
         "places": 6,
         "format": "json"
     }
 
+    if (today.year,today.month,today.day)==(year,month,day):
+         url = "https://api.fxratesapi.com/latest"
+         params = {
+            "api_key": EXCHANGE_API_KEY,
+            "base": "USD",
+            "currencies": "MXN",
+            "resolution": "1d",
+            "amount": 1,
+            "places": 6,
+            "format": "json"
+            }
+
     response = requests.get(url=url,params=params, timeout=10)
     response.raise_for_status()
     data = response.json()
-    rates = data["rates"]
+    rate = data["rates"]["MXN"]
     
+    return rate
+
+def get_usd_rate_time_series(start:datetime.date=datetime.date(today.year,today.month,1),end:datetime.date=today) ->pd.DataFrame: 
+    
+    url = "https://api.fxratesapi.com/timeseries"
+    params = {
+            "api_key": EXCHANGE_API_KEY,
+            "start_date":start.strftime("%Y-%m-%d"),
+            "end_date": end.strftime("%Y-%m-%d"),
+            "base": "USD",
+            "currencies": "MXN",
+            "accuracy": "day",
+            "amount": 1,
+            "places": 6,
+            "format": "json"
+        }
     exchange_rates={}
-    for date,info in rates.items():
-        date = datetime.datetime.fromisoformat(date)
-        exchange_rates[date.strftime("%Y-%m-%d")]=info["MXN"]
+    
+    period_days = (end-start).days
+    if period_days > 60:
+        start_date = start
+        for i in range((period_days//30)):
+            start_date += i*datetime.timedelta(days=30)
+            print(f"{i}, {start_date}")
+            if start_date > end:
+                break
+           
+            end_date = start_date+datetime.timedelta(days=30)
+            print(f"{i}, {end_date}")
+            params["start_date"]= start_date.strftime("%Y-%m-%d")
+            params["end_date"]= end_date.strftime("%Y-%m-%d")
+            response = requests.get(url=url,params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            rates = data["rates"]
+            
+            for date,info in rates.items():
+                if len(info)==0:
+                    continue
+                date = datetime.datetime.fromisoformat(date)
+                exchange_rates[date.strftime("%Y-%m-%d")]=info["MXN"]
+
+        params["start_date"]= end_date.strftime("%Y-%m-%d")
+        params["end_date"]= end.strftime("%Y-%m-%d")
+        print(end_date,end)
+        response = requests.get(url=url,params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        rates = data["rates"]
+            
+        for date,info in rates.items():
+            if len(info)==0:
+                continue
+            date = datetime.datetime.fromisoformat(date)
+            exchange_rates[date.strftime("%Y-%m-%d")]=info["MXN"]
+    else:
+        response = requests.get(url=url,params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        rates = data["rates"]
         
+        
+        for date,info in rates.items():
+            if len(info)==0:
+                continue
+            date = datetime.datetime.fromisoformat(date)
+            exchange_rates[date.strftime("%Y-%m-%d")]=info["MXN"]
+            
 
     df = pd.DataFrame(data=exchange_rates.items(),columns=["date","exchange_rate"])
     df["date"]=df["date"].astype("datetime64[ns]")
     df = df.set_index("date")
+
     return df
 
 # -----------------------------------------------------------
@@ -563,27 +642,34 @@ def load_storage()->dict:
 
     return branch_storage
 
-def load_data(output_file:str,start_date:str=start_date,end_date:str=end_date)->tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
-    """
-    Función que recibe fecha de inicio y final de periodo junto con ruta de salida
-    especifícada. Extrae los datos necesarios, los guarda en un archivo parquet y los 
-    carga en un dataframe de pandas.
+
+def load_exchange_rate()->pd.DataFrame:
+    file_exists = os.path.exists("data/raw/conversion_usd_mxn.parquet")
+
+    if file_exists:
+        old_rates = pd.read_parquet("data/raw/conversion_usd_mxn.parquet")
+        last_date = old_rates.index.max()
+        file_updated = last_date.to_pydatetime().date() == today
+        if file_updated:
+            return old_rates
+        start_date = last_date.to_pydatetime().date() + datetime.timedelta(days=1)
+        rate = get_usd_to_mxn(date=start_date)
+        new_rate = pd.DataFrame(
+            {"exchange_rate": [rate]   },
+            index=pd.DatetimeIndex([start_date], name="date")  )
+        new_rate.index = new_rate.index.astype("datetime64[ns]")
+        
+        updated_rates = (
+            pd.concat([old_rates, new_rate])
+              .sort_index()
+              .loc[~pd.concat([old_rates, new_rate]).index.duplicated(keep="last")]
+        )
+        updated_rates.to_parquet("data/raw/conversion_usd_mxn.parquet")
+        return updated_rates
     
-    """
-    # Códigos de productos
-    product_codes = load_product_codes()
-
-    # Categorías y productos
-    categories = load_categories()
-    products= load_products()
-    
-    # Facturas
-    invoices = load_invoices()
-
-    return invoices,categories,products,product_codes
 
 
 
-    
+        
 
    

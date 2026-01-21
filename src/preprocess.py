@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import json
-from src.data_loader import get_usd_rate_time_series,load_categories,load_products,load_invoices,load_product_codes
+from src.data_loader import load_exchange_rate,load_categories,load_products,load_invoices,load_product_codes
 import streamlit as st
 
 
@@ -26,7 +26,7 @@ def clean_data()->pd.DataFrame:
 
     invoices = load_invoices()
     product_codes =load_product_codes()
-    exchange_rates = get_usd_rate_time_series()
+    exchange_rates = load_exchange_rate()
     branches = pd.read_csv("data/raw/almacen.csv")
     
     # Normalizar precios a MXN
@@ -54,7 +54,7 @@ def clean_data()->pd.DataFrame:
     return df
 
 @st.cache_data
-def process_data(update:bool=False)->pd.DataFrame:
+def process_data(update:bool=False,**kwargs)->pd.DataFrame:
     """
     Agarra el dataset limpio y listo para procesar para generar las variables 
     útiles/relevantes en el dashboard. 
