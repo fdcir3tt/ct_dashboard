@@ -8,7 +8,7 @@ load_dotenv()
 data_columns = os.getenv("SALES_DATA_COLUMNS")
 
 
-graphs = [period_sales,sales_velocity,sales_hist,interactive_sales_heat_map,abc_bar_chart]
+graphs = [period_sales,sales_velocity,sales_hist,prepare_sales_heatmap_data,abc_bar_chart]
 mono_graphs =[period_sales,sales_velocity,sales_hist]
     
 # -----------------------------------------------------------
@@ -103,6 +103,8 @@ def test_total_sales_consistency():
     total_sales = df[is_product & is_in_period]["quantity"].sum()
     sales.add(total_sales)
     for g in graphs:
+        
+
         _,dummy_df = g(data=df,
                    selected_elements=[top_product],
                    main_element=top_product,
@@ -113,15 +115,19 @@ def test_total_sales_consistency():
                    type ="productos",
                    val=True)
         
+        if g==prepare_sales_heatmap_data:
+        
+            total_sales = dummy_df["quantity"].sum()
+            sales.add(total_sales)
+            continue
+
         if g==abc_bar_chart:
             is_product = dummy_df["productId"]==top_product
             branch_sales = dummy_df[is_product]["total_sales"].iloc[0]
             total_branch_sales.add(branch_sales)
             continue
-        if g==interactive_sales_heat_map:
-            total_sales = dummy_df["quantity"].sum()
-            sales.add(total_sales)
-            continue
+
+        
 
         in_branch = dummy_df["sucursal"]==frequent_branch
         
@@ -160,6 +166,10 @@ def test_top_product():
     """
     top_products = set()
     for g in graphs:
+
+        
+
+
         _,dummy_df = g(data=df,
                    selected_elements=[top_product],
                    main_element=top_product,

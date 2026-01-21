@@ -600,78 +600,62 @@ def sales_hist(data:pd.DataFrame,main_element:str,element_column:str,branch:str,
     return (fig, df) if val else fig
 
 @st.cache_data
-def interactive_sales_heat_map(data: pd.DataFrame,main_element: str, element_column: str,start_date, end_date,val:bool=False,**kwargs):
-    """
-    Interactive choropleth heat map of Mexico with state selection.
-    """
-    if data.empty:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return fig
+def prepare_sales_heatmap_data(data: pd.DataFrame, main_element: str,element_column: str,start_date,end_date,val:bool=False,**kwargs)->pd.DataFrame:
+    if data.empty or "date" not in data or element_column not in data:
+        return None
 
-    if "date" not in data or element_column not in data:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        
-        return fig
-
-    # Filtro por fecha 
+    data = data.copy()
     data["date"] = pd.to_datetime(data["date"], errors="coerce")
-    start_date = pd.to_datetime(start_date)
-    end_date = pd.to_datetime(end_date)
 
-    data = data[(data["date"] >= start_date) & (data["date"] <= end_date)]
+    data = data[
+        (data["date"] >= pd.to_datetime(start_date)) &
+        (data["date"] <= pd.to_datetime(end_date))
+    ]
 
-    #  Filtro de elemento  
-    is_element = data[element_column] == main_element
-    df_filtered = data[is_element]
+    df_filtered = data[data[element_column] == main_element]
 
-    
     if df_filtered.empty:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return fig,data
-    
-    # --- Agregación ---
-    total_sales_per_state = df_filtered.groupby("state")["quantity"].sum().reset_index()
+        return None
 
-    
+    total_sales_per_state = (
+        df_filtered.groupby("state")["quantity"]
+        .sum()
+        .reset_index()
+    )
+
     mexico = load_mexico_shp()
-
-   
     merged = mexico.merge(total_sales_per_state, on="state", how="left")
     merged["quantity"] = merged["quantity"].fillna(0)
 
-    if val:
-        
-        merged[element_column] = main_element
-        
-        return None,merged
+    return (merged,df_filtered) if val else merged
 
+def render_sales_heat_map(merged: pd.DataFrame, main_element: str)->tuple[folium.Map,str]:
+    if merged is None:
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig, None
 
-    # --- Mapa de Folium ---
-    m = folium.Map(location=[23.6345, -102.5528],
-                   tiles=None, 
-                   zoom_start=5,
-                   zoom_control=False,     
-                   scrollWheelZoom=False,  
-                   dragging=False,         
-                   doubleClickZoom=False,  
-                   touchZoom=False,
-                   attr=None         
-)   
-    title_html = f'''
-     <h3 align="center" style="font-size:20px"><b>Ventas de {main_element} por Estado</b></h3>
-     '''
+    m = folium.Map(
+        location=[20, -90],
+        tiles=None,
+        zoom_start=4,
+        zoom_control=True,
+        scrollWheelZoom=False,
+        dragging=True,
+        doubleClickZoom=False,
+        touchZoom=False,
+    )
+
+    title_html = f"""
+    <h3 align="center" style="font-size:20px">
+        <b>Ventas de {main_element} por Estado</b>
+    </h3>
+    """
     m.get_root().html.add_child(folium.Element(title_html))
-    
-    # --- Choropleth  ---
+
     folium.Choropleth(
         geo_data=merged,
-        name="choropleth",
         data=merged,
         columns=["state", "quantity"],
         key_on="feature.properties.state",
@@ -682,30 +666,29 @@ def interactive_sales_heat_map(data: pd.DataFrame,main_element: str, element_col
         legend_name="Ventas",
     ).add_to(m)
 
-    # ---  Estados clickeables ---
     folium.GeoJson(
         merged,
-        tooltip=folium.GeoJsonTooltip(fields=["NAME_1", "quantity"],
-                                      aliases=["Estado", "Ventas"]),
-        popup=folium.GeoJsonPopup(fields=["NAME_1"], aliases=["Estado"]),
+        tooltip=folium.GeoJsonTooltip(
+            fields=["NAME_1", "quantity"],
+            aliases=["Estado", "Ventas"],
+        ),
         name="Estados",
         style_function=lambda x: {
             "color": "gray",
             "weight": 0.5,
-            "fillOpacity": 0  
-        }
+            "fillOpacity": 0,
+        },
     ).add_to(m)
 
-    # Render map
-    map_data = st_folium(m, width=700, height=420)
+    map_data = st_folium(m, width=700, height=250)
 
-    # Extracción de click
     selected_state = None
     if map_data and "last_active_drawing" in map_data:
         props = map_data["last_active_drawing"]
         if props and "properties" in props:
-            selected_state = props["properties"]["NAME_1"]
-    return m._repr_html_()
+            selected_state = props["properties"].get("NAME_1")
+
+    return m, selected_state
 
 
 

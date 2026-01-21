@@ -46,6 +46,7 @@ data["sales_day"]   = data.groupby(["productId", "date"])["quantity"].transform(
 data = remove_outliers(data,"sales_day")
 
 inventory = load_inventory()
+
 # -----------------------------------------------------------
 # VALORES PREDETERMINADOS
 # -----------------------------------------------------------
@@ -254,13 +255,15 @@ with col1:
     st.pyplot(histogram)
 with col2:
 
-    st.components.v1.html(interactive_sales_heat_map(
-            data=global_data,
-            main_element=main_element,
-            element_column=element_column,
-            start_date=fecha_inicio,
-            end_date=fecha_fin
-        ), height=600)
+    merged= prepare_sales_heatmap_data(
+    global_data,
+    main_element,
+    element_column,
+    start_date,
+    end_date,
+)
+
+    map_obj, selected_state = render_sales_heat_map(merged, main_element)
 
 # -----------------------------------------------------------
 # KPIs (SUCURSAL)
