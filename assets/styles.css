@@ -1,0 +1,248 @@
+
+/* Global text color */
+html, body, [class*="css"] {
+    color: #1f2937 !important; /* dark gray */
+}
+
+/* Markdown text */
+.stMarkdown, 
+.stMarkdown p,
+.stMarkdown span,
+.stMarkdown h1,
+.stMarkdown h2,
+.stMarkdown h3,
+.stMarkdown h4 {
+    color: #1f2937 !important;
+}
+
+/* App background */
+.stApp {
+    background-color: #f5f6f8;
+}
+
+/* Main container padding */
+.block-container {
+    padding: 1.5rem 2rem;
+}
+
+/* Header bar */
+.header h3{
+    background-color: #e5e1df;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: #1f2937 !important;
+    margin: 0;
+}
+
+/* Cards */
+.card {
+    background-color: white;
+    padding: 1.25rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    margin-bottom: 1rem;
+}
+
+/* KPI cards */
+.kpi-title {
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.kpi-delta {
+    font-size: 0.85rem;
+    color: #10b981;
+}
+
+/* Tabs / segmented buttons */
+.stButton > button {
+    border-radius: 8px;
+    padding: 0.4rem 0.8rem;
+}
+
+/* Dataframe container */
+[data-testid="stDataFrame"] {
+    background-color: #e8f1fb !important;
+    border-radius: 8px;
+    padding: 0.5rem;
+}
+
+/* st.table styling */
+[data-testid="stDataFrame"] table {
+    background-color: #e8f1fb !important;
+}
+
+/* Header row */
+[data-testid="stDataFrame"] thead th {
+    background-color: #dbeafe !important;
+    color: #1e3a8a !important;
+    font-weight: 600;
+}
+
+/* Table cells */
+[data-testid="stDataFrame"] tbody td {
+    background-color: #eff6ff !important;
+    color: #1f2937 !important;
+}
+
+/* Hover effect */
+[data-testid="stDataFrame"] tbody tr:hover td {
+    background-color: #dbeafe !important;
+}
+
+/* st.table styling */
+.stTable {
+    background-color: #e8f1fb !important;
+}
+
+.stTable thead th {
+    background-color: #dbeafe !important;
+    color: #1e3a8a !important;
+}
+
+.stTable tbody td {
+    background-color: #eff6ff !important;
+    color: #1f2937 !important;
+}
+
+/* st.multiselect styling */
+[data-testid="stMultiSelect"] {
+    padding: 0.4rem;
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* Multiselect label */
+[data-testid="stMultiSelect"] label {
+    color: #1e3a8a !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* Multiselect input box */
+[data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
+    background-color: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    min-height: 38px;
+}
+
+/* Selected value tags */
+[data-testid="stMultiSelect"] span[data-baseweb="tag"] {
+    background-color: #dbeafe !important;
+    color: #1e3a8a !important;
+    border-radius: 6px;
+    font-size: 0.75rem;
+}
+
+/* Hover */
+[data-testid="stMultiSelect"] div[data-baseweb="select"]:hover > div {
+    border-color: #94a3b8 !important;
+}
+
+/* Focus */
+[data-testid="stMultiSelect"] div[data-baseweb="select"]:focus-within > div {
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 1px #2563eb;
+}
+
+/* Dropdown list */
+div[data-baseweb="popover"] ul {
+    background-color: #eff6ff !important;
+}
+
+/* Dropdown options */
+div[data-baseweb="popover"] li {
+    color: #1f2937 !important;
+}
+
+/* Hovered option */
+div[data-baseweb="popover"] li:hover {
+    background-color: #dbeafe !important;
+}
+
+
+/* st.date_input styling */
+[data-testid="stDateInput"] {
+    background-color: #ffffff;
+    border-radius: 8px;
+}
+
+[data-testid="stDateInput"] label {
+    color: #475569 !important; /* slate */
+    font-weight: 500;
+}
+/* Input field */
+[data-testid="stDateInput"] input {
+    background-color: #f8fafc !important;
+    color: #1f2937 !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    padding: 0.45rem 0.6rem;
+}
+
+/* Placeholder text */
+[data-testid="stDateInput"] input::placeholder {
+    color: #717272;
+}
+
+/* Hover */
+[data-testid="stDateInput"] input:hover {
+    border-color: #94a3b8 !important;
+}
+
+/* Focus */
+[data-testid="stDateInput"] input:focus {
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 1px #2563eb;
+}
+[data-testid="stDateInput"] {
+    padding: 0.4rem;
+    background-color: #c2c2c2;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* st.tab styling */
+[data-testid="stTabs"] {
+    background-color: transparent;
+}
+
+/* All tabs */
+[data-testid="stTabs"] button {
+    background-color: #e5e7eb !important;
+    color: #1f2937 !important;
+    border-radius: 8px 8px 0 0;
+    padding: 0.45rem 1rem;
+    font-weight: 500;
+    border: none;
+    margin-right: 0.25rem;
+}
+
+/* Hover */
+[data-testid="stTabs"] button:hover {
+    background-color: #dbeafe !important;
+    color: #1e3a8a !important;
+}
+
+/* Active tab */
+[data-testid="stTabs"] button[aria-selected="true"] {
+    background-color: #ffffff !important;
+    color: #2563eb !important;
+    font-weight: 600;
+    border-bottom: 2px solid #2563eb;
+}
+
+
+/* Remove Streamlit footer */
+footer {visibility: hidden;}

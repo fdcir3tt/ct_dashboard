@@ -629,7 +629,7 @@ def prepare_sales_heatmap_data(data: pd.DataFrame, main_element: str,element_col
 
     return (merged,df_filtered) if val else merged
 
-def render_sales_heat_map(merged: pd.DataFrame, main_element: str)->tuple[folium.Map,str]:
+def render_sales_heat_map(merged: pd.DataFrame, main_element: str,map_key:str=None)->tuple[folium.Map,str]:
     if merged is None:
         fig, ax = plt.subplots(figsize=(12, 6))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
@@ -680,7 +680,7 @@ def render_sales_heat_map(merged: pd.DataFrame, main_element: str)->tuple[folium
         },
     ).add_to(m)
 
-    map_data = st_folium(m, width=700, height=250)
+    map_data = st_folium(m, width=700, height=250,key=map_key)
 
     selected_state = None
     if map_data and "last_active_drawing" in map_data:

@@ -487,6 +487,13 @@ def update_table(table:str,latest_update:str,save_dir:str="data"):
     Se especifica cual de las tablas de datos ocupa actualizarse y el último periodo
     que tiene registrado para no generar una consulta grande.
 
+    ------------------------
+    Args:
+
+    table(str):
+    latest_update(str):
+    save_dir(str,optional):
+
     """
     if latest_update==today:
         return None
@@ -507,7 +514,7 @@ def update_table(table:str,latest_update:str,save_dir:str="data"):
     df = df.drop_duplicates(subset=["productId","folio","date"])
     df.to_parquet(f"{save_dir}/{table}.parquet",engine="pyarrow",index=False)
 
-    shutil.rmtree(f"{save_dir}/{table}_update.parquet")
+    os.remove(f"{save_dir}/{table}_update.parquet")
 # -----------------------------------------------------------
 # CARGA
 # -----------------------------------------------------------
@@ -569,8 +576,7 @@ def load_products():
 
 def load_invoices(start_date:str=start_date,end_date:str=end_date)->pd.DataFrame:
     """
-    Recibe nombre de salida del archivo, su formato y el periodo de las facturas que se quieren
-    extraer. Revisa si esta actualizada la base con ese periodo para no hacer la consulta completa. 
+    Revisa si esta actualizada la base de facturas con el periodo específicado para no hacer la consulta completa. 
     """
     
     source_file = "data/raw/facturas.parquet"

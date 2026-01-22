@@ -30,7 +30,7 @@ def clean_data()->pd.DataFrame:
     branches = pd.read_csv("data/raw/almacen.csv")
     
     # Normalizar precios a MXN
-    df = invoices.merge(product_codes[["productId","sell_coin","buy_coin","cost"]],how="inner",on="productId")
+    df = invoices.merge(product_codes,how="inner",on="productId")
     df = df.merge(exchange_rates,how="inner",on="date")
 
     
