@@ -51,20 +51,21 @@ def remove_outliers(data: pd.DataFrame, column: str) -> pd.DataFrame:
     return clean_data
 
 
-def top_n(data:pd.DataFrame,type:str="producto",criteria:str="ventas_diarias",n:int=5)->list[str]:
+def top_n(data:pd.DataFrame,element_column,type:str="producto",criteria:str="ventas_diarias",n:int=5)->list[str]:
     """
     Recibe el dataframe de datos del periodo especificado y regresa los mejores
     'n' productos o categorías en base el criterio específicado.
     """
     type_dict= {"producto":"productId",
                 "categoria":"category",
-                "sucursal":"branch",
+                "sucursal":"branchId",
                 "cliente":"clientId"}
 
     criteria_dict={"ventas_diarias":"sales_day",
                    "ventas_mensuales":"sales_month",
                    "ganancia_total":"total_profit"}
     
+    data["sales_day"] = data.groupby([element_column, "date"])["quantity"].transform("sum")
     if n==1:
         top_n= data[[type_dict[type],criteria_dict[criteria]]].sort_values(by=criteria_dict[criteria],ascending=False)[type_dict[type]].iloc[0]
         return top_n
@@ -141,7 +142,7 @@ def top_month(data:pd.DataFrame)->str:
 # GRÄFICAS
 # -----------------------------------------------------------
 
-def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_column:str,branch:str ,start_date, end_date,val:bool=False,**kwargs)->Figure:
+def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_column:str ,start_date, end_date,branch:str=None,val:bool=False,**kwargs)->Figure:
     """
     Grafica curva de ventas y regresa la figura.
     """
@@ -165,6 +166,8 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
 
     # --- Asegurar que las fechas SON datetime ---
     data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    data["month"] = data["date"].dt.month
+    data["year"] = data["date"].dt.year
 
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
@@ -185,8 +188,9 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
         return (fig, df) if val else fig
     
     # Filtro por sucursal 
-    in_branch = df["sucursal"]==branch
-    df = df[in_branch]
+    if branch:
+        in_branch = df["sucursal"]==branch
+        df = df[in_branch]
 
     if df.empty:
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -240,8 +244,11 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
                 color=colors[i], linewidth=2, linestyle="--",
                 label="Tendencia")
         i+=1
-        
-    ax.set_title(f"Ventas diarias de {month},{year}", fontsize=16, fontweight="bold")
+    if branch:
+        title = f"Ventas en {branch} de {month},{year}"
+    else:
+        title = f"Ventas globales de {month},{year}"
+    ax.set_title(title, fontsize=16, fontweight="bold")
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Cantidad")
 
@@ -260,7 +267,7 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     
     return (fig, plot_df) if val else fig
 
-def period_inventory(data: pd.DataFrame, selected_elements: list[str] ,element_column:str,branch:str ,start_date, end_date,val:bool=False,**kwargs)->Figure:
+def period_inventory(data: pd.DataFrame, selected_elements: list[str] ,element_column:str ,start_date, end_date,branch:str=None,val:bool=False,**kwargs)->Figure:
     """
     Grafica curva de inventario y regresa la figura.
     """
@@ -305,11 +312,13 @@ def period_inventory(data: pd.DataFrame, selected_elements: list[str] ,element_c
     
     
     # Inventario por sucursal
-    
-    storages = branch_storage[branch] 
-    df["stock"] = 0
-    for s in storages:
-        df["stock"] = df["existence"].apply(lambda x: sum(x[s] for s in storages if isinstance(x, dict) and s in x))
+    if branch:
+        storages = branch_storage[branch] 
+        df["stock"] = 0
+        for s in storages:
+            df["stock"] = df["existence"].apply(lambda x: sum(x[s] for s in storages if isinstance(x, dict) and s in x))
+    else:
+        df["stock"] = df["existence"].apply(lambda x: sum(x.values()))
 
     if df.empty:
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -364,8 +373,11 @@ def period_inventory(data: pd.DataFrame, selected_elements: list[str] ,element_c
                 color=colors[i], linewidth=2, linestyle="--",
                 label="Tendencia")
         i+=1
-        
-    ax.set_title(f"Existencia diaria de {month},{year}", fontsize=16, fontweight="bold")
+    if branch:
+        title = f"Existencia en {branch} de {month},{year}"
+    else:
+        title = f"Existencia global de {month},{year}"
+    ax.set_title(title, fontsize=16, fontweight="bold")
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Cantidad")
 
@@ -774,4 +786,5 @@ def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,branch:str,type:
     
     
     return fig
+
 

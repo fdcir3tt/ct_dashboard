@@ -9,6 +9,30 @@ from src.preprocess import process_data
 # CONFIGURACIÓN INICIAL
 # -----------------------------------------------------------
 
+def pick_date(label: str, default: datetime.date = None, key: str = "selected_date"):
+    
+    if key not in st.session_state:
+        st.session_state[key] = default
+    
+    return st.date_input(label, value=st.session_state[key], key=key)
+
+
+def pick_elements(label: str,options:list,default: list[str]= None, key: str = "selected_elements"):
+    if key not in st.session_state:
+        st.session_state[key] = default
+    return st.multiselect(label, options ,
+                                    default = default,
+                                    max_selections= 4 ,
+                                    key=key)
+    
+
+def pick_main_element(label: str,options:list,default: str= None, key: str = "selected_element"):
+    if key not in st.session_state:
+        st.session_state[key] = default
+    
+    return st.radio(label=label,options= options ,key=key)
+
+
 def load_css(file_name):
     with open(file_name) as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
@@ -20,6 +44,7 @@ load_css("assets/styles.css")
 
 
 
+
 # -----------------------------------------------------------
 # CARGA DE DATOS
 # -----------------------------------------------------------
@@ -28,8 +53,6 @@ global_data = process_data (update=True)
 global_data["income"] = global_data["price"] * global_data["quantity"]
 
 data = global_data.copy()
-data["sales_day"]   = data.groupby(["productId", "date"])["quantity"].transform("sum")
-data = remove_outliers(data,"sales_day")
 
 inventory = load_inventory()
 
@@ -84,45 +107,8 @@ top_category_index = category_list.index(top_category)
 st.sidebar.header("Filtros")
 
 analysis_lvl = st.sidebar.radio("Nivel de análisis",options=["Productos","Categorías"] )
-
-if analysis_lvl=="Categorías":
-    products = []
-    categories = st.sidebar.multiselect(label="Categorías",options= data["category"].unique(),default=[top_category] ,max_selections=4)
-    main_element = st.sidebar.radio("Categoría de análisis",options=categories)
-
-if analysis_lvl=="Productos":
-    categories = []
-    products = st.sidebar.multiselect("Producto(s)", product_list ,
-                                    default = [ top_product ],
-                                    max_selections= 4 )
-    main_element = st.sidebar.radio("Producto de análisis",options= products)
-
-
-
 outliers= st.sidebar.radio("Análisis con ventas anomalas incluídas", ["No","Sí"])
-
-
 branch = st.sidebar.selectbox("Sucursal", branch_list, index=frequent_branch_index)
-
-selected_elements = {"Productos":products,
-                     "Categorías":categories}[analysis_lvl]
-element_column = {"Productos":"productId",
-                  "Categorías":"category"}[analysis_lvl]
-
-is_category = data["category"].isin(categories)
-in_branch = global_data["sucursal"] == branch
-in_elements= global_data[element_column].isin(selected_elements)
-is_global_element = global_data[element_column]==main_element
-is_in_period = ( period_start <= global_data["date"] ) & ( global_data["date"] <= period_end )
-
-data = global_data [in_branch & in_elements & is_in_period].copy()
-is_element = data[element_column]== main_element
-
-data["sales_day"]   = data.groupby([element_column, "date"])["quantity"].transform("sum")
-data["date"] = pd.to_datetime(data["date"])
-data["month"] = data["date"].dt.month
-data["year"] = data["date"].dt.year
-data["income"] = data["price"] * data["quantity"]
 
 
 if outliers=="Sí":
@@ -130,7 +116,7 @@ if outliers=="Sí":
 
 if data.empty:
     print("Dataset vacío")
-        
+
 
 # -----------------------------------------------------------
 # LOGO Y TITULO
@@ -145,11 +131,10 @@ with col2:
 
 
 
-
-tab1, tab2 = st.tabs(["Sucursal","Global"])
+tab1, tab2 = st.tabs(["Ventas","Inventario"])
 
 # -----------------------------------------------------------
-# ANÁLISIS NIVEL SUCURSAL
+# ANÁLISIS VENTAS
 # -----------------------------------------------------------
 
 with tab1:
@@ -161,35 +146,51 @@ with tab1:
 # -----------------------------------------------------------
 # INFO DE PRODUCTO/CATEGORIA
 # -----------------------------------------------------------
+
         
-        cost_per_unit = round(data["cost"].iloc[0],2)
-        price_range =( round(data["price"].min(),2) , round( data["price"].max(),2) )
-        category = data[is_element]["category"].iloc[0]
-        top_clients = list ( top_n(data[is_element],type="cliente")["clientId"] )
+        if analysis_lvl=="Productos":
+            categories = []
+            products = pick_elements(label="Producto(s)",options=product_list,default=[top_product],key="Sucursal Productos Seleccionados")
+            main_element = pick_main_element(label="Producto de análisis",options= products,key="producto de análisis")
+            st.markdown(f"**Producto:** {main_element}")
+
+        if analysis_lvl=="Categorías":
+            products = []
+            categories = pick_elements(label="Categoría(s)",options=category_list,default=[top_category],key="Sucursal Categorías Seleccionadas")
+            main_element = pick_main_element(label="Categoría de análisis",options= categories,key="categoría de análisis")
+            st.markdown(f"**Categoría:** {main_element}")
+        
+        
+        selected_elements = {"Productos":products,
+                            "Categorías":categories}[analysis_lvl]
+        element_column = {"Productos":"productId",
+                        "Categorías":"category"}[analysis_lvl]
+
+        is_global_element = global_data[element_column]==main_element
+        is_element = data[element_column]== main_element
+        
+
+        st.markdown("### Periodo")
+        period_start = pick_date(label="Inicio",default=period_start,key="Sucursal Inicio")
+        period_end = pick_date(label="Fin",default=period_end,key="Sucursal Fin")
+
+        filtered = data[is_element]
+        if filtered.empty:
+            st.warning("No hay datos para el elemento seleccionado en este periodo.")
+            st.stop()
+
+        cost_per_unit = round(filtered["cost"].iloc[0],2)
+        price_range =( round(filtered["price"].min(),2) , round( filtered["price"].max(),2) )
+        category = filtered["category"].iloc[0]
+        top_clients = list ( top_n(filtered,element_column,type="cliente")["clientId"] )
 
         clients_str=''
         for client in top_clients:
             clients_str+=client+','
         clients_str = clients_str[:-1]
 
-        
-
-        products = st.multiselect("Producto(s)", product_list ,
-                                    default = [ top_product ],
-                                    max_selections= 4 ,
-                                    key="Sucursal")
-        if analysis_lvl=="Productos":
-            st.markdown(f"**Producto:** {main_element}")
-
-        if analysis_lvl=="Categorías":
-            st.markdown(f"**Categoría:** {main_element}")
-
-        st.markdown("### Periodo")
-        period_start = st.date_input("Inicio",period_start,key="Sucursal Inicio")
-        period_end = st.date_input("Fin",period_end,key="Sucursal Fin")
 
         if analysis_lvl=="Productos":
-    
             st.table(pd.DataFrame({
                 "": [
                     "Código",
@@ -221,23 +222,27 @@ with tab1:
     with right:
 
 # -----------------------------------------------------------
-# VENTAS O INVENTARIO
+# SUCURSAL Y GLOBAL 
 # -----------------------------------------------------------
         
-        period_sales_fig = period_sales(data=data,
+        branch_period_sales_fig = period_sales(data=data,
                                     selected_elements=selected_elements,
                                     element_column=element_column,
                                     branch=branch,
+                                    start_date=period_start,end_date=period_end)
+        global_period_sales_fig = period_sales(data=data,
+                                    selected_elements=selected_elements,
+                                    element_column=element_column,
                                     start_date=period_start,end_date=period_end)
 
-        period_inventory_fig = period_inventory(data=inventory,
-                                    selected_elements=selected_elements,
-                                    element_column=element_column,
-                                    branch=branch,
-                                    start_date=period_start,end_date=period_end)
+        
         st.markdown("### Ventas Diarias")
-        st.pyplot(period_sales_fig)
-
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.pyplot(branch_period_sales_fig)
+        with col2:
+            st.pyplot(global_period_sales_fig)
 
 # -----------------------------------------------------------
 # HISTOGRAMA Y MAPA CALOR
@@ -269,29 +274,33 @@ with tab1:
 
 
 # -----------------------------------------------------------
-# KPIs (SUCURSAL)
+# KPIs (VENTAS)
 # -----------------------------------------------------------
+        filtered = data[is_element]
 
+        if filtered.empty:
+            st.warning("No hay datos para el elemento seleccionado en este periodo.")
+            st.stop()
 
-        total_branch_sales = round ( data[is_element]["quantity"].sum() ,2 )
-        total_branch_cost = round ( data[is_element]["cost"].sum() ,2 )
-        total_branch_profit = round( data[is_element]["income"].sum() - total_branch_cost ,2 )
+        total_branch_sales = round ( filtered["quantity"].sum() ,2 )
+        total_branch_cost = round ( filtered["cost"].sum() ,2 )
+        total_branch_profit = round( filtered["income"].sum() - total_branch_cost ,2 )
         branch_inventory_t_ratio = 0
 
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown(f'<div class="kpi-title"><h3>Unidades Vendidas</h3><h2>{total_branch_sales:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
         with col2:
-            st.markdown(f'<div class="kpi-title"><h3>Ganancia </h3><h2>${total_branch_profit:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-title"><h3>Ganancia (MXN)</h3><h2>${total_branch_profit:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
         with col3:
-            st.markdown(f'<div class="kpi-title"><h3>Costo </h3><h2>${total_branch_cost:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-title"><h3>Costo (MXN) </h3><h2>${total_branch_cost:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 
 
 
 # -----------------------------------------------------------
 # PRIORIDADES
 # -----------------------------------------------------------
-
+        
         product_priorities = abc_bar_chart(data=global_data,
                                             branch=branch,
                                             start_date=period_start,end_date=period_end,type="productos")
@@ -300,17 +309,19 @@ with tab1:
                                             branch=branch,
                                             start_date=period_start,end_date=period_end,type="categorias")
 
-        col1, col2 = st.columns(2)
-        with col1:
+        
+        if analysis_lvl=="Productos":
             st.pyplot(product_priorities)
-        with col2:
+        if analysis_lvl=="Categorías":
             st.pyplot(category_priorities)
+            
+        
 
 
 
 
 # -----------------------------------------------------------
-# ANÁLISIS NIVEL GLOBAL
+# ANÁLISIS INVENTARIO
 # -----------------------------------------------------------
 with tab2:
 
@@ -322,11 +333,15 @@ with tab2:
 # -----------------------------------------------------------
 # INFO DE PRODUCTO/CATEGORIA
 # -----------------------------------------------------------
-        
+        filtered = data[is_element]
+
+        if filtered.empty:
+            st.warning("No hay datos para el elemento seleccionado en este periodo.")
+            st.stop()
         cost_per_unit = round(data["cost"].iloc[0],2)
         price_range =( round(data["price"].min(),2) , round( data["price"].max(),2) )
-        category = data[is_element]["category"].iloc[0]
-        top_clients = list ( top_n(data[is_element],type="cliente")["clientId"] )
+        category = filtered["category"].iloc[0]
+        top_clients = list ( top_n(filtered,element_column,type="cliente")["clientId"] )
 
         clients_str=''
         for client in top_clients:
@@ -343,9 +358,9 @@ with tab2:
         if analysis_lvl=="Categorías":
             st.markdown(f"**Categoría:** {main_element}")
 
-        st.markdown("### Periodo")
-        period_start = st.date_input("Inicio",period_start)
-        period_end = st.date_input("Fin",period_end)
+        st.markdown("Periodo")
+        period_start_global = pick_date(label="Inicio",default=period_start,key="Global Inicio")
+        period_end_global = pick_date(label="Fin",default=period_end,key="Global Fin")
 
         if analysis_lvl=="Productos":
     
@@ -383,19 +398,22 @@ with tab2:
 # VENTAS O INVENTARIO
 # -----------------------------------------------------------
         
-        period_sales_fig = period_sales(data=data,
+        branch_period_inventory_fig = period_inventory(data=inventory,
                                     selected_elements=selected_elements,
                                     element_column=element_column,
                                     branch=branch,
-                                    start_date=period_start,end_date=period_end)
+                                    start_date=period_start_global,end_date=period_end_global)
 
-        period_inventory_fig = period_inventory(data=inventory,
+        global_period_inventory_fig = period_inventory(data=inventory,
                                     selected_elements=selected_elements,
                                     element_column=element_column,
-                                    branch=branch,
-                                    start_date=period_start,end_date=period_end)
-        st.markdown("### Ventas Diarias")
-        st.pyplot(period_sales_fig)
+                                    start_date=period_start_global,end_date=period_end_global)
+        st.markdown("### Existencia Diaria")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.pyplot(branch_period_inventory_fig)
+        with col2:
+            st.pyplot(global_period_inventory_fig)
 
 
 # -----------------------------------------------------------
@@ -409,7 +427,7 @@ with tab2:
                           main_element=main_element,
                           element_column=element_column,
                           branch=branch,
-                          start_date=period_start,end_date=period_end)
+                          start_date=period_start_global,end_date=period_end_global)
 
                 st.markdown("**Histograma de Ventas**")
                 st.pyplot(histogram)
@@ -420,8 +438,8 @@ with tab2:
                                                     global_data,
                                                     main_element,
                                                     element_column,
-                                                    period_start,
-                                                    period_end,
+                                                    period_start_global,
+                                                    period_end_global,
                                                 )
 
                 map_obj, selected_state = render_sales_heat_map(merged, main_element,map_key="Global Mapa")
@@ -429,22 +447,26 @@ with tab2:
 
 
 # -----------------------------------------------------------
-# KPIs (GLOBAL)
+# KPIs (INVENTARIO)
 # -----------------------------------------------------------
+        filtered = global_data [is_global_element & is_in_period]
 
+        if filtered.empty:
+            st.warning("No hay datos para el elemento seleccionado en este periodo.")
+            st.stop()
 
-        total_sales = round( global_data [is_global_element & is_in_period]["quantity"].sum() , 2 )
-        total_cost = round( global_data [is_global_element & is_in_period]["cost"].sum() , 2 )
-        total_profit = round( global_data [is_global_element & is_in_period]["income"].sum() - total_cost ,2 )
-        inventory_t_ratio = 0
+        total_sales = round( filtered["quantity"].sum() , 2 )
+        total_cost = round( filtered["cost"].sum() , 2 )
+        total_profit = round( filtered["income"].sum() - total_cost ,2 )
+        
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.markdown(f'<div class="kpi-title"><h3>Unidades Vendidas</h3><h2>{total_sales:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-title"><h3>Unidades Vendidas</h3><h2>{total_sales:,} </h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
         with col2:
-            st.markdown(f'<div class="kpi-title"><h3>Ganancia Total</h3><h2>${total_profit:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-title"><h3>Ganancia Total (MXN)</h3><h2>${total_profit:,} </h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
         with col3:
-            st.markdown(f'<div class="kpi-title"><h3>Costo Total</h3><h2>${total_cost:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-title"><h3>Costo Total (MXN)</h3><h2>${total_cost:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
 
 
 
@@ -455,16 +477,18 @@ with tab2:
 
         product_priorities = abc_bar_chart(data=global_data,
                                             branch=branch,
-                                            start_date=period_start,end_date=period_end,type="productos")
+                                            start_date=period_start_global,end_date=period_end_global,type="productos")
 
         category_priorities = abc_bar_chart(data=global_data,
                                             branch=branch,
-                                            start_date=period_start,end_date=period_end,type="categorias")
+                                            start_date=period_start_global,end_date=period_end_global,type="categorias")
 
-        col1, col2 = st.columns(2)
-        with col1:
+        
+        
+        if analysis_lvl=="Productos":
             st.pyplot(product_priorities)
-        with col2:
+        if analysis_lvl=="Categorías":
             st.pyplot(category_priorities)
+
 
 
