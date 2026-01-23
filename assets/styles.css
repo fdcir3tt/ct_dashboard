@@ -243,6 +243,104 @@ div[data-baseweb="popover"] li:hover {
     border-bottom: 2px solid #2563eb;
 }
 
+/* st.radio styling */
+[data-testid="stRadio"] {
+    padding: 0.4rem;
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* Radio label (title) */
+[data-testid="stRadio"] > label {
+    color: #1e3a8a !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}
+
+/* Radio option row */
+[data-testid="stRadio"] div[role="radiogroup"] > label {
+    background-color: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0.4rem 0.6rem;
+    margin-bottom: 0.35rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+/* Hover on option */
+[data-testid="stRadio"] div[role="radiogroup"] > label:hover {
+    border-color: #94a3b8;
+    background-color: #eff6ff;
+}
+
+/* Selected option */
+[data-testid="stRadio"] input[type="radio"]:checked + div {
+    background-color: #dbeafe !important;
+    border-color: #2563eb !important;
+}
+
+/* Radio text */
+[data-testid="stRadio"] span {
+    color: #161616 !important;
+    font-size: 0.85rem;
+}
+
+/* Focus */
+[data-testid="stRadio"] input[type="radio"]:focus-visible + div {
+    box-shadow: 0 0 0 1px #2563eb;
+}
+
+/* FORCE radio text color */
+[data-testid="stRadio"] * {
+    color: #1f2937 !important;
+}
+
+/* Texto de cada opción */
+[data-testid="stRadio"] label span {
+    color: #1f2937 !important;
+}
+
+/* Texto cuando está seleccionada */
+[data-testid="stRadio"] input[type="radio"]:checked + div span {
+    color: #1e3a8a !important;
+    font-weight: 500;
+}
+
+
+
+/* Contenedor del icono radio */
+[data-testid="stRadio"] svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Círculo exterior */
+[data-testid="stRadio"] svg circle:first-child {
+    stroke: #94a3b8 !important;   /* borde gris */
+    stroke-width: 2px;
+    fill: #ffffff !important;
+}
+
+/* Hover */
+[data-testid="stRadio"] label:hover svg circle:first-child {
+    stroke: #2563eb !important;
+}
+
+/* Círculo interior (seleccionado) */
+[data-testid="stRadio"] svg circle:last-child {
+    fill: #2563eb !important;     /* bola azul */
+}
+
+/* Cuando NO está seleccionado, ocultar bola interna */
+[data-testid="stRadio"] input:not(:checked) + div svg circle:last-child {
+    fill: transparent !important;
+}
+
+
+
 
 /* Remove Streamlit footer */
 footer {visibility: hidden;}

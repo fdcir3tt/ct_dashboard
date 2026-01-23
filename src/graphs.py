@@ -514,102 +514,58 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
     
     return (fig, plot_df) if val else fig
 
-def sales_hist(data:pd.DataFrame,main_element:str,element_column:str,branch:str,start_date,end_date,val:bool=False,**kwargs):
+
+def sales_hist(data: pd.DataFrame,main_element: str,element_column: str,start_date,end_date,branch: str = None,val: bool = False,):
     """
     Función que recibe el dataframe de datos del periodo especificado y 
     gráfica las curvas de existencia del producto y ventas.
     """
-    if data.empty:
-        
+    def empty_fig(msg, df):
         fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.text(0.5, 0.5, msg, ha="center", va="center", fontsize=14)
         ax.axis("off")
-        return (fig, data) if val else fig
+        return (fig, df) if val else fig
 
-    if "date" not in data or element_column not in data:
-        
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-       
-        return (fig, data) if val else fig
-    
+    if data.empty or "date" not in data or element_column not in data:
+        return empty_fig("No hay datos disponibles", data)
+
+    data = data.copy()
     data["date"] = pd.to_datetime(data["date"], errors="coerce")
-    start_date = pd.to_datetime(start_date)
-    end_date   = pd.to_datetime(end_date)
-    is_in_period = ( start_date <= data["date"] ) & ( data["date"] <= end_date )
-    data = data[is_in_period]
 
-    # Filtro por elemento
-    is_element = data[element_column] == main_element
-    df = data[is_element].copy()
+    mask = (
+        (data["date"] >= pd.to_datetime(start_date)) &
+        (data["date"] <= pd.to_datetime(end_date)) &
+        (data[element_column] == main_element)
+    )
 
-    if df.empty:
-        
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return (fig, df) if val else fig
-    
-    # Filtro por sucursal 
-    in_branch = df["sucursal"]==branch
-    df = df[in_branch]
+    if branch:
+        mask &= data["sucursal"] == branch
+
+    df = data.loc[mask, ["quantity"]].dropna()
 
     if df.empty:
-        
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return (fig, df) if val else fig
+        return empty_fig("No hay datos disponibles", df)
+
     
-
-    # Rellenar datos faltantes con 0
-    df = df.fillna(0)
-
-
     fig, ax = plt.subplots(figsize=(10, 6))
-    
-    # Bins alineados a enteros
-    min_val = int(df["quantity"].min())
-    max_value = int(df["quantity"].max())
-    bins = range(min_val,max_value+10)
-    
-    counts, bin_edges, patches = ax.hist(df["quantity"], 
-            bins=bins, 
-            color='blue', 
-            edgecolor='black')
-    
-    # --- Etiquetas debajo de cada barra ---
-    for i, patch in enumerate(patches):
-        x_center = patch.get_x() + patch.get_width() / 2
-        x_value  = int(bin_edges[i])  # valor del bin (entero)
 
-        ax.text(
-            x_center,                # centrado
-            -0.5,                    # debajo del eje X
-            str(x_value),            # etiqueta
-            ha='center',
-            va='top',
-            fontsize=9
-        )
+    ax.hist(
+        df["quantity"],
+        bins=100,               
+        color="steelblue",
+        edgecolor="black"
+    )
 
-    # Ocultar etiquetas del eje X
-    ax.set_xticks([])
-
-    ax.set_title("Frecuencia de Ventas", fontsize=14, fontweight='bold')
+    ax.set_title("Frecuencia de Ventas", fontsize=14, fontweight="bold")
     ax.set_xlabel("Ventas diarias")
     ax.set_ylabel("Frecuencia")
-
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-
-    # Expandir ligeramente el espacio inferior para que quepan etiquetas
-    plt.subplots_adjust(bottom=0.15)
-
-    ax.grid(axis='y', linestyle='--', alpha=0.7)
+    ax.grid(axis="y", linestyle="--", alpha=0.7)
 
     fig.tight_layout()
-    
+
     return (fig, df) if val else fig
+
 
 @st.cache_data
 def prepare_sales_heatmap_data(data: pd.DataFrame, main_element: str,element_column: str,start_date,end_date,val:bool=False,**kwargs)->pd.DataFrame:

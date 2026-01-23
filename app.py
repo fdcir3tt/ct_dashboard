@@ -9,7 +9,7 @@ from src.preprocess import process_data
 # CONFIGURACIÓN INICIAL
 # -----------------------------------------------------------
 
-def pick_date(label: str, default: datetime.date = None, key: str = "selected_date"):
+def pick_date(label: str, default: datetime.datetime = None, key: str = "selected_date"):
     
     if key not in st.session_state:
         st.session_state[key] = default
@@ -37,6 +37,10 @@ def load_css(file_name):
     with open(file_name) as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
+def growth_rate(current, previous):
+    if previous == 0:
+        return 0
+    return round(((current - previous) / previous) * 100, 2)
 
 st.set_page_config(page_title="Inventario CT International", layout="wide")
 
@@ -51,7 +55,6 @@ load_css("assets/styles.css")
 
 global_data = process_data (update=True)
 global_data["income"] = global_data["price"] * global_data["quantity"]
-
 data = global_data.copy()
 
 inventory = load_inventory()
@@ -64,8 +67,7 @@ today = datetime.date.today()
 period_start = pd.to_datetime( datetime.date(today.year, today.month, 1) )
 period_end = pd.to_datetime( today )
 
-global_data["date"] = pd.to_datetime(global_data["date"], errors="coerce")
-data["date"] = pd.to_datetime(data["date"], errors="coerce")
+
 
 # Producto con cantidad de unidades más vendidas dentro de periodo
 is_in_period = ( period_start <= data["date"] ) & ( data["date"] <= period_end )
@@ -138,7 +140,7 @@ tab1, tab2 = st.tabs(["Ventas","Inventario"])
 # -----------------------------------------------------------
 
 with tab1:
-    left, right = st.columns([1.2, 3])
+    left, right = st.columns([1.3, 3.7])
 
     with left:
 
@@ -146,21 +148,31 @@ with tab1:
 # -----------------------------------------------------------
 # INFO DE PRODUCTO/CATEGORIA
 # -----------------------------------------------------------
-
-        
         if analysis_lvl=="Productos":
-            categories = []
-            products = pick_elements(label="Producto(s)",options=product_list,default=[top_product],key="Sucursal Productos Seleccionados")
-            main_element = pick_main_element(label="Producto de análisis",options= products,key="producto de análisis")
-            st.markdown(f"**Producto:** {main_element}")
-
+                categories = []
+                products = pick_elements(label="Producto(s)",options=product_list,default=[top_product],key="Sucursal Productos Seleccionados")
+        
         if analysis_lvl=="Categorías":
-            products = []
-            categories = pick_elements(label="Categoría(s)",options=category_list,default=[top_category],key="Sucursal Categorías Seleccionadas")
-            main_element = pick_main_element(label="Categoría de análisis",options= categories,key="categoría de análisis")
-            st.markdown(f"**Categoría:** {main_element}")
-        
-        
+                products = []
+                categories = pick_elements(label="Categoría(s)",options=category_list,default=[top_category],key="Sucursal Categorías Seleccionadas")
+                
+        col1,col2 = st.columns(2)
+        with col1:
+
+            if analysis_lvl=="Productos":
+                main_element = pick_main_element(label="Producto de análisis",options= products,key="producto de análisis")
+                element_title= f"**Producto:** {main_element}"
+
+            if analysis_lvl=="Categorías":
+                main_element = pick_main_element(label="Categoría de análisis",options= categories,key="categoría de análisis")
+                element_title = f"**Categoría:** {main_element}"
+                
+
+        with col2:
+            st.markdown(" Periodo")
+            period_start = pick_date(label="Inicio",default=period_start,key="Sucursal Inicio")
+            period_end = pick_date(label="Fin",default=period_end,key="Sucursal Fin")
+
         selected_elements = {"Productos":products,
                             "Categorías":categories}[analysis_lvl]
         element_column = {"Productos":"productId",
@@ -170,16 +182,14 @@ with tab1:
         is_element = data[element_column]== main_element
         
 
-        st.markdown("### Periodo")
-        period_start = pick_date(label="Inicio",default=period_start,key="Sucursal Inicio")
-        period_end = pick_date(label="Fin",default=period_end,key="Sucursal Fin")
+        
 
         filtered = data[is_element]
         if filtered.empty:
             st.warning("No hay datos para el elemento seleccionado en este periodo.")
             st.stop()
 
-        cost_per_unit = round(filtered["cost"].iloc[0],2)
+        cost_per_unit = round(filtered["cost"].max(),2)
         price_range =( round(filtered["price"].min(),2) , round( filtered["price"].max(),2) )
         category = filtered["category"].iloc[0]
         top_clients = list ( top_n(filtered,element_column,type="cliente")["clientId"] )
@@ -189,7 +199,7 @@ with tab1:
             clients_str+=client+','
         clients_str = clients_str[:-1]
 
-
+        st.markdown(element_title)
         if analysis_lvl=="Productos":
             st.table(pd.DataFrame({
                 "": [
@@ -203,7 +213,7 @@ with tab1:
                     main_element,
                     category,
                     cost_per_unit,
-                    price_range[0],
+                    price_range[1],
                     clients_str
                 ]
             }))
@@ -251,26 +261,25 @@ with tab1:
         c1, c2 = st.columns(2)
 
         with c1:
-                histogram = sales_hist(data=data,
+                branch_histogram = sales_hist(data=data,
                           main_element=main_element,
                           element_column=element_column,
                           branch=branch,
                           start_date=period_start,end_date=period_end)
 
-                st.markdown("**Histograma de Ventas**")
-                st.pyplot(histogram)
+                st.markdown(f"**{branch}**")
+                st.pyplot(branch_histogram)
 
         with c2:
-                st.markdown("**Mapa de calor de ventas (México)**")
-                merged = prepare_sales_heatmap_data(
-                                                    global_data,
-                                                    main_element,
-                                                    element_column,
-                                                    period_start,
-                                                    period_end,
-                                                )
+                global_histogram = sales_hist(data=data,
+                          main_element=main_element,
+                          element_column=element_column,
+                          start_date=period_start,end_date=period_end)
 
-                map_obj, selected_state = render_sales_heat_map(merged, main_element,map_key="Sucursal Mapa")
+                st.markdown("**Global**")
+                st.pyplot(global_histogram)
+                
+                
 
 
 # -----------------------------------------------------------
@@ -288,12 +297,52 @@ with tab1:
         branch_inventory_t_ratio = 0
 
         col1, col2, col3 = st.columns(3)
+        previous_period = ( pd.to_datetime(period_start)-datetime.timedelta(days=30) <= filtered["date"] ) & ( filtered["date"] <= pd.to_datetime(period_start) ) 
+        filtered_prev = filtered[previous_period]
+        prev_sales = filtered_prev["quantity"].sum()
+        prev_cost = filtered_prev["cost"].sum()
+        prev_profit = filtered_prev["income"].sum() - prev_cost
+
+
+        sales_rate = growth_rate(total_branch_sales, prev_sales)
+        profit_rate = growth_rate(total_branch_profit, prev_profit)
+        cost_rate = growth_rate(total_branch_cost, prev_cost)
+
         with col1:
-            st.markdown(f'<div class="kpi-title"><h3>Unidades Vendidas</h3><h2>{total_branch_sales:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+            st.markdown(
+                f'''
+                <div class="kpi-title">
+                    <h3>Unidades Vendidas</h3>
+                    <h2>{total_branch_sales:,}</h2>
+                    <p>{5:+}%</p>
+                </div>
+                ''',
+                unsafe_allow_html=True
+            )
+
         with col2:
-            st.markdown(f'<div class="kpi-title"><h3>Ganancia (MXN)</h3><h2>${total_branch_profit:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+            st.markdown(
+                f'''
+                <div class="kpi-title">
+                    <h3>Ganancia (MXN)</h3>
+                    <h2>${total_branch_profit:,}</h2>
+                    <p>{2:+}%</p>
+                </div>
+                ''',
+                unsafe_allow_html=True
+            )
+
         with col3:
-            st.markdown(f'<div class="kpi-title"><h3>Costo (MXN) </h3><h2>${total_branch_cost:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+            st.markdown(
+                f'''
+                <div class="kpi-title">
+                    <h3>Costo (MXN)</h3>
+                    <h2>${total_branch_cost:,}</h2>
+                    <p>{5:+}%</p>
+                </div>
+                ''',
+                unsafe_allow_html=True
+            )
 
 
 
@@ -310,10 +359,23 @@ with tab1:
                                             start_date=period_start,end_date=period_end,type="categorias")
 
         
-        if analysis_lvl=="Productos":
-            st.pyplot(product_priorities)
-        if analysis_lvl=="Categorías":
-            st.pyplot(category_priorities)
+        col1, col2 = st.columns(2)
+        with col1:
+                st.markdown("**Mapa de calor de ventas (México)**")
+                merged = prepare_sales_heatmap_data(
+                                                    global_data,
+                                                    main_element,
+                                                    element_column,
+                                                    period_start,
+                                                    period_end,
+                                                )
+
+                map_obj, selected_state = render_sales_heat_map(merged, main_element,map_key="Ventas Mapa")
+        with col2:
+            if analysis_lvl=="Productos":
+                st.pyplot(product_priorities)
+            if analysis_lvl=="Categorías":
+                st.pyplot(category_priorities)
             
         
 
@@ -420,29 +482,28 @@ with tab2:
 # HISTOGRAMA Y MAPA CALOR
 # -----------------------------------------------------------
 
-        c1, c2 = st.columns(2)
+        col1, col2 = st.columns(2)
 
-        with c1:
-                histogram = sales_hist(data=data,
+        with col1:
+                branch_histogram = sales_hist(data=data,
                           main_element=main_element,
                           element_column=element_column,
                           branch=branch,
                           start_date=period_start_global,end_date=period_end_global)
 
-                st.markdown("**Histograma de Ventas**")
-                st.pyplot(histogram)
+                st.markdown(f"**{branch}**")
+                st.pyplot(branch_histogram)
 
-        with c2:
-                st.markdown("**Mapa de calor de ventas (México)**")
-                merged = prepare_sales_heatmap_data(
-                                                    global_data,
-                                                    main_element,
-                                                    element_column,
-                                                    period_start_global,
-                                                    period_end_global,
-                                                )
+        with col2:
+                global_histogram = sales_hist(data=data,
+                          main_element=main_element,
+                          element_column=element_column,
+                          start_date=period_start_global,end_date=period_end_global)
 
-                map_obj, selected_state = render_sales_heat_map(merged, main_element,map_key="Global Mapa")
+                st.markdown("**Global**")
+                st.pyplot(global_histogram)
+
+                
 
 
 
@@ -482,13 +543,23 @@ with tab2:
         category_priorities = abc_bar_chart(data=global_data,
                                             branch=branch,
                                             start_date=period_start_global,end_date=period_end_global,type="categorias")
+        col1, col2 = st.columns(2)
+        with col1:
+                st.markdown("**Mapa de calor de ventas (México)**")
+                merged = prepare_sales_heatmap_data(
+                                                    global_data,
+                                                    main_element,
+                                                    element_column,
+                                                    period_start_global,
+                                                    period_end_global,
+                                                )
 
-        
-        
-        if analysis_lvl=="Productos":
-            st.pyplot(product_priorities)
-        if analysis_lvl=="Categorías":
-            st.pyplot(category_priorities)
+                map_obj, selected_state = render_sales_heat_map(merged, main_element,map_key="Global Mapa")
+        with col2:
+            if analysis_lvl=="Productos":
+                st.pyplot(product_priorities)
+            if analysis_lvl=="Categorías":
+                st.pyplot(category_priorities)
 
 
 
