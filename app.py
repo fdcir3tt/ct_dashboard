@@ -52,11 +52,17 @@ load_css("assets/styles.css")
 # -----------------------------------------------------------
 # CARGA DE DATOS
 # -----------------------------------------------------------
+invoices = load_invoices()
+product_codes =load_product_codes()
+exchange_rates = load_exchange_rates()
+branches = pd.read_csv("data/raw/almacen.csv")
+categories = load_categories()
+products = load_products()
 
-global_data = process_data (update=True)
+global_data = process_data (invoices,product_codes,exchange_rates,branches,categories,products,update=True)
 global_data["income"] = global_data["price"] * global_data["quantity"]
-data = global_data.copy()
 
+data = global_data.copy()
 inventory = load_inventory()
 
 # -----------------------------------------------------------
@@ -180,7 +186,7 @@ with tab1:
 
         is_global_element = global_data[element_column]==main_element
         is_element = data[element_column]== main_element
-        
+        in_branch = data["sucursal"]==branch
 
         
 
@@ -285,7 +291,7 @@ with tab1:
 # -----------------------------------------------------------
 # KPIs (VENTAS)
 # -----------------------------------------------------------
-        filtered = data[is_element]
+        filtered = data[is_element & is_in_period & in_branch].copy()
 
         if filtered.empty:
             st.warning("No hay datos para el elemento seleccionado en este periodo.")
@@ -343,6 +349,45 @@ with tab1:
                 ''',
                 unsafe_allow_html=True
             )
+
+        global_filtered = global_data [is_global_element & is_in_period].copy()
+
+        if filtered.empty:
+            st.warning("No hay datos para el elemento seleccionado en este periodo.")
+            st.stop()
+
+        total_sales = round( global_filtered["quantity"].sum() , 2 )
+        total_cost = round( global_filtered["cost"].sum() , 2 )
+        total_profit = round( global_filtered["income"].sum() - total_cost ,2 )
+        
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown(f'''
+                        <div class="kpi-title">
+                            <h3>Unidades Vendidas</h3>
+                            <h2>{total_sales:,} </h2>
+                            <p>- {3.1}</p>
+                        </div>
+                        ''', 
+                        unsafe_allow_html=True)
+        with col2:
+            st.markdown(f'''
+                        <div class="kpi-title">
+                            <h3>Ganancia Total (MXN)</h3>
+                            <h2>${total_profit:,} </h2>
+                            <p>+ {2}</p>
+                        </div>
+                        ''',
+                        unsafe_allow_html=True)
+        with col3:
+            st.markdown(f'''
+                        <div class="kpi-title">
+                            <h3>Costo Total (MXN)</h3>
+                            <h2>${total_cost:,}</h2>
+                            <p>+{10}</p>
+                        </div>''',
+                        unsafe_allow_html=True)
 
 
 

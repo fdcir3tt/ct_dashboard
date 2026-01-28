@@ -5,10 +5,11 @@ import mysql.connector
 import streamlit as st
 import pandas as pd
 import pyarrow.parquet as pq
-from dotenv import load_dotenv
-import requests
 import shutil
 import datetime
+import requests
+
+from dotenv import load_dotenv
 from pymongo import MongoClient 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -103,7 +104,7 @@ def connect_to_DB(conn_uri,db_name)-> MongoClient:
 # QUERIES
 # -----------------------------------------------------------
 
-def build_query(start_date:datetime.datetime,end_date:datetime.datetime)->str:
+def build_query(start_date:Date,end_date:Date)->str:
     """
     Recibe fecha de inicio y final de periodo y regresa un query
     utilizado para la extracción de la tabla de facturas de venta.
@@ -187,116 +188,7 @@ def get_product_cost_dict(query_fn=get_query)-> dict :
     #cost_dict = df.set_index(art_col).to_dict(orient="index")
     return dict(zip(df[art_col], df[art_cost]))
 
-def get_usd_to_mxn(date:datetime.datetime)->float:
-    year = date.year
-    month = date.month
-    day = date.day
-    today = datetime.datetime.today()
 
-    url = "https://api.fxratesapi.com/historical"
-
-    params = {
-        "api_key": EXCHANGE_API_KEY,
-        "date": f"{year}-{month}-{day}",
-        "base": "USD",
-        "currencies": "MXN",
-        "resolution": "1d",
-        "amount": 1,
-        "places": 6,
-        "format": "json"
-    }
-
-    if (today.year,today.month,today.day)==(year,month,day):
-         url = "https://api.fxratesapi.com/latest"
-         params = {
-            "api_key": EXCHANGE_API_KEY,
-            "base": "USD",
-            "currencies": "MXN",
-            "resolution": "1d",
-            "amount": 1,
-            "places": 6,
-            "format": "json"
-            }
-
-    response = requests.get(url=url,params=params, timeout=10)
-    response.raise_for_status()
-    data = response.json()
-    rate = data["rates"]["MXN"]
-    
-    return rate
-
-def get_usd_rate_time_series(start:datetime.date=datetime.date(today.year,today.month,1),end:datetime.date=today) ->pd.DataFrame: 
-    
-    url = "https://api.fxratesapi.com/timeseries"
-    params = {
-            "api_key": EXCHANGE_API_KEY,
-            "start_date":start.strftime("%Y-%m-%d"),
-            "end_date": end.strftime("%Y-%m-%d"),
-            "base": "USD",
-            "currencies": "MXN",
-            "accuracy": "day",
-            "amount": 1,
-            "places": 6,
-            "format": "json"
-        }
-    exchange_rates={}
-    
-    period_days = (end-start).days
-    if period_days > 60:
-        start_date = start
-        for i in range((period_days//30)):
-            start_date += i*datetime.timedelta(days=30)
-            print(f"{i}, {start_date}")
-            if start_date > end:
-                break
-           
-            end_date = start_date+datetime.timedelta(days=30)
-            print(f"{i}, {end_date}")
-            params["start_date"]= start_date.strftime("%Y-%m-%d")
-            params["end_date"]= end_date.strftime("%Y-%m-%d")
-            response = requests.get(url=url,params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            rates = data["rates"]
-            
-            for date,info in rates.items():
-                if len(info)==0:
-                    continue
-                date = datetime.datetime.fromisoformat(date)
-                exchange_rates[date.strftime("%Y-%m-%d")]=info["MXN"]
-
-        params["start_date"]= end_date.strftime("%Y-%m-%d")
-        params["end_date"]= end.strftime("%Y-%m-%d")
-        print(end_date,end)
-        response = requests.get(url=url,params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        rates = data["rates"]
-            
-        for date,info in rates.items():
-            if len(info)==0:
-                continue
-            date = datetime.datetime.fromisoformat(date)
-            exchange_rates[date.strftime("%Y-%m-%d")]=info["MXN"]
-    else:
-        response = requests.get(url=url,params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        rates = data["rates"]
-        
-        
-        for date,info in rates.items():
-            if len(info)==0:
-                continue
-            date = datetime.datetime.fromisoformat(date)
-            exchange_rates[date.strftime("%Y-%m-%d")]=info["MXN"]
-            
-
-    df = pd.DataFrame(data=exchange_rates.items(),columns=["date","exchange_rate"])
-    df["date"]=df["date"].astype("datetime64[ns]")
-    df = df.set_index("date")
-
-    return df
 
 # -----------------------------------------------------------
 # TRANSFORMACIONES
@@ -482,6 +374,48 @@ max_workers: int = 4,temp_dir:str='./temp_chunks'
         print(f" Error crítico: {e}")
 
 
+def get_usd_to_mxn(logger,date:datetime.datetime = datetime.datetime.today())->float:
+    
+    url = "https://api.fxratesapi.com/latest"
+    params = {
+            "api_key": EXCHANGE_API_KEY,
+            "base": "USD",
+            "currencies": "MXN",
+            "resolution": "1d",
+            "amount": 1,
+            "places": 6,
+            "format": "json"
+            }
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+    except requests.exceptions.RequestException:
+        logger.exception("FX rates API request failed")
+        return None
+
+    try:
+        data = response.json()
+    except json.JSONDecodeError:
+        logger.exception(
+            "Failed to decode JSON from FX rates API",
+            extra={"response_text": response.text},
+        )
+        return None
+
+    try:
+        return data["rates"]["MXN"]
+    except KeyError:
+        logger.error(
+            "MXN rate missing from API response",
+            extra={"response_json": data},
+        )
+        return None
+
+# -----------------------------------------------------------
+# ACTUALIZACIÓN
+# -----------------------------------------------------------
+
+
 def update_table(table:str,latest_update:str,save_dir:str="data"):
     """ 
     Se especifica cual de las tablas de datos ocupa actualizarse y el último periodo
@@ -515,6 +449,23 @@ def update_table(table:str,latest_update:str,save_dir:str="data"):
     df.to_parquet(f"{save_dir}/{table}.parquet",engine="pyarrow",index=False)
 
     os.remove(f"{save_dir}/{table}_update.parquet")
+
+def update_exchange_rates(logger,rates_dataframe:pd.DataFrame,rate:float=None)->pd.DataFrame:
+    if rate is None:
+        rate = get_usd_to_mxn(logger=logger)
+    new_rate =pd.DataFrame(
+            {"exchange_rate": [rate]   },
+            index=pd.DatetimeIndex( [datetime.datetime.today()], name="date")  )
+    
+    new_rate.index = new_rate.index.astype("datetime64[ns]")
+        
+    updated_rates = (
+            pd.concat([rates_dataframe, new_rate])
+              .sort_index()
+              .loc[~pd.concat([rates_dataframe, new_rate]).index.duplicated(keep="last")]
+        )
+    return updated_rates
+
 # -----------------------------------------------------------
 # CARGA
 # -----------------------------------------------------------
@@ -648,31 +599,22 @@ def load_storage()->dict:
 
     return branch_storage
 
+def load_raw_exchange_rates()->pd.DataFrame:
+    df = pd.read_csv("data/raw/historical_data_usd_mxn_2008-12-31_to_2026-01-20.csv",sep=";")
+    df = df[["Date","Close"]]
+    df = df.rename(columns={"Date":"date","Close":"exchange_rate"})
+    df = df.astype({"date":"datetime64[ns]","exchange_rate":"float"})
+    df = df.set_index("date")
+    return df
 
-def load_exchange_rate()->pd.DataFrame:
-    file_exists = os.path.exists("data/raw/conversion_usd_mxn.parquet")
+def load_exchange_rates():
+    processed = os.path.exists("data/processed/conversion_usd_mxn.parquet")
+    if processed:
+        df = pd.read_parquet("data/processed/conversion_usd_mxn.parquet")
+        return df
+    else: 
+        return None
 
-    if file_exists:
-        old_rates = pd.read_parquet("data/raw/conversion_usd_mxn.parquet")
-        last_date = old_rates.index.max()
-        file_updated = last_date.to_pydatetime().date() == today
-        if file_updated:
-            return old_rates
-        start_date = last_date.to_pydatetime().date() + datetime.timedelta(days=1)
-        rate = get_usd_to_mxn(date=start_date)
-        new_rate = pd.DataFrame(
-            {"exchange_rate": [rate]   },
-            index=pd.DatetimeIndex([start_date], name="date")  )
-        new_rate.index = new_rate.index.astype("datetime64[ns]")
-        
-        updated_rates = (
-            pd.concat([old_rates, new_rate])
-              .sort_index()
-              .loc[~pd.concat([old_rates, new_rate]).index.duplicated(keep="last")]
-        )
-        updated_rates.to_parquet("data/raw/conversion_usd_mxn.parquet")
-        return updated_rates
-    
 
 
 

@@ -17,3 +17,13 @@
 2026-01-12 08:20:58,017 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17792764 storage=2502656 total=2502656
 2026-01-13 06:00:06,524 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17823296 storage=2502656 total=2502656
 2026-01-15 08:59:12,611 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17853801 storage=2510848 total=2510848
+2026-01-16 08:53:30,790 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17884306 storage=2510848 total=2510848
+2026-01-19 08:40:58,934 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17914811 storage=2519040 total=2519040
+2026-01-20 06:00:06,778 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17945316 storage=2519040 total=2519040
+2026-01-21 06:00:05,970 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=17975821 storage=2527232 total=2527232
+2026-01-22 06:00:06,314 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=18006326 storage=2527232 total=2527232
+2026-01-23 06:00:06,499 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=18036831 storage=2535424 total=2535424
+2026-01-24 06:00:06,410 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=18067336 storage=2535424 total=2535424
+2026-01-26 08:31:11,234 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=18097841 storage=2543616 total=2543616
+2026-01-27 08:51:37,878 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=18128346 storage=2543616 total=2543616
+2026-01-28 10:47:13,482 - INFO - inserted=62 Stats 'tbl_existenciasHistorial': count=None size=18158851 storage=2551808 total=2551808
