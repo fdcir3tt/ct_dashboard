@@ -3,7 +3,6 @@ import geopandas as gpd
 import numpy as np
 import folium
 import streamlit as st
-from src.data_loader import load_storage
 from streamlit_folium import st_folium
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -20,7 +19,6 @@ def load_mexico_shp():
     mexico["state"] = mexico["NAME_1"].str.upper()
     return mexico
 
-branch_storage = load_storage()
 
 month_dict={  1:"Enero",
                   2:"Febrero",
@@ -267,7 +265,7 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     
     return (fig, plot_df) if val else fig
 
-def period_inventory(data: pd.DataFrame, selected_elements: list[str] ,element_column:str ,start_date, end_date,branch:str=None,val:bool=False,**kwargs)->Figure:
+def period_inventory(data: pd.DataFrame,branch_storage:dict[str], selected_elements: list[str] ,element_column:str ,start_date, end_date,branch:str=None,val:bool=False,**kwargs)->Figure:
     """
     Grafica curva de inventario y regresa la figura.
     """

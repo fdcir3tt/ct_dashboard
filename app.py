@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 import datetime
-from src.graphs import *
-from src.data_loader import *
-from src.preprocess import process_data
+from src.ct_sales_dashboard.graphs import *
+from src.ct_sales_dashboard.data_loader import *
+from src.ct_sales_dashboard.preprocess import process_data
 
 # -----------------------------------------------------------
 # CONFIGURACIÓN INICIAL
@@ -58,6 +58,7 @@ exchange_rates = load_exchange_rates()
 branches = load_branches()
 categories = load_categories()
 products = load_products()
+branch_storage = load_storage()
 
 global_data = process_data (invoices,product_codes,exchange_rates,branches,categories,products,update=True)
 global_data["income"] = global_data["price"] * global_data["quantity"]
@@ -506,12 +507,14 @@ with tab2:
 # -----------------------------------------------------------
         
         branch_period_inventory_fig = period_inventory(data=inventory,
+                                    branch_storage=branch_storage,
                                     selected_elements=selected_elements,
                                     element_column=element_column,
                                     branch=branch,
                                     start_date=period_start_global,end_date=period_end_global)
 
         global_period_inventory_fig = period_inventory(data=inventory,
+                                    branch_storage=branch_storage,
                                     selected_elements=selected_elements,
                                     element_column=element_column,
                                     start_date=period_start_global,end_date=period_end_global)

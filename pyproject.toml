@@ -1,5 +1,5 @@
 [project]
-name = "ct-dashboard"
+name = "ct_sales_dashboard"
 version = "0.1.0"
 description = "Dashboard de almacenamiento de productos que maneja CT International"
 authors = [
