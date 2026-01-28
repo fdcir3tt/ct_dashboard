@@ -113,19 +113,6 @@ def process_data(invoices,product_codes,exchange_rates,branches,categories,produ
     útiles/relevantes en el dashboard. 
 
     """
-    existence= pd.read_csv("data/raw/existencia.csv")
-    existence["almacenes"] = existence["almacenes"].str.replace("'", '"')
-    existence["total_stock"] =  existence["almacenes"].apply(lambda x: get_existence(x) )
-
-    is_active = existence["activo"]
-    exists = existence["total_stock"]!= 0
-
-    existence = existence[is_active & exists]
-
-    columns=["codigo","activo","existencia","total_stock","fechaRegistro"]
-    existence = existence[columns]
-
-    
 
     data_exists= os.path.exists("data/processed/facturas_ventas.parquet")
     if (data_exists)&(not update):
@@ -133,7 +120,6 @@ def process_data(invoices,product_codes,exchange_rates,branches,categories,produ
         return df
     else:
         
-
         products = products.merge(categories,how="left",on="idCategoria")
         products = products [["clave","nombre"]]
 
@@ -149,8 +135,7 @@ def process_data(invoices,product_codes,exchange_rates,branches,categories,produ
         df = df.merge(products,how="left",left_on="productId",right_on="clave")
         df = df.rename(columns={"nombre":"category"})
 
-        # Existencia
-        df = df.merge(existence,how="inner",left_on="productId",right_on="codigo")
+        
         df.to_parquet('data/processed/facturas_ventas.parquet',index=False)
 
     return df

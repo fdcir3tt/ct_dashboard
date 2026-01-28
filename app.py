@@ -55,7 +55,7 @@ load_css("assets/styles.css")
 invoices = load_invoices()
 product_codes =load_product_codes()
 exchange_rates = load_exchange_rates()
-branches = pd.read_csv("data/raw/almacen.csv")
+branches = load_branches()
 categories = load_categories()
 products = load_products()
 

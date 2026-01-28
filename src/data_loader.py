@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import pyodbc
 import mysql.connector
@@ -576,7 +577,7 @@ def load_inventory()->pd.DataFrame:
     return df
 
 @st.cache_data
-def load_storage()->dict:
+def load_branches()->pd.DataFrame:
     conn_uri = os.getenv("API_MONGO_URI")
     db_name = os.getenv("API_MONGO_DB")
 
@@ -586,6 +587,13 @@ def load_storage()->dict:
     docs = get_documents(database,collection)
 
     branches = pd.DataFrame(docs)
+    return branches
+    
+
+
+@st.cache_data
+def load_storage()->dict:
+    branches = load_branches()
     branches = branches[["nemonico","sucursal"]]
     branches = branches.set_index("nemonico")["sucursal"].to_dict()
 
@@ -600,7 +608,15 @@ def load_storage()->dict:
     return branch_storage
 
 def load_raw_exchange_rates()->pd.DataFrame:
-    df = pd.read_csv("data/raw/historical_data_usd_mxn_2008-12-31_to_2026-01-20.csv",sep=";")
+    if os.path.exists("data/raw"):
+        for path in os.listdir("data/raw"):
+            match_group = re.match(pattern="^historical_data_usd_mxn_",string=path)
+            if match_group:
+                file_path = "data/raw"+"/"+path
+                break
+    else:
+        return None
+    df = pd.read_csv(file_path,sep=";")
     df = df[["Date","Close"]]
     df = df.rename(columns={"Date":"date","Close":"exchange_rate"})
     df = df.astype({"date":"datetime64[ns]","exchange_rate":"float"})
