@@ -1,5 +1,6 @@
 # Directorios
-data/
+data/raw/*
+data/processed/
 gadm41_MEX_shp/
 __pycache__/
 .pytest_cache/
