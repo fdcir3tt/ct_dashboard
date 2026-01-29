@@ -3,7 +3,7 @@ import re
 import pandas as pd
 import datetime
 from pandas.testing import assert_frame_equal
-from src.data_loader import extract_table_parallel, update_table
+from ct_sales_dashboard.data_loader import extract_table_parallel, update_table
 
 
 

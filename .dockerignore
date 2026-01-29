@@ -4,5 +4,9 @@ __pycache__/
 .streamlit/
 tests/
 *.log
-data/processed.parquet
-data/facturas.parquet
+data/processed
+data/raw/*
+.env
+
+# Excepciones
+!data/raw/historical_data_usd_mxn_2008-12-31_to_2026-01-20.csv

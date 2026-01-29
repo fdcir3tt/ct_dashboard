@@ -1,3 +1,4 @@
 2026-01-28 10:19:53,676 - INFO - Stats update exchange rates | status=True prev_rate=None fetched_at=None fallback_type=estimated fallback_source_date=2026-01-28 10:19:52.910295
 2026-01-28 10:31:39,488 - INFO - Stats update exchange rates | status=True prev_rate=None fetched_at=None fallback_type=estimated fallback_source_date=2026-01-28 10:31:38.670561
 2026-01-28 10:44:03,425 - INFO - Stats update exchange rates | status=True prev_rate=None fetched_at=None fallback_type=estimated fallback_source_date=2026-01-28 10:44:02.540890
+2026-01-29 09:07:52,481 - INFO - Stats update exchange rates | status=True prev_rate=None fetched_at=None 

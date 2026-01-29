@@ -5,7 +5,6 @@ ENV POETRY_HOME=/opt/poetry
 ENV PATH="$POETRY_HOME/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
-ENV APP_HOSTNAME=ct_dashboard
 
 
 RUN apt-get update && apt-get install -y \
@@ -41,6 +40,9 @@ RUN poetry config virtualenvs.create false \
     && poetry install --no-root --no-interaction --no-ansi
 
 COPY . .
+
+RUN useradd -m appuser
+USER appuser
 
 EXPOSE 8501
 

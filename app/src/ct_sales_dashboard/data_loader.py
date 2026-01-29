@@ -9,6 +9,7 @@ import pyarrow.parquet as pq
 import shutil
 import datetime
 import requests
+import time
 
 from dotenv import load_dotenv
 from pymongo import MongoClient 
@@ -249,7 +250,7 @@ def save_last_processed_offset(offset_file: str, offset: int):
 
 
 def fetch_and_write_chunk(query:str,chunk_index:int, offset:int, chunk_size:int, connection_str:str, order_column:str, 
-temp_dir:str,file_format:str="parquet",**kwargs)->int:
+temp_dir:str,**kwargs)->int:
     
     conn = pyodbc.connect(connection_str)
 
@@ -261,16 +262,12 @@ temp_dir:str,file_format:str="parquet",**kwargs)->int:
     conn.close()
 
     if not df.empty:
-        if file_format=="csv":
-            temp_file = os.path.join(temp_dir, f'chunk_{chunk_index}.{file_format}')
-            df.to_csv(temp_file, index=False)
-        if file_format=="parquet":
-            temp_file = os.path.join(temp_dir, f'chunk_{chunk_index}.{file_format}')
-            df.to_parquet(temp_file, index=False,engine="pyarrow")
+        temp_file = os.path.join(temp_dir, f'chunk_{chunk_index}.parquet')
+        df.to_parquet(temp_file, index=False,engine="pyarrow")
     return chunk_index
 
-def extract_table_parallel(query:str,output_file: str,connection_str: str,file_format:str="parquet",chunk_percent: float = 10,table_name: str = table_name,schema: str = schema,order_column: str = date_col,offset_file: str = 'last_offset.json',
-max_workers: int = 4,temp_dir:str='./temp_chunks'
+def extract_table_parallel(query:str,output_file: str,connection_str: str,chunk_percent: float = 10,table_name: str = table_name,schema: str = schema,order_column: str = date_col,offset_file: str = 'last_offset.json',
+max_workers: int = 4,temp_dir:str='/tmp'
 ):
     try:
         print("Conectando para obtener número de filas...")
@@ -293,7 +290,7 @@ max_workers: int = 4,temp_dir:str='./temp_chunks'
 
         for i in range(total_chunks):
             chunk_offset = i * chunk_size + offset
-            chunk_file = os.path.join(temp_dir, f'chunk_{i}.csv')
+            chunk_file = os.path.join(temp_dir, f'chunk_{i}.parquet')
             if not os.path.exists(chunk_file):
                 remaining_chunks.append((i, chunk_offset))
             else:
@@ -333,42 +330,36 @@ max_workers: int = 4,temp_dir:str='./temp_chunks'
             return
 
         print(" Unificando archivos...")
-        if file_format=="csv":
-            with open(output_file, 'w', newline='', encoding='utf-8') as out_file:
-                first = True
-                for i in range(total_chunks):
-                    chunk_file = os.path.join(temp_dir, f'chunk_{i}.csv')
-                    if os.path.isfile(chunk_file):
-                        with open(chunk_file, 'r', encoding='utf-8') as f:
-                            if first:
-                                shutil.copyfileobj(f, out_file)
-                                first = False
-                            else:
-                                next(f)  # saltar header
-                                shutil.copyfileobj(f, out_file)
-        if file_format=="parquet":
-            writer = None
+        writer = None
 
-            for i in range(total_chunks):
-                fchunk = os.path.join(temp_dir, f"chunk_{i}.parquet")
-                if os.path.isfile(fchunk):
-                    table = pq.read_table(fchunk)
+        chunk_files = sorted(
+            (f for f in os.listdir(temp_dir) if f.endswith(".parquet")),
+            key=lambda x: int(x.split("_")[1].split(".")[0])
+            )
 
-                    if writer is None:
-                        writer = pq.ParquetWriter(output_file, table.schema)
 
-                    writer.write_table(table)
+        for fname in chunk_files:
+            table = pq.read_table(os.path.join(temp_dir, fname))
+            if writer is None:
+                writer = pq.ParquetWriter(output_file, table.schema)
+            else:
+                if table.schema != writer.schema:
+                    raise ValueError(f"Schema inconsistente en {fname}")
 
-            if writer:
-                writer.close()
+            writer.write_table(table)
 
-       
+
+        writer.close()
         
 
-        shutil.rmtree(temp_dir)
+        time.sleep(0.2)  # deja que Windows libere handles
+
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir, ignore_errors=False)
         print(f" Archivos temporales eliminados: {temp_dir}")
 
-        shutil.rmtree(offset_file)
+        if os.path.exists(offset_file):
+            os.remove(offset_file)
         print(f" Archivos temporales eliminados: {offset_file}")
         
     except Exception as e:

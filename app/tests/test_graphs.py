@@ -2,8 +2,8 @@ import pytest
 import pandas as pd
 import numpy as np
 from matplotlib.figure import Figure
-from src.graphs import *
-from src.data_loader import *
+from ct_sales_dashboard.graphs import *
+from ct_sales_dashboard.data_loader import *
 import matplotlib
 matplotlib.use("Agg")
 

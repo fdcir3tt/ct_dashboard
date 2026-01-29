@@ -2,8 +2,8 @@ from dotenv import load_dotenv
 import os
 import datetime
 import pandas as pd
-from src.graphs import *
-from src.data_loader import *
+from ct_sales_dashboard.graphs import *
+from ct_sales_dashboard.data_loader import *
 load_dotenv()
 data_columns = os.getenv("SALES_DATA_COLUMNS")
 

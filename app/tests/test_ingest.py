@@ -6,7 +6,7 @@ import random
 import datetime as dt
 from bson import ObjectId
 from dotenv import load_dotenv
-from  src.ingest import *
+from  scripts.ingest import *
 
 
 load_dotenv()

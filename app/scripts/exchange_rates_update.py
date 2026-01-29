@@ -36,7 +36,7 @@ def log_exchange_rate_update(status: bool,meta_data: dict,logger: logging.Logger
         "Stats update exchange rates | "
         f"status={status} "
         f"prev_rate={meta_data.get('previous_rate')} "
-        f"fetched_at={meta_data.get('API_call_time')} "
+        f"fetched_at={meta_data.get('fetched_at')} "
     )
 
     if meta_data.get("errors"):
@@ -101,7 +101,7 @@ def main():
 
     # Loggeo
     updated.to_parquet("data/raw/usd_mxn_rates.parquet")
-    meta_data["prev_rate"]=previous_rate
+    meta_data["previous_rate"]=previous_rate
     meta_data["status"]=True
     log_exchange_rate_update(status=True,meta_data=meta_data)
 
