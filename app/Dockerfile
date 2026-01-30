@@ -41,8 +41,6 @@ RUN poetry config virtualenvs.create false \
 
 COPY . .
 
-RUN useradd -m appuser
-USER appuser
 
 EXPOSE 8501
 
