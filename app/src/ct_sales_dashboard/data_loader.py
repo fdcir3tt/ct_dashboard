@@ -427,8 +427,7 @@ def update_table(table:str,latest_update:str,save_dir:str="data"):
 
     extract_table_parallel(query=query,
                            output_file=f"{save_dir}/{table}_update.parquet",
-                           connection_str=conn_str,
-                           file_format="parquet")
+                           connection_str=conn_str)
     
     update_df = pd.read_parquet(f"{save_dir}/{table}_update.parquet",dtype_backend="pyarrow")
     update_df = format_columns(update_df) 
