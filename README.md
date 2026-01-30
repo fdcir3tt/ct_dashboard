@@ -40,10 +40,6 @@
 
 
 
-
-
-
-
 ## Objetivos del proyecto
 
 El objetivo de este proyecto es visualizar la distribución de productos en las sucursales de CT International. Actualmente, la empresa gestiona el aspecto logístico mediante archivos de Excel. Se busca optimizar esta tarea mediante una herramienta intuitiva que permita visualizar la información de manera más eficiente. El éxito del proyecto se evaluará en función de la capacidad del dashboard para proporcionar información valiosa a los usuarios de forma diaria.
@@ -52,31 +48,74 @@ El objetivo de este proyecto es visualizar la distribución de productos en las 
 
 ```
 ct_dashboard/
+.
+├── app                           # Entorno de aplicación
+│   │
+│   ├── assets                    # Recursos estáticos (imágenes, CSS, logos)
+│   │   ├── logo.png              
+│   │   └── styles.css            
+│   │
+│   ├── data
+│   │   ├── processed
+│   │   │   ├── conversion_usd_mxn.parquet   # Datos de conversion procesados
+│   │   │   └── facturas_ventas.parquet      # Datos de facturas de venta procesados
+│   │   │
+│   │   └── raw
+│   │       ├── categorias.parquet            
+│   │       ├── codigos_productos.parquet     
+│   │       ├── facturas.parquet              
+│   │       ├── historical_data_usd_mxn_2008-12-31_to_2026-01-20.csv  # Datos históricos de conversión de moneda
+│   │       │                                
+│   │       ├── productos.parquet             
+│   │       ├── usd_mxn_rates.parquet          # Datos actualizados de conversión de moneda
+│   │       │
+│   │       └── gadm41_MEX_shp                 # Datos geográficos de México
+│   │           
+│   │
+│   ├── log
+│   │   ├── exchange_rates.log      
+│   │   └── historic_stats.log      
+│   │
+│   ├── scripts
+│   │   ├── exchange_rates_update.py 
+│   │   ├── ingest.py               
+│   │   ├── pipeline.py              # ETL pipeline
+│   │   └── shapefile_extraction.py 
+│   │
+│   ├── src                          # Código fuente (módulos auxiliares)
+│   │   └── ct_sales_dashboard
+│   │       ├── data_loader.py       # Carga de datos
+│   │       ├── graphs.py            # Gráficas y lógica de visualización
+│   │       └── preprocess.py        # Limpieza y procesamiento de datos crudos
+│   │
+│   ├── tests
+│   │    ├── test_data_loader.py      
+│   │    ├── test_graphs.py           
+│   │    ├── test_ingest.py           
+│   │    └── validation_test.py       # Validación de datos 
+│   │
+│   ├── .env                      # Variables de entorno
+│   ├── app.py                    # Punto de entrada principal (main)
+│   ├── Dockerfile                
+│   ├── poetry.lock               # Dependencias de proyecto
+│   ├── pyproject.toml            
+│   ├── pytest.ini                
+│   └── states_dict.json          # Configuración de región/estado
 │
-├── app.py                    # Punto de entrada principal (main)
-│
-│
-├── data/                     # Datos locales (CSV, JSON, etc.)
-│   ├── ventas.csv
-│   └── clientes.csv
-│
-├── src/                      # Código fuente (módulos auxiliares)
-│   ├── __init__.py
-│   ├── data_loader.py        # Funciones para cargar datos
-│   ├── preprocess.py         # Limpieza y transformación de datos
-│   ├── graphs.py             # Funciones para generar gráficos
-│   └── utils.py              # Funciones de utilidad (colores, formatos, etc.)
-│
-├── assets/                   # Recursos estáticos (imágenes, CSS, logos)
-│   ├── logo.png
-│   └── style.css
-│
-├── requirements.txt          # Dependencias del proyecto
-├── .env
-├── license.md
-├── poetry.lock
-├── pyproject.toml 
-└── README.md                 # Descripción del proyecto
+├── references
+│    ├── data_dict.md                 
+│    ├── data_validation.md           # Reglas/criterios de validación de datos
+│    ├── existence_schema.md          # Esquema de tabla de historial de existencias de productos
+│    ├── graphs.md                    # Documentación acerca de gráficas y visualización
+│    ├── links.md                     # Enlaces a referencias externas
+│    └── other                        
+│ 
+├── .dockerignore                 
+├── .gitignore                  
+├── license.md                   
+└── README.md                     
+
+
 
 ```
 
