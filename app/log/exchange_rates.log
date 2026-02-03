@@ -2,3 +2,7 @@
 2026-01-28 10:31:39,488 - INFO - Stats update exchange rates | status=True prev_rate=None fetched_at=None fallback_type=estimated fallback_source_date=2026-01-28 10:31:38.670561
 2026-01-28 10:44:03,425 - INFO - Stats update exchange rates | status=True prev_rate=None fetched_at=None fallback_type=estimated fallback_source_date=2026-01-28 10:44:02.540890
 2026-01-29 09:07:52,481 - INFO - Stats update exchange rates | status=True prev_rate=None fetched_at=None 
+2026-01-30 11:07:23,150 - INFO - Stats update exchange rates | status=True prev_rate=exchange_rate    17.167603
+Name: 2026-01-29 09:07:52.478266, dtype: float64 fetched_at=2026-01-30 11:07:22.127270 
+2026-02-03 08:37:27,806 - INFO - Stats update exchange rates | status=True prev_rate=exchange_rate    17.228702
+Name: 2026-01-30 11:07:23.145229, dtype: float64 fetched_at=2026-02-03 08:37:26.764993 
