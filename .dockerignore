@@ -4,9 +4,9 @@ __pycache__/
 .streamlit/
 tests/
 *.log
-data/processed
-data/raw/*
+app/data/processed/*
+app/data/raw/*
 .env
 
 # Excepciones
-!data/raw/historical_data_usd_mxn_2008-12-31_to_2026-01-20.csv
+!app/data/raw/historical_data_usd_mxn_2008-12-31_to_2026-01-20.csv
