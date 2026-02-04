@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 from ct_sales_dashboard.graphs import *
 from ct_sales_dashboard.data_loader import *
-from ct_sales_dashboard.preprocess import process_data
+
 
 # -----------------------------------------------------------
 # CONFIGURACIÓN INICIAL
@@ -52,15 +52,9 @@ load_css("assets/styles.css")
 # -----------------------------------------------------------
 # CARGA DE DATOS
 # -----------------------------------------------------------
-invoices = load_invoices()
-product_codes =load_product_codes()
-exchange_rates = load_exchange_rates()
-branches = load_branches()
-categories = load_categories()
-products = load_products()
-branch_storage = load_storage()
 
-global_data = process_data (invoices,product_codes,exchange_rates,branches,categories,products,update=True)
+
+global_data = load_sales_invoices()
 global_data["income"] = global_data["price"] * global_data["quantity"]
 
 data = global_data.copy()
@@ -136,7 +130,7 @@ branch = st.sidebar.selectbox("Sucursal", branch_list, index=frequent_branch_ind
 
 
 if outliers=="Sí":
-    data = process_data()
+    data = load_sales_invoices()
 
 if data.empty:
     print("Dataset vacío")
@@ -157,9 +151,9 @@ with col2:
 
 tab1, tab2 = st.tabs(["Ventas","Inventario"])
 
-# -----------------------------------------------------------
-# ANÁLISIS VENTAS
-# -----------------------------------------------------------
+# ===========================================================
+#                       ANÁLISIS VENTAS
+# ===========================================================
 
 with tab1:
     left, right = st.columns([1.3, 3.7])
@@ -443,9 +437,11 @@ with tab1:
 
 
 
-# -----------------------------------------------------------
-# ANÁLISIS INVENTARIO
-# -----------------------------------------------------------
+# ===========================================================
+#                       ANÁLISIS INVENTARIO
+# ===========================================================
+
+
 with tab2:
 
    left, right = st.columns([1.2, 3])

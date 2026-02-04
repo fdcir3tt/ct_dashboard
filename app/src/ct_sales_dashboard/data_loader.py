@@ -623,8 +623,12 @@ def load_exchange_rates():
         return None
 
 
-
-
-        
+def load_sales_invoices():
+    processed = os.path.exists("data/processed/facturas_ventas.parquet")
+    if processed:
+        df = pd.read_parquet("data/processed/facturas_ventas.parquet")
+        return df
+    else: 
+        return None
 
    

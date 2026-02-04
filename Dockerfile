@@ -51,7 +51,6 @@ RUN poetry config virtualenvs.create false \
 EXPOSE 8501
 
 
-CMD PYTHONPATH=/app python scripts/exchange_rates_update.py && \
-    PYTHONPATH=/app python scripts/shapefile_extraction.py && \
+CMD PYTHONPATH=/app python scripts/pipeline.py && \
     PYTHONPATH=/app streamlit run app.py --server.address=0.0.0.0 --server.port=8501
 
