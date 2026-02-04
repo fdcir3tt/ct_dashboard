@@ -74,19 +74,10 @@ conn_str = (
 )
 
 
-ip=os.getenv("CDB_IP")
-user=os.getenv("CDB_UID")
-password=os.getenv("CDB_PASSWORD")
-database=os.getenv('CDB_DATABASE')
+
+
 category_table=os.getenv('CDB_CATEGORY_TABLE')
 product_table=os.getenv('CDB_PRODUCT_TABLE')
-
-conn_mysql = mysql.connector.connect(
-    host=ip,
-    user=user,
-    password=password,
-    database=database
-)
 
 
 def connect_to_DB(conn_uri,db_name)-> MongoClient:
@@ -101,6 +92,14 @@ def connect_to_DB(conn_uri,db_name)-> MongoClient:
     db = client[db_name]
 
     return db
+
+def get_mysql_connection():
+    return mysql.connector.connect(
+    host=os.getenv("CDB_IP"),
+    user=os.getenv("CDB_UID"),
+    password=os.getenv("CDB_PASSWORD"),
+    database=os.getenv('CDB_DATABASE')
+)
 
 # -----------------------------------------------------------
 # QUERIES
@@ -486,6 +485,7 @@ def load_categories():
         df = pd.read_parquet("data/raw/categorias.parquet")
         
     else:
+        conn_mysql = get_mysql_connection()
         cursor = conn_mysql.cursor(dictionary=True)  # devuelve resultados como diccionarios
 
         cursor.execute(f"SELECT * FROM {category_table};")
@@ -505,6 +505,7 @@ def load_products():
         df = pd.read_parquet("data/raw/productos.parquet")
         
     else:
+        conn_mysql=get_mysql_connection()
         cursor = conn_mysql.cursor(dictionary=True)  # devuelve resultados como diccionarios
         cursor.execute(f"SELECT * FROM {product_table};")
         rows_products = cursor.fetchall()

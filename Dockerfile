@@ -1,7 +1,4 @@
-# ========================
-# Stage 1: Build stage
-# ========================
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim 
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -36,53 +33,24 @@ RUN curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /us
     apt-get update && ACCEPT_EULA=Y apt-get install -y msodbcsql17 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
+
 RUN curl -sSL https://install.python-poetry.org | python3 -
 
-# Set the working directory
+
 WORKDIR /app
 
-# Copy only dependency files first to leverage Docker cache
-COPY pyproject.toml poetry.lock* /app/
 
-# Install dependencies without creating virtualenv
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-root --no-interaction --no-ansi
-
-# Copy the rest of the app code
+COPY app/pyproject.toml app/poetry.lock* /app/
 COPY app/ /app/
 
-# ========================
-# Stage 2: Runtime stage
-# ========================
-FROM python:3.12-slim AS final
 
-# Set environment variables for runtime
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV POETRY_HOME=/opt/poetry
-ENV PATH="$POETRY_HOME/bin:$PATH"
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi
 
-# Install system dependencies for runtime
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    unixodbc \
-    && rm -rf /var/lib/apt/lists/*
 
-# Set the working directory
-WORKDIR /app
-
-# Copy Poetry and Python packages from the builder stage
-COPY --from=builder /opt/poetry /opt/poetry
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-
-# Copy the app code from the builder stage
-COPY --from=builder /app/ /app/
-
-# Expose the port Streamlit will run on
 EXPOSE 8501
 
-# Combine both script executions (exchange rates update + shapefile extraction) 
-# with Streamlit running in a single CMD
+
 CMD PYTHONPATH=/app python scripts/exchange_rates_update.py && \
     PYTHONPATH=/app python scripts/shapefile_extraction.py && \
     PYTHONPATH=/app streamlit run app.py --server.address=0.0.0.0 --server.port=8501
