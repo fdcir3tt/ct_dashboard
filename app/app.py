@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 import datetime
-from src.ct_sales_dashboard.graphs import *
-from src.ct_sales_dashboard.data_loader import *
-from src.ct_sales_dashboard.preprocess import process_data
+from ct_sales_dashboard.graphs import *
+from ct_sales_dashboard.data_loader import *
+from ct_sales_dashboard.preprocess import process_data
 
 # -----------------------------------------------------------
 # CONFIGURACIÓN INICIAL
@@ -78,14 +78,38 @@ period_end = pd.to_datetime( today )
 
 # Producto con cantidad de unidades más vendidas dentro de periodo
 is_in_period = ( period_start <= data["date"] ) & ( data["date"] <= period_end )
-top_product= (
+
+if data[is_in_period].empty:
+    top_product= (
+        data
+        .groupby("productId")["quantity"]
+        .sum()
+        .idxmax()
+    )
+    top_category= (
+    data
+    .groupby("category")["quantity"]
+    .sum()
+    .idxmax()
+)
+else:     
+    top_product= (
+        data[is_in_period]
+        .groupby("productId")["quantity"]
+        .sum()
+        .idxmax()
+    )
+    top_category= (
     data[is_in_period]
-    .groupby("productId")["quantity"]
+    .groupby("category")["quantity"]
     .sum()
     .idxmax()
 )
 product_list = list( data["productId"].unique() )
 top_product_index = product_list.index(top_product)
+
+category_list = list( data["category"].unique() )
+top_category_index = category_list.index(top_category)
 
 # Sucursal en donde se vende más seguido el producto más vendido
 is_top_product= data["productId"]==top_product
@@ -95,18 +119,9 @@ frequent_branch= (
     .nunique() 
     .idxmax()
 )
+
 branch_list = list( data["sucursal"].unique() )
 frequent_branch_index = branch_list.index(frequent_branch)
-
-
-top_category= (
-    data[is_in_period]
-    .groupby("category")["quantity"]
-    .sum()
-    .idxmax()
-)
-category_list = list( data["category"].unique() )
-top_category_index = category_list.index(top_category)
 
 
 # -----------------------------------------------------------

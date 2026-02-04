@@ -6,8 +6,8 @@ import numpy as np
 
 from json import JSONDecodeError
 from dotenv import load_dotenv
-from src.ct_sales_dashboard.data_loader import load_raw_exchange_rates,load_exchange_rates,update_exchange_rates,get_usd_to_mxn
-from src.ct_sales_dashboard.preprocess import process_exchange_rates
+from ct_sales_dashboard.data_loader import load_raw_exchange_rates,load_exchange_rates,update_exchange_rates,get_usd_to_mxn
+from ct_sales_dashboard.preprocess import process_exchange_rates
 
 # -----------------------------------------------------------
 # SETUP 
