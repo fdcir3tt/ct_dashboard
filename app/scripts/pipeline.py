@@ -1,7 +1,11 @@
 import os
-import subprocess
+import subprocess,warnings
+
+warnings.filterwarnings('ignore')
+
 from ct_sales_dashboard.data_loader import *
 from ct_sales_dashboard.preprocess import *
+
 
 
 def main():
@@ -9,15 +13,29 @@ def main():
 # -----------------------------------------------------------
 # ACTUALIZAR DATOS
 # -----------------------------------------------------------
-    if ( not os.path.exists("data/raw/gadm41_MEX_shp") ):
-        subprocess.run(["python", "scripts/shapefile_extraction.py"])
-    subprocess.run(["python", "scripts/ingest.py"])
-    subprocess.run(["python", "scripts/exchange_rates_update.py"])
+    print("Revisando actualizaciones ...")
 
+    if ( not os.path.exists("data/raw/gadm41_MEX_shp") ):
+        print(" ="*25)
+        print("||   Comenzando extracción de archivos geográficos   ||")
+        print(" ="*25)
+
+        subprocess.run(["python", "scripts/shapefile_extraction.py"])
+    
+    print(" ="*25)
+    print("||   Comenzando ingesta de datos históricos  ||")
+    print(" ="*25)
+    subprocess.run(["python", "scripts/ingest.py"])
+
+    print(" ="*25)
+    print("||   Comenzando actualización de conversiones de moneda  ||")
+    print(" ="*25)
+    subprocess.run(["python", "scripts/exchange_rates_update.py"])
+    print("Actualizaciones completas!!")
 # -----------------------------------------------------------
 # CARGAR DATOS
 # -----------------------------------------------------------
-
+    print(" Comenzando carga de datos...")
     invoices = load_invoices()
 
     product_codes =load_product_codes()
@@ -27,7 +45,7 @@ def main():
     categories = load_categories()
     products = load_products()
 
-
+    print("Carga completa!!")
     process_data (invoices,
                   product_codes,
                   exchange_rates,
@@ -35,7 +53,7 @@ def main():
                   products,
                   categories,
                   update=True)
-
+    print("Proceso de datos completo!!")
 
 
 if __name__ == "__main__":
