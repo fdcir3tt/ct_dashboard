@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import logging
 import datetime
+import warnings
 
 from ct_sales_dashboard.data_loader import connect_to_DB,get_documents,get_product_cost_dict
 from dotenv import load_dotenv
@@ -12,6 +13,7 @@ from bson import BSON
 # -----------------------------------------------------------
 # SETUP 
 # -----------------------------------------------------------
+warnings.filterwarnings('ignore')
 load_dotenv()
 
 BATCH_SIZE = 500
@@ -44,6 +46,44 @@ Documents = list[Document]
 # -----------------------------------------------------------
 # INGESTA
 # -----------------------------------------------------------
+from typing import Dict, Any
+
+
+def check_database_up_to_date(collection, date_field: str = 'createdAt') -> Dict[str, Any]:
+    """
+    Revisa si la base contiene documentos del día de hoy
+    
+    Args:
+        collection: MongoDB collection object
+        date_field: The field name that contains the date (e.g., 'createdAt', 'updatedAt')
+    
+    Returns:
+        Dict with keys:
+            - is_up_to_date (bool): True if documents exist from today
+            - today_count (int): Number of documents from today
+            - today_date (datetime): Today's date
+    """
+    try:
+        
+        today_start = datetime.datetime.combine(today, datetime.time.min)
+        today_end = datetime.datetime.combine(today, datetime.time.max)
+        
+        # Query for documents created today
+        today_count = collection.count_documents({
+            date_field: {
+                '$gte': today_start,
+                '$lte': today_end
+            }
+        })
+        
+        return {
+            'is_up_to_date': today_count > 0,
+            'today_count': today_count,
+            'today_date': today_start
+        }
+    except Exception as e:
+        raise Exception(f"Error checking database status: {str(e)}")
+
 
 def make_observation(raw_doc:Document,cost_dictionary:dict,now:datetime.datetime)->Document :
     """
@@ -133,7 +173,10 @@ def main(extract_database=None,insert_database=None,now=datetime.datetime.now(),
     # Ingesta
     hist_table = os.getenv("EXISTENCE_HIST_COLLECTION")
     
-    
+    result = check_database_up_to_date(insert_db[hist_table],date_field='fechaRegistro')
+    if result['is_up_to_date']:
+        print(f"Collección {hist_table} ya esta actualizada!!")
+        return None
     # Procesamiento por chunks para reducir ancho de banda
     num_inserted_docs = 0
     for i in range(0, len(exist_docs), BATCH_SIZE):

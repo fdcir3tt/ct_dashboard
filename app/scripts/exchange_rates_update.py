@@ -3,6 +3,7 @@ import os
 import datetime
 import logging
 import numpy as np
+import warnings
 
 from json import JSONDecodeError
 from dotenv import load_dotenv
@@ -12,7 +13,7 @@ from ct_sales_dashboard.preprocess import process_exchange_rates
 # -----------------------------------------------------------
 # SETUP 
 # -----------------------------------------------------------
-
+warnings.filterwarnings('ignore')
 load_dotenv()
 
 EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY")
@@ -29,8 +30,21 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+def is_up_to_date():
+    file_exists = os.path.exists("data/raw/usd_mxn_rates.parquet")
+    if file_exists:
+        df = pd.read_parquet("data/raw/usd_mxn_rates.parquet")
+        previous_rate= df.iloc[-1]
 
-
+    else:
+        return False
+    
+    rate = get_usd_to_mxn(logger=logger)
+    if rate:
+        return previous_rate==rate
+    else:
+        return False
+    
 def log_exchange_rate_update(status: bool,meta_data: dict,logger: logging.Logger = logger,):
     msg = (
         "Stats update exchange rates | "
@@ -55,6 +69,10 @@ def log_exchange_rate_update(status: bool,meta_data: dict,logger: logging.Logger
 
 
 def main():
+    if is_up_to_date():
+        print("Conversiones ya estan actualizadas !")
+        return None
+    
     meta_data = {}
     file_exists = os.path.exists("data/raw/usd_mxn_rates.parquet")
     if file_exists:
