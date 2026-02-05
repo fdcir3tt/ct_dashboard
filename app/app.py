@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 import datetime
-from src.ct_sales_dashboard.graphs import *
-from src.ct_sales_dashboard.data_loader import *
-from src.ct_sales_dashboard.preprocess import process_data
+from ct_sales_dashboard.graphs import *
+from ct_sales_dashboard.data_loader import *
+
 
 # -----------------------------------------------------------
 # CONFIGURACIÓN INICIAL
@@ -52,15 +52,9 @@ load_css("assets/styles.css")
 # -----------------------------------------------------------
 # CARGA DE DATOS
 # -----------------------------------------------------------
-invoices = load_invoices()
-product_codes =load_product_codes()
-exchange_rates = load_exchange_rates()
-branches = load_branches()
-categories = load_categories()
-products = load_products()
-branch_storage = load_storage()
 
-global_data = process_data (invoices,product_codes,exchange_rates,branches,categories,products,update=True)
+
+global_data = load_sales_invoices()
 global_data["income"] = global_data["price"] * global_data["quantity"]
 
 data = global_data.copy()
@@ -78,14 +72,38 @@ period_end = pd.to_datetime( today )
 
 # Producto con cantidad de unidades más vendidas dentro de periodo
 is_in_period = ( period_start <= data["date"] ) & ( data["date"] <= period_end )
-top_product= (
+
+if data[is_in_period].empty:
+    top_product= (
+        data
+        .groupby("productId")["quantity"]
+        .sum()
+        .idxmax()
+    )
+    top_category= (
+    data
+    .groupby("category")["quantity"]
+    .sum()
+    .idxmax()
+)
+else:     
+    top_product= (
+        data[is_in_period]
+        .groupby("productId")["quantity"]
+        .sum()
+        .idxmax()
+    )
+    top_category= (
     data[is_in_period]
-    .groupby("productId")["quantity"]
+    .groupby("category")["quantity"]
     .sum()
     .idxmax()
 )
 product_list = list( data["productId"].unique() )
 top_product_index = product_list.index(top_product)
+
+category_list = list( data["category"].unique() )
+top_category_index = category_list.index(top_category)
 
 # Sucursal en donde se vende más seguido el producto más vendido
 is_top_product= data["productId"]==top_product
@@ -95,18 +113,9 @@ frequent_branch= (
     .nunique() 
     .idxmax()
 )
+
 branch_list = list( data["sucursal"].unique() )
 frequent_branch_index = branch_list.index(frequent_branch)
-
-
-top_category= (
-    data[is_in_period]
-    .groupby("category")["quantity"]
-    .sum()
-    .idxmax()
-)
-category_list = list( data["category"].unique() )
-top_category_index = category_list.index(top_category)
 
 
 # -----------------------------------------------------------
@@ -121,7 +130,7 @@ branch = st.sidebar.selectbox("Sucursal", branch_list, index=frequent_branch_ind
 
 
 if outliers=="Sí":
-    data = process_data()
+    data = load_sales_invoices()
 
 if data.empty:
     print("Dataset vacío")
@@ -142,9 +151,9 @@ with col2:
 
 tab1, tab2 = st.tabs(["Ventas","Inventario"])
 
-# -----------------------------------------------------------
-# ANÁLISIS VENTAS
-# -----------------------------------------------------------
+# ===========================================================
+#                       ANÁLISIS VENTAS
+# ===========================================================
 
 with tab1:
     left, right = st.columns([1.3, 3.7])
@@ -428,9 +437,11 @@ with tab1:
 
 
 
-# -----------------------------------------------------------
-# ANÁLISIS INVENTARIO
-# -----------------------------------------------------------
+# ===========================================================
+#                       ANÁLISIS INVENTARIO
+# ===========================================================
+
+
 with tab2:
 
    left, right = st.columns([1.2, 3])

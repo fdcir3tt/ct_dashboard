@@ -3,7 +3,7 @@ import pandas as pd
 import json
 import datetime
 import numpy as np
-import streamlit as st
+
 
 
 
@@ -76,17 +76,9 @@ def process_exchange_rates(data:pd.DataFrame):
 
     processed_rates.to_parquet("data/processed/conversion_usd_mxn.parquet")
 
-def clean_data(invoices,product_codes,exchange_rates,branches,*args,**kwargs)->pd.DataFrame:
-    """
-    Función que carga datos y los limpia y prepara para el procesamiento.
+   
+def normalize_coins(df:pd.DataFrame)->pd.DataFrame:
 
-    """
-    
-    # Normalizar precios a MXN
-    df = invoices.merge(product_codes,how="inner",on="productId")
-    df = df.merge(exchange_rates,how="inner",on="date")
-
-    
     df["price"] = df["price"] * (
         1 - df["sell_coin"] + df["exchange_rate"] * df["sell_coin"]
     )
@@ -95,35 +87,37 @@ def clean_data(invoices,product_codes,exchange_rates,branches,*args,**kwargs)->p
     )
     df= df.drop(columns=["sell_coin","buy_coin","exchange_rate"])
 
-    # Filtros
-    is_sale= (df["quantity"] > 0)&( df["price"] > 0 ) # Solo nos interesan casos donde sí hubo venta
-    is_hardware = df["cost"] > 0
-    df = df[is_sale & is_hardware]
-
-    # Sucursales
-    df['branchId']= df['folio'].str.extract( r'(?P<branchId>[A-Za-z]+)' )
-    df = df.merge(branches[["nemonico","sucursal","homoclave"]],how="inner",left_on="branchId",right_on="homoclave")
-    
     return df
 
-@st.cache_data
-def process_data(invoices,product_codes,exchange_rates,branches,categories,products,update:bool=False,**kwargs)->pd.DataFrame:
+def sales_filters(df:pd.DataFrame)->pd.DataFrame:
+    is_sale= (df["quantity"] > 0)&( df["price"] > 0 ) # Solo nos interesan casos donde sí hubo venta
+    is_hardware = df["cost"] > 0
+    mask = is_sale & is_hardware
+    df = df[mask]
+    return df
+
+def process_data(invoices,product_codes,exchange_rates,branches,products,categories,update:bool=False):
     """
     Agarra el dataset limpio y listo para procesar para generar las variables 
     útiles/relevantes en el dashboard. 
 
     """
-
     data_exists= os.path.exists("data/processed/facturas_ventas.parquet")
     if (data_exists)&(not update):
         df=pd.read_parquet("data/processed/facturas_ventas.parquet")
         return df
     else:
+        df = invoices.merge(product_codes,how="inner",on="productId")
+        df = df.merge(exchange_rates,how="inner",on="date")
         
+        df = normalize_coins(df)
+        df = sales_filters(df)
+
+        df['branchId']= df['folio'].str.extract( r'(?P<branchId>[A-Za-z]+)' )
+        df = df.merge(branches[["nemonico","sucursal","homoclave"]],how="inner",left_on="branchId",right_on="homoclave")
+    
         products = products.merge(categories,how="left",on="idCategoria")
         products = products [["clave","nombre"]]
-
-        df = clean_data(invoices,product_codes,exchange_rates,branches)
 
         # Columna de estados
         with open("states_dict.json", "r", encoding="utf-8") as f:
@@ -138,4 +132,4 @@ def process_data(invoices,product_codes,exchange_rates,branches,categories,produ
         
         df.to_parquet('data/processed/facturas_ventas.parquet',index=False)
 
-    return df
+    

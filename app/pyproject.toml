@@ -6,7 +6,7 @@ authors = [
     {name = "fdcir3tt",email = "fd.cirett@gmail.com"}
 ]
 license = {text = "MIT"}
-readme = "../README.md"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "streamlit (>=1.51.0,<2.0.0)",
@@ -18,7 +18,7 @@ dependencies = [
     "pyodbc (>=5.3.0,<6.0.0)",
     "pytest (>=9.0.1,<10.0.0)",
     "mysql (>=0.0.3,<0.0.4)",
-    "mysql-connector-python (>=9.5.0,<10.0.0)",
+    "mysql-connector-python (==9.5.0)",
     "plotly (>=6.4.0,<7.0.0)",
     "pymongo (>=4.15.4,<5.0.0)",
     "dask[distributed] (>=2025.11.0,<2026.0.0)",
@@ -26,7 +26,8 @@ dependencies = [
     "sqlalchemy (>=2.0.44,<3.0.0)",
     "folium (>=0.20.0,<0.21.0)",
     "streamlit-folium (>=0.25.3,<0.26.0)",
-    "mongomock (>=4.3.0,<5.0.0)"
+    "mongomock (>=4.3.0,<5.0.0)",
+    "pg8000 (>=1.31.5,<2.0.0)",
 ]
 
 
