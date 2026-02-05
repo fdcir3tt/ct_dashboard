@@ -53,7 +53,7 @@ load_css("assets/styles.css")
 # CARGA DE DATOS
 # -----------------------------------------------------------
 
-
+branch_storage = load_storage()
 global_data = load_sales_invoices()
 global_data["income"] = global_data["price"] * global_data["quantity"]
 

@@ -73,7 +73,7 @@ def process_exchange_rates(data:pd.DataFrame):
     
     processed_rates = fill_exchange_rates(rates_dataframe=merged)
     processed_rates = processed_rates.set_index("date") 
-
+    os.makedirs("data/processed",exist_ok=True)
     processed_rates.to_parquet("data/processed/conversion_usd_mxn.parquet")
 
    
@@ -102,6 +102,7 @@ def process_data(invoices,product_codes,exchange_rates,branches,products,categor
     útiles/relevantes en el dashboard. 
 
     """
+    
     data_exists= os.path.exists("data/processed/facturas_ventas.parquet")
     if (data_exists)&(not update):
         df=pd.read_parquet("data/processed/facturas_ventas.parquet")
@@ -129,7 +130,7 @@ def process_data(invoices,product_codes,exchange_rates,branches,products,categor
         df = df.merge(products,how="left",left_on="productId",right_on="clave")
         df = df.rename(columns={"nombre":"category"})
 
-        
+        os.makedirs("data/processed",exist_ok=True)
         df.to_parquet('data/processed/facturas_ventas.parquet',index=False)
 
     

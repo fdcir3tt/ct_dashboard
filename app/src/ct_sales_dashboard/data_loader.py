@@ -436,6 +436,7 @@ def update_table(table:str,latest_update:str,save_dir:str="data"):
 
     df = pd.concat([outdated_df, update_df], ignore_index=True)
     df = df.drop_duplicates(subset=["productId","folio","date"])
+    os.makedirs(save_dir,exist_ok=True)
     df.to_parquet(f"{save_dir}/{table}.parquet",engine="pyarrow",index=False)
 
     os.remove(f"{save_dir}/{table}_update.parquet")
@@ -475,6 +476,7 @@ def load_product_codes():
         df["buy_coin" ] = df["buy_coin"].astype("int8[pyarrow]")
         df["sell_coin"] = df["sell_coin"].astype("int8[pyarrow]")
         df = df.astype({'productId':'string'}) 
+        os.makedirs("data/raw",exist_ok=True)
         df.to_parquet('data/raw/codigos_productos.parquet',index=False)
 
     return df
