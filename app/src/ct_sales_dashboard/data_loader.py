@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import warnings 
 import pyodbc
 import mysql.connector
 import streamlit as st
@@ -16,7 +17,7 @@ from pymongo import MongoClient
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
-
+warnings.filterwarnings('ignore')
 # -----------------------------------------------------------
 # SETUP 
 # -----------------------------------------------------------

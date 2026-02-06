@@ -4,7 +4,7 @@ app/data/processed/
 gadm41_MEX_shp/
 __pycache__/
 .pytest_cache/
-
+data
 # Archivos
 .env
 

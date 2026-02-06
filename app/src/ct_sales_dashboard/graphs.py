@@ -2,6 +2,7 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 import folium
+import warnings
 import streamlit as st
 from streamlit_folium import st_folium
 import matplotlib.pyplot as plt
@@ -9,6 +10,8 @@ import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
 from matplotlib.ticker import MaxNLocator
 from matplotlib.figure import Figure
+
+warnings.filterwarnings('ignore')
 
 @st.cache_resource
 def load_mexico_shp():
