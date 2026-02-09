@@ -5,7 +5,6 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     container_name: dashboard
-    container_name: dashboard
     volumes:
       - ./data:/app/data:Z
     env_file:
