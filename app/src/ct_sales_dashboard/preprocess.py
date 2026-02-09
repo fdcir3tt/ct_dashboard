@@ -62,15 +62,22 @@ def get_existence(existences:str)->int:
        
     return global_existence
 
+
+
 def process_exchange_rates(data:pd.DataFrame):
     
     df = data.copy()
     
     # Imputación 
+    rates = pd.read_parquet('data/raw/usd_mxn_rates.parquet')
+    rates.index = rates.index.date.astype('datetime64[ns]')
+    rates.index.name = 'date'
     period = pd.DataFrame(data=time_period(start_date=datetime.datetime(2020,1,1) ),columns=["date"])
     merged = period.merge(df,how="left",on="date")
+    merged = merged.merge(rates,how='left',on='date',suffixes=('', '_fill'))
+    merged['exchange_rate'] = merged['exchange_rate'].fillna(merged['exchange_rate_fill'])
+    merged = merged.drop(columns=['exchange_rate_fill'])
 
-    
     processed_rates = fill_exchange_rates(rates_dataframe=merged)
     processed_rates = processed_rates.set_index("date") 
     os.makedirs("data/processed",exist_ok=True)

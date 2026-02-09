@@ -10,3 +10,4 @@ Name: 2026-01-30 11:07:23.145229, dtype: float64 fetched_at=2026-02-03 08:37:26.
 Name: 2026-02-03 08:37:27.762236, dtype: float64 fetched_at=2026-02-04 08:35:54.190396 
 2026-02-05 10:43:31,729 - INFO - Stats update exchange rates | status=True prev_rate=exchange_rate    17.242403
 Name: 2026-02-04 08:35:55.044009, dtype: float64 fetched_at=2026-02-05 10:43:30.709456 
+2026-02-09 10:30:04,526 - INFO - Stats update exchange rates | status=True prev_rate=17.522003 fetched_at=2026-02-09 10:30:03.748459 
