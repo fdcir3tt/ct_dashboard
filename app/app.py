@@ -176,11 +176,11 @@ with tab1:
         with col1:
 
             if analysis_lvl=="Productos":
-                main_element = pick_main_element(label="Producto de análisis",options= products,key="producto de análisis")
+                main_element = pick_main_element(label="Producto de análisis",options= products,key="producto de análisis",default=top_product)
                 element_title= f"**Producto:** {main_element}"
 
             if analysis_lvl=="Categorías":
-                main_element = pick_main_element(label="Categoría de análisis",options= categories,key="categoría de análisis")
+                main_element = pick_main_element(label="Categoría de análisis",options= categories,key="categoría de análisis",default=top_category)
                 element_title = f"**Categoría:** {main_element}"
                 
 
