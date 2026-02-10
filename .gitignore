@@ -1,4 +1,6 @@
 # Directorios
+.vscode/
+.venv/
 app/data/raw/*
 app/data/processed/
 gadm41_MEX_shp/
