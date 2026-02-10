@@ -44,8 +44,6 @@ def fill_exchange_rates(rates_dataframe:pd.DataFrame)->pd.DataFrame:
                 df["exchange_rate"].iloc[1] = df["exchange_rate"].iloc[0]
                 continue
 
-        
-
             fill_rate = np.mean([ df["exchange_rate"].iloc[idx-1], df["exchange_rate"].iloc[idx-2] ]) 
             df["exchange_rate"].iloc[idx] = fill_rate
     return df
@@ -95,6 +93,7 @@ def normalize_coins(df:pd.DataFrame)->pd.DataFrame:
     df= df.drop(columns=["sell_coin","buy_coin","exchange_rate"])
 
     return df
+
 
 def sales_filters(df:pd.DataFrame)->pd.DataFrame:
     is_sale= (df["quantity"] > 0)&( df["price"] > 0 ) # Solo nos interesan casos donde sí hubo venta

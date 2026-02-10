@@ -39,18 +39,6 @@ month_dict={  1:"Enero",
 # AUXILIARES
 # -----------------------------------------------------------
 
-def remove_outliers(data: pd.DataFrame, column: str) -> pd.DataFrame:
-    series = data[column]
-    
-    Q1 = series.quantile(0.25)
-    Q3 = series.quantile(0.75)
-    IQR = Q3 - Q1
-    lower = Q1 - 1.5 * IQR
-    upper = Q3 + 1.5 * IQR
-    
-    clean_data = data[(series >= lower) & (series <= upper)]
-    return clean_data
-
 
 def top_n(data:pd.DataFrame,element_column,type:str="producto",criteria:str="ventas_diarias",n:int=5)->list[str]:
     """
@@ -143,7 +131,13 @@ def top_month(data:pd.DataFrame)->str:
 # GRÄFICAS
 # -----------------------------------------------------------
 
-def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_column:str ,start_date, end_date,branch:str=None,val:bool=False,**kwargs)->Figure:
+def period_sales(data: pd.DataFrame, 
+                 selected_elements: list[str] ,
+                 element_column:str ,
+                 start_date, end_date,
+                 outliers:bool,
+                 branch:str=None,
+                 val:bool=False,**kwargs)->Figure:
     """
     Grafica curva de ventas y regresa la figura.
     """
@@ -173,13 +167,19 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
 
+    df = data.copy()
     # Filtro por rango de fechas
-    in_period = (data["date"] >= start_date) & (data["date"] <= end_date)
-    data = data[in_period]
+    in_period = (df['date'] >= start_date) & (df['date'] <= end_date)
 
     # Filtro por productos o categorías
-    in_selected = data[element_column].isin(selected_elements)
-    df = data[in_selected].copy()
+    in_selected = df[element_column].isin(selected_elements)
+    
+
+    # Filtro por outlier 
+    outlier_filter =  df['is_outlier']==outliers
+    
+    mask = in_period & in_selected & outlier_filter
+    df = df[mask]
 
     if df.empty:
         
@@ -268,7 +268,13 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     
     return (fig, plot_df) if val else fig
 
-def period_inventory(data: pd.DataFrame,branch_storage:dict[str], selected_elements: list[str] ,element_column:str ,start_date, end_date,branch:str=None,val:bool=False,**kwargs)->Figure:
+def period_inventory(data: pd.DataFrame,
+                     branch_storage:dict[str], 
+                     selected_elements: list[str] ,
+                     element_column:str ,
+                     start_date, end_date,
+                     branch:str=None,
+                     val:bool=False,**kwargs)->Figure:
     """
     Grafica curva de inventario y regresa la figura.
     """
@@ -296,13 +302,16 @@ def period_inventory(data: pd.DataFrame,branch_storage:dict[str], selected_eleme
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
 
+    df = data.copy()
+
     # Filtro por rango de fechas
-    in_period = (data["date"] >= start_date) & (data["date"] <= end_date)
-    data = data[in_period]
+    in_period = (df['date'] >= start_date) & (df['date'] <= end_date)
 
     # Filtro por productos o categorías
-    in_selected = data[element_column].isin(selected_elements)
-    df = data[in_selected].copy()
+    in_selected = df[element_column].isin(selected_elements)
+
+    mask = in_period & in_selected 
+    df = df[mask]
 
     if df.empty:
         
@@ -397,7 +406,13 @@ def period_inventory(data: pd.DataFrame,branch_storage:dict[str], selected_eleme
     
     return (fig, plot_df) if val else fig
 
-def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,branch:str,start_date,end_date,val:bool=False,**kwargs):
+def sales_velocity(data:pd.DataFrame,
+                   selected_elements:list,
+                   element_column: str,
+                   branch:str,
+                   outliers:bool,
+                   start_date,end_date,
+                   val:bool=False,**kwargs):
     
     if data.empty:
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -412,37 +427,34 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
         ax.axis("off")
         return (fig, data) if val else fig
     
+    df = data.copy()
 
-    data["sales_velocity"] = (
-    data["sales_day"]
+    df['sales_velocity'] = (
+    df['sales_day']
         .rolling(window=2)
         .mean()
         .interpolate(method="linear", limit_direction="both")
 )
 
-    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
 
     
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
-    is_in_period = ( start_date <= data["date"] ) & ( data["date"] <= end_date )
-    data = data[is_in_period]
 
 
+    in_period = ( start_date <= df['date'] ) & ( df['date'] <= end_date )
     # Filtro por productos o categorías
     in_selected = data[element_column].isin(selected_elements)
-    df = data[in_selected].copy()
-
-    if df.empty:
-        
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return (fig, df) if val else fig
 
     # Filtro por sucursal 
     in_branch = df["sucursal"]==branch
-    df = df[in_branch]
+    outlier_filter =  df['is_outlier']==outliers
+    
+    mask = in_period & in_selected & outlier_filter
+    df = df[mask]
+    
+
     if df.empty:
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
@@ -516,7 +528,13 @@ def sales_velocity(data:pd.DataFrame,selected_elements:list,element_column: str,
     return (fig, plot_df) if val else fig
 
 
-def sales_hist(data: pd.DataFrame,main_element: str,element_column: str,start_date,end_date,branch: str = None,val: bool = False,):
+def sales_hist(data: pd.DataFrame,
+               main_element: str,
+               element_column: str,
+               start_date,end_date,
+               outliers:bool,
+               branch: str = None,
+               val: bool = False,):
     """
     Función que recibe el dataframe de datos del periodo especificado y 
     gráfica las curvas de existencia del producto y ventas.
@@ -530,19 +548,21 @@ def sales_hist(data: pd.DataFrame,main_element: str,element_column: str,start_da
     if data.empty or "date" not in data or element_column not in data:
         return empty_fig("No hay datos disponibles", data)
 
-    data = data.copy()
-    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    df = data.copy()
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
     mask = (
-        (data["date"] >= pd.to_datetime(start_date)) &
-        (data["date"] <= pd.to_datetime(end_date)) &
-        (data[element_column] == main_element)
+        (df["date"] >= pd.to_datetime(start_date)) &
+        (df["date"] <= pd.to_datetime(end_date)) &
+        (df[element_column] == main_element)
     )
 
     if branch:
-        mask &= data["sucursal"] == branch
+        mask &= df["sucursal"] == branch
+    if outliers:
+        mask &= df["is_outlier"] == outliers
 
-    df = data.loc[mask, ["quantity"]].dropna()
+    df = df.loc[mask, ["quantity"]].dropna()
 
     if df.empty:
         return empty_fig("No hay datos disponibles", df)
@@ -569,19 +589,29 @@ def sales_hist(data: pd.DataFrame,main_element: str,element_column: str,start_da
 
 
 @st.cache_data
-def prepare_sales_heatmap_data(data: pd.DataFrame, main_element: str,element_column: str,start_date,end_date,val:bool=False,**kwargs)->pd.DataFrame:
+def prepare_sales_heatmap_data(data: pd.DataFrame, 
+                               main_element: str,
+                               element_column: str,
+                               start_date,end_date,
+                               outliers:bool,
+                               val:bool=False,**kwargs)->pd.DataFrame:
+    
     if data.empty or "date" not in data or element_column not in data:
         return None
 
-    data = data.copy()
-    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    df = data.copy()
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
-    data = data[
-        (data["date"] >= pd.to_datetime(start_date)) &
-        (data["date"] <= pd.to_datetime(end_date))
-    ]
+    mask = (
+        (df["date"] >= pd.to_datetime(start_date)) &
+        (df["date"] <= pd.to_datetime(end_date)) &
+        (df[element_column] == main_element )
+    )
 
-    df_filtered = data[data[element_column] == main_element]
+    if outliers:
+        mask &= df["is_outlier"] == outliers
+
+    df_filtered = df[mask]
 
     if df_filtered.empty:
         return None
@@ -598,7 +628,9 @@ def prepare_sales_heatmap_data(data: pd.DataFrame, main_element: str,element_col
 
     return (merged,df_filtered) if val else merged
 
-def render_sales_heat_map(merged: pd.DataFrame, main_element: str,map_key:str=None)->tuple[folium.Map,str]:
+def render_sales_heat_map(merged: pd.DataFrame,
+                          main_element: str,
+                          map_key:str=None)->tuple[folium.Map,str]:
     if merged is None:
         fig, ax = plt.subplots(figsize=(12, 6))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
@@ -661,7 +693,12 @@ def render_sales_heat_map(merged: pd.DataFrame, main_element: str,map_key:str=No
 
 
 
-def abc_bar_chart(data:pd.DataFrame,start_date:str,end_date:str,branch:str,type:str="productos",val:bool=False,**kwargs):
+def abc_bar_chart(data:pd.DataFrame,
+                  start_date:str,
+                  end_date:str,
+                  branch:str,
+                  type:str="productos",
+                  val:bool=False,**kwargs):
     
     if data.empty:
         print("Dataset vacío")

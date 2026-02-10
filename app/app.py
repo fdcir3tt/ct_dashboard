@@ -42,6 +42,30 @@ def growth_rate(current, previous):
         return 0
     return round(((current - previous) / previous) * 100, 2)
 
+def calculate_iqr_bounds(sales_series):
+    q1 = sales_series.quantile(0.25)
+    q3 = sales_series.quantile(0.75)
+    iqr = q3 - q1
+    return (q1 - 1.5 * iqr, q3 + 1.5 * iqr)
+
+
+def identify_outlier_sales(data: pd.DataFrame,
+                           element_column:str='productId')->pd.DataFrame:
+    df = data.copy()
+
+    bounds_dict = df.groupby(element_column)['quantity'].apply(calculate_iqr_bounds).to_dict()
+    
+    df['iqr_bounds'] = df[element_column].map(bounds_dict)
+    df['is_outlier'] = df['quantity'].between(
+                                              df['iqr_bounds'].str[0], 
+                                              df['iqr_bounds'].str[1]
+                                              )
+
+    print('Ventas anomalas detectadas correctamente !')
+    df = df.drop(columns='iqr_bounds')
+    return df
+
+
 st.set_page_config(page_title="Inventario CT International", layout="wide")
 
 load_css("assets/styles.css")
@@ -54,8 +78,11 @@ load_css("assets/styles.css")
 # -----------------------------------------------------------
 
 branch_storage = load_storage()
+
 global_data = load_sales_invoices()
-global_data["income"] = global_data["price"] * global_data["quantity"]
+global_data['income'] = global_data['price'] * global_data['quantity']
+global_data = identify_outlier_sales(global_data)
+
 
 data = global_data.copy()
 inventory = load_inventory()
@@ -125,15 +152,17 @@ frequent_branch_index = branch_list.index(frequent_branch)
 st.sidebar.header("Filtros")
 
 analysis_lvl = st.sidebar.radio("Nivel de análisis",options=["Productos","Categorías"] )
-outliers= st.sidebar.radio("Análisis con ventas anomalas incluídas", ["No","Sí"])
+outliers= st.sidebar.radio("Análisis con ventas anomalas incluídas", ['Sí','No'])
 branch = st.sidebar.selectbox("Sucursal", branch_list, index=frequent_branch_index)
 
 
-if outliers=="Sí":
-    data = load_sales_invoices()
+if outliers=='Sí':
+    include_outliers = True
+else: 
+    include_outliers = False
 
 if data.empty:
-    print("Dataset vacío")
+    print('Dataset vacío')
 
 
 # -----------------------------------------------------------
@@ -185,7 +214,7 @@ with tab1:
                 
 
         with col2:
-            st.markdown(" Periodo")
+            st.markdown("Periodo")
             period_start = pick_date(label="Inicio",default=period_start,key="Sucursal Inicio")
             period_end = pick_date(label="Fin",default=period_end,key="Sucursal Fin")
 
@@ -255,10 +284,12 @@ with tab1:
                                     selected_elements=selected_elements,
                                     element_column=element_column,
                                     branch=branch,
+                                    outliers = include_outliers,
                                     start_date=period_start,end_date=period_end)
         global_period_sales_fig = period_sales(data=data,
                                     selected_elements=selected_elements,
                                     element_column=element_column,
+                                    outliers = include_outliers,
                                     start_date=period_start,end_date=period_end)
 
         
@@ -281,6 +312,7 @@ with tab1:
                           main_element=main_element,
                           element_column=element_column,
                           branch=branch,
+                          outliers = include_outliers,
                           start_date=period_start,end_date=period_end)
 
                 st.markdown(f"**{branch}**")
@@ -290,6 +322,7 @@ with tab1:
                 global_histogram = sales_hist(data=data,
                           main_element=main_element,
                           element_column=element_column,
+                          outliers = include_outliers,
                           start_date=period_start,end_date=period_end)
 
                 st.markdown("**Global**")
@@ -418,14 +451,17 @@ with tab1:
         with col1:
                 st.markdown("**Mapa de calor de ventas (México)**")
                 merged = prepare_sales_heatmap_data(
-                                                    global_data,
-                                                    main_element,
-                                                    element_column,
-                                                    period_start,
-                                                    period_end,
+                                                    data=global_data,
+                                                    main_element=main_element,
+                                                    element_column=element_column,
+                                                    start_date=period_start,
+                                                    end_date=period_end,
+                                                    outliers = include_outliers,
                                                 )
 
-                map_obj, selected_state = render_sales_heat_map(merged, main_element,map_key="Ventas Mapa")
+                map_obj, selected_state = render_sales_heat_map(merged, 
+                                                                main_element,
+                                                                map_key="Ventas Mapa")
         with col2:
             if analysis_lvl=="Productos":
                 st.pyplot(product_priorities)
@@ -514,7 +550,7 @@ with tab2:
    with right:
 
 # -----------------------------------------------------------
-# VENTAS O INVENTARIO
+# INVENTARIO
 # -----------------------------------------------------------
         
         branch_period_inventory_fig = period_inventory(data=inventory,
@@ -548,6 +584,7 @@ with tab2:
                           main_element=main_element,
                           element_column=element_column,
                           branch=branch,
+                          outliers=include_outliers,
                           start_date=period_start_global,end_date=period_end_global)
 
                 st.markdown(f"**{branch}**")
@@ -557,6 +594,7 @@ with tab2:
                 global_histogram = sales_hist(data=data,
                           main_element=main_element,
                           element_column=element_column,
+                          outliers=include_outliers,
                           start_date=period_start_global,end_date=period_end_global)
 
                 st.markdown("**Global**")
@@ -606,14 +644,17 @@ with tab2:
         with col1:
                 st.markdown("**Mapa de calor de ventas (México)**")
                 merged = prepare_sales_heatmap_data(
-                                                    global_data,
-                                                    main_element,
-                                                    element_column,
-                                                    period_start_global,
-                                                    period_end_global,
+                                                    data=global_data,
+                                                    main_element=main_element,
+                                                    element_column=element_column,
+                                                    start_date=period_start_global,
+                                                    end_date=period_end_global,
+                                                    outliers=include_outliers,
                                                 )
 
-                map_obj, selected_state = render_sales_heat_map(merged, main_element,map_key="Global Mapa")
+                map_obj, selected_state = render_sales_heat_map(merged, 
+                                                                main_element,
+                                                                map_key="Global Mapa")
         with col2:
             if analysis_lvl=="Productos":
                 st.pyplot(product_priorities)
