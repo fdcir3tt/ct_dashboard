@@ -1,12 +1,11 @@
 import os
-import pandas as pd
 import logging
 import datetime
 import warnings
 
 from ct_sales_dashboard.data_loader import connect_to_DB,get_documents,get_product_cost_dict
 from dotenv import load_dotenv
-from bson import BSON
+
 
 
 

@@ -4,7 +4,6 @@ import json
 import warnings 
 import pyodbc
 import mysql.connector
-import streamlit as st
 import pandas as pd
 import pyarrow.parquet as pq
 import shutil
@@ -550,7 +549,7 @@ def load_invoices(start_date:str=start_date,end_date:str=end_date)->pd.DataFrame
     
     return df
 
-@st.cache_data
+
 def load_inventory()->pd.DataFrame:
 
     conn_uri = os.getenv("HIST_MONGO_URI")
@@ -570,7 +569,7 @@ def load_inventory()->pd.DataFrame:
 
     return df
 
-@st.cache_data
+
 def load_branches()->pd.DataFrame:
     conn_uri = os.getenv("API_MONGO_URI")
     db_name = os.getenv("API_MONGO_DB")
@@ -585,7 +584,7 @@ def load_branches()->pd.DataFrame:
     
 
 
-@st.cache_data
+
 def load_storage()->dict:
     branches = load_branches()
     branches = branches[["nemonico","sucursal"]]

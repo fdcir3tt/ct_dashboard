@@ -3,7 +3,6 @@ import geopandas as gpd
 import numpy as np
 import folium
 import warnings
-import streamlit as st
 from streamlit_folium import st_folium
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -13,7 +12,7 @@ from matplotlib.figure import Figure
 
 warnings.filterwarnings('ignore')
 
-@st.cache_resource
+
 def load_mexico_shp():
     mexico = gpd.read_file("data/raw/gadm41_MEX_shp/gadm41_MEX_1.shp")
     mexico["geometry"] = mexico["geometry"].simplify(
@@ -588,7 +587,7 @@ def sales_hist(data: pd.DataFrame,
     return (fig, df) if val else fig
 
 
-@st.cache_data
+
 def prepare_sales_heatmap_data(data: pd.DataFrame, 
                                main_element: str,
                                element_column: str,

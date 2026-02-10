@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import datetime
+from functools import wraps
 from ct_sales_dashboard.graphs import *
 from ct_sales_dashboard.data_loader import *
 
@@ -8,6 +9,14 @@ from ct_sales_dashboard.data_loader import *
 # -----------------------------------------------------------
 # CONFIGURACIÓN INICIAL
 # -----------------------------------------------------------
+
+def make_cached(func):
+    """Factory to create cached version of any function"""
+    @st.cache_data
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
 
 def pick_date(label: str, default: datetime.datetime = None, key: str = "selected_date"):
     
@@ -67,25 +76,34 @@ def identify_outlier_sales(data: pd.DataFrame,
 
 
 st.set_page_config(page_title="Inventario CT International", layout="wide")
-
 load_css("assets/styles.css")
 
 
+# -----------------------------------------------------------
+# CACHE WRAPPERS
+# -----------------------------------------------------------
 
+cached_load_branches = make_cached (load_branches)
+cached_load_storage = make_cached(load_storage)
+cached_load_inventory = make_cached(load_inventory)
+cached_load_sales_invoices = make_cached(load_sales_invoices)
+cached_identify_outlier_sales = make_cached (identify_outlier_sales)
+cached_prepare_sales_heatmap_data = make_cached(prepare_sales_heatmap_data)
 
 # -----------------------------------------------------------
 # CARGA DE DATOS
 # -----------------------------------------------------------
 
-branch_storage = load_storage()
+branch_storage = cached_load_storage()
+inventory = cached_load_inventory()
 
-global_data = load_sales_invoices()
+global_data = cached_load_sales_invoices()
 global_data['income'] = global_data['price'] * global_data['quantity']
-global_data = identify_outlier_sales(global_data)
+global_data = cached_identify_outlier_sales(global_data)
 
 
 data = global_data.copy()
-inventory = load_inventory()
+
 
 # -----------------------------------------------------------
 # VALORES PREDETERMINADOS
@@ -247,21 +265,21 @@ with tab1:
         st.markdown(element_title)
         if analysis_lvl=="Productos":
             st.table(pd.DataFrame({
-                "": [
-                    "Código",
-                    "Categoría",
-                    "Costo por unidad(MXN)",
-                    "Precio por unidad(MXN)",
-                    "Clientes frecuentes"
-                ],
-                "Valor": [
-                    main_element,
-                    category,
-                    cost_per_unit,
-                    price_range[1],
-                    clients_str
-                ]
-            }))
+                    "": [
+                        "Código",
+                        "Categoría",
+                        "Costo por unidad(MXN)",
+                        "Precio por unidad(MXN)",
+                        "Clientes frecuentes"
+                    ],
+                    "Valor": [
+                        str(main_element),
+                        str(category),
+                        str(cost_per_unit),
+                        str(price_range[1]),
+                        str(clients_str)
+                    ]
+                }))
         if analysis_lvl=="Categorías":
         
             st.table(pd.DataFrame({
@@ -450,7 +468,7 @@ with tab1:
         col1, col2 = st.columns(2)
         with col1:
                 st.markdown("**Mapa de calor de ventas (México)**")
-                merged = prepare_sales_heatmap_data(
+                merged = cached_prepare_sales_heatmap_data(
                                                     data=global_data,
                                                     main_element=main_element,
                                                     element_column=element_column,
@@ -528,11 +546,11 @@ with tab2:
                     "Clientes frecuentes"
                 ],
                 "Valor": [
-                    main_element,
-                    category,
-                    cost_per_unit,
-                    price_range[0],
-                    clients_str
+                    str(main_element),
+                    str(category),
+                    str(cost_per_unit),
+                    str(price_range[1]),
+                    str(clients_str)
                 ]
             }))
         if analysis_lvl=="Categorías":
@@ -643,7 +661,7 @@ with tab2:
         col1, col2 = st.columns(2)
         with col1:
                 st.markdown("**Mapa de calor de ventas (México)**")
-                merged = prepare_sales_heatmap_data(
+                merged = cached_prepare_sales_heatmap_data(
                                                     data=global_data,
                                                     main_element=main_element,
                                                     element_column=element_column,
