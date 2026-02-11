@@ -6,15 +6,6 @@ from ct_sales_dashboard.graphs import *
 from ct_sales_dashboard.data_loader import *
 
 
-st.set_page_config(
-    page_title="CT Dashboard",
-    layout="wide",  
-    initial_sidebar_state="collapsed" 
-)
-
-
-
-
 
 def make_cached(func):
     """Crea versiones cacheadas de funciones"""
@@ -80,136 +71,69 @@ def identify_outlier_sales(data: pd.DataFrame,
     df = df.drop(columns='iqr_bounds')
     return df
 
+def calculate_top_product_and_category(data:pd.DataFrame)->tuple[str,str]:
+    df = data.copy()
+    is_in_period = ( period_start <= df['date'] ) & ( df['date'] <= period_end )
 
-st.set_page_config(page_title="Inventario CT International", layout="wide")
-load_css("assets/styles.css")
-
-
-# -----------------------------------------------------------
-# CACHE WRAPPERS
-# -----------------------------------------------------------
-
-cached_load_branches = make_cached (load_branches)
-cached_load_storage = make_cached(load_storage)
-cached_load_inventory = make_cached(load_inventory)
-cached_load_sales_invoices = make_cached(load_sales_invoices)
-cached_identify_outlier_sales = make_cached (identify_outlier_sales)
-cached_prepare_sales_heatmap_data = make_cached(prepare_sales_heatmap_data)
-
-# -----------------------------------------------------------
-# CARGA DE DATOS
-# -----------------------------------------------------------
-
-branch_storage = cached_load_storage()
-inventory = cached_load_inventory()
-
-global_data = cached_load_sales_invoices()
-global_data['income'] = global_data['price'] * global_data['quantity']
-global_data = cached_identify_outlier_sales(global_data)
-
-
-data = global_data.copy()
-
-
-# -----------------------------------------------------------
-# VALORES PREDETERMINADOS
-# -----------------------------------------------------------
-
-today = datetime.date.today() 
-period_start = pd.to_datetime( datetime.date(today.year, today.month, 1) )
-period_end = pd.to_datetime( today )
-
-
-
-# Producto con cantidad de unidades más vendidas dentro de periodo
-is_in_period = ( period_start <= data["date"] ) & ( data["date"] <= period_end )
-
-if data[is_in_period].empty:
-    top_product= (
+    if df[is_in_period].empty:
+        top_product= (
+            data
+            .groupby("productId")["quantity"]
+            .sum()
+            .idxmax()
+        )
+        top_category= (
         data
-        .groupby("productId")["quantity"]
+        .groupby("category")["quantity"]
         .sum()
         .idxmax()
-    )
-    top_category= (
-    data
-    .groupby("category")["quantity"]
-    .sum()
-    .idxmax()
-)
-else:     
-    top_product= (
+    )   
+        return top_product,top_category
+    else:     
+        top_product= (
+            data[is_in_period]
+            .groupby("productId")["quantity"]
+            .sum()
+            .idxmax()
+        )
+        top_category= (
         data[is_in_period]
-        .groupby("productId")["quantity"]
+        .groupby("category")["quantity"]
         .sum()
         .idxmax()
+    )   
+        return top_product,top_category
+    
+def calculate_frequent_branch(data:pd.DataFrame,top_product:str)->str:
+    is_top_product= data["productId"]==top_product
+    frequent_branch= (
+        data[is_top_product]
+        .groupby("sucursal")["date"]
+        .nunique() 
+        .idxmax()
     )
-    top_category= (
-    data[is_in_period]
-    .groupby("category")["quantity"]
-    .sum()
-    .idxmax()
-)
-product_list = list( data["productId"].unique() )
-top_product_index = product_list.index(top_product)
-
-category_list = list( data["category"].unique() )
-top_category_index = category_list.index(top_category)
-
-# Sucursal en donde se vende más seguido el producto más vendido
-is_top_product= data["productId"]==top_product
-frequent_branch= (
-    data[is_top_product]
-    .groupby("sucursal")["date"]
-    .nunique() 
-    .idxmax()
-)
-
-branch_list = list( data["sucursal"].unique() )
-frequent_branch_index = branch_list.index(frequent_branch)
+    return frequent_branch
 
 
-if data.empty:
-    print('Dataset vacío')
+def left_section(period_start,period_end):
 
-
-# -----------------------------------------------------------
-# LOGO Y TITULO
-# -----------------------------------------------------------
-
-col1, col2 = st.columns([1, 8])
-with col1:
-    st.image("assets/logo.png", width=50)
-
-with col2:
-    st.markdown("### Inventario CT International")
-
-
-
-tab1, tab2 = st.tabs(["Ventas","Inventario"])
-
-# ===========================================================
-#                       ANÁLISIS VENTAS
-# ===========================================================
-
-with tab1:
-    left, right = st.columns([1.3, 3.7])
-
-    with left:
-
-        
-# -----------------------------------------------------------
-# INFO DE PRODUCTO/CATEGORIA
-# -----------------------------------------------------------
+    def filters(*args,**kwargs)->tuple:
         st.markdown('**Filtros**')
         col1, col2 = st.columns(2)
         with col1 :
-            analysis_lvl = pick_main_element(label='Nivel de análisis',options=["Productos","Categorías"],default='Productos',key='Nivel de análisis seleccionado')
+            analysis_lvl = pick_main_element(label='Nivel de análisis',
+                                             options=["Productos","Categorías"],
+                                             default='Productos',
+                                             key='Nivel de análisis seleccionado')
         with col2 :
-            outliers= pick_main_element(label='Análisis con ventas anomalas incluídas',options= ['Sí','No'],default='Sí',key='Incluir ventas anómalas')
-        
-        
-        branch = st.selectbox("Sucursal", branch_list, index=frequent_branch_index)
+            outliers= pick_main_element(label='Análisis con ventas anomalas incluídas',
+                                        options= ['Sí','No'],
+                                        default='Sí',
+                                        key='Incluir ventas anómalas')
+            
+        branch = st.selectbox(label='Sucursal', 
+                              options=branch_list,
+                              index=frequent_branch_index)
 
 
         if outliers=='Sí':
@@ -219,12 +143,21 @@ with tab1:
 
         if analysis_lvl=="Productos":
                 categories = []
-                products = pick_elements(label="Producto(s)",options=product_list,default=[top_product],key="Sucursal Productos Seleccionados")
-        
+                products = pick_elements(label="Producto(s)",
+                                         options=product_list,
+                                         default=[top_product],
+                                         key="Sucursal Productos Seleccionados")
+            
         if analysis_lvl=="Categorías":
                 products = []
-                categories = pick_elements(label="Categoría(s)",options=category_list,default=[top_category],key="Sucursal Categorías Seleccionadas")
-                
+                categories = pick_elements(label="Categoría(s)",
+                                           options=category_list,
+                                           default=[top_category],
+                                           key="Sucursal Categorías Seleccionadas")
+        
+        return analysis_lvl,branch,include_outliers,categories,products
+    
+    def analysis_element_and_period_select(start_date,end_date):
         col1,col2 = st.columns(2)
         with col1:
 
@@ -235,24 +168,25 @@ with tab1:
             if analysis_lvl=="Categorías":
                 main_element = pick_main_element(label="Categoría de análisis",options= categories,key="categoría de análisis",default=top_category)
                 element_title = f"**categoría:** {main_element}"
-                
-
         with col2:
             st.markdown("Periodo")
-            period_start = pick_date(label="Inicio",default=period_start,key="Sucursal Inicio")
-            period_end = pick_date(label="Fin",default=period_end,key="Sucursal Fin")
+            period_start = pick_date(label="Inicio",default=start_date,key="Sucursal Inicio")
+            period_end = pick_date(label="Fin",default=end_date,key="Sucursal Fin")
+        return main_element,element_title,period_start,period_end
 
-        selected_elements = {"Productos":products,
+    def element_selection(analysis_lvl,products,categories,*args,**kwargs):
+        elements={"Productos":products,
                             "Categorías":categories}[analysis_lvl]
-        element_column = {"Productos":"productId",
-                        "Categorías":"category"}[analysis_lvl]
-
-        is_global_element = global_data[element_column]==main_element
-        is_element = data[element_column]== main_element
-        in_branch = data["sucursal"]==branch
-
         
-
+        column={"Productos":"productId",
+                        "Categorías":"category"}[analysis_lvl]
+        return elements,column
+    
+    def element_info(data:pd.DataFrame,
+                     selected_element:str,
+                     element_column:str,*args,**kwargs):
+        
+        is_element = data[element_column]== selected_element
         filtered = data[is_element]
         if filtered.empty:
             st.warning("No hay datos para el elemento seleccionado en este periodo.")
@@ -271,33 +205,154 @@ with tab1:
         st.markdown(f'**Información de** {element_title}')
         if analysis_lvl=="Productos":
             st.table(pd.DataFrame({
+                        "": [
+                            "Código",
+                            "Categoría",
+                            "Costo por unidad(MXN)",
+                            "Precio por unidad(MXN)",
+                            "Clientes frecuentes"
+                        ],
+                        "Valor": [
+                            str(main_element),
+                            str(category),
+                            str(cost_per_unit),
+                            str(price_range[1]),
+                            str(clients_str)
+                        ]
+                    }))
+        if analysis_lvl=="Categorías":
+            
+            st.table(pd.DataFrame({
                     "": [
-                        "Código",
                         "Categoría",
-                        "Costo por unidad(MXN)",
-                        "Precio por unidad(MXN)",
                         "Clientes frecuentes"
                     ],
                     "Valor": [
-                        str(main_element),
-                        str(category),
-                        str(cost_per_unit),
-                        str(price_range[1]),
-                        str(clients_str)
+                        category,
+                        clients_str
                     ]
                 }))
-        if analysis_lvl=="Categorías":
+    
+    
+    
+    
+    analysis_lvl,branch,include_outliers,categories,products = filters()
+ 
+    main_element,element_title,period_start,period_end = analysis_element_and_period_select(start_date=period_start,end_date=period_end)
+ 
+    selected_elements,element_column = element_selection(analysis_lvl=analysis_lvl,
+                                                         products=products,
+                                                         categories=categories)
+    
+
+    is_global_element = global_data[element_column]==main_element
+    is_element = data[element_column]== main_element
+    
+    element_info(data=data,
+                 selected_element=main_element,
+                 element_column=element_column)
+
         
-            st.table(pd.DataFrame({
-                "": [
-                    "Categoría",
-                    "Clientes frecuentes"
-                ],
-                "Valor": [
-                    category,
-                    clients_str
-                ]
-            }))
+        
+    return analysis_lvl,branch,include_outliers,categories,products,main_element,element_title,period_start,period_end,selected_elements,element_column,is_element,is_global_element
+
+st.set_page_config(
+    page_title="CT Dashboard",
+    layout="wide",  
+    initial_sidebar_state="collapsed" 
+)
+
+load_css("assets/styles.css")
+
+
+# -----------------------------------------------------------
+# CACHE WRAPPERS
+# -----------------------------------------------------------
+funcs = [
+         load_branches,
+         load_storage,
+         load_inventory,
+         load_sales_invoices,
+         identify_outlier_sales,
+         prepare_sales_heatmap_data
+         ]
+
+cache_wrappers ={}
+for f in funcs:
+    cache_wrappers[f.__name__]= make_cached(f)
+
+
+# -----------------------------------------------------------
+# CARGA DE DATOS
+# -----------------------------------------------------------
+
+branch_storage = cache_wrappers['load_storage']()
+inventory = cache_wrappers['load_inventory']()
+
+global_data = cache_wrappers['load_sales_invoices']()
+global_data['income'] = global_data['price'] * global_data['quantity']
+global_data = cache_wrappers['identify_outlier_sales'](global_data)
+
+
+data = global_data.copy()
+
+
+# -----------------------------------------------------------
+# VALORES PREDETERMINADOS
+# -----------------------------------------------------------
+
+today = datetime.date.today() 
+period_start = pd.to_datetime( datetime.date(today.year, today.month, 1) )
+period_end = pd.to_datetime( today )
+
+
+
+# Producto con cantidad de unidades más vendidas dentro de periodo
+is_in_period = ( period_start <= data["date"] ) & ( data["date"] <= period_end )
+
+top_product,top_category = calculate_top_product_and_category(data)
+
+product_list = list( data["productId"].unique() )
+category_list = list( data["category"].unique() )
+branch_list = list( data["sucursal"].unique() )
+
+# Sucursal en donde se vende más seguido el producto más vendido
+
+
+frequent_branch = calculate_frequent_branch(data=data,
+                                            top_product=top_product)
+frequent_branch_index = branch_list.index(frequent_branch)
+
+if data.empty:
+    print('Dataset vacío')
+
+
+# -----------------------------------------------------------
+# LOGO Y TITULO
+# -----------------------------------------------------------
+
+col1, col2 = st.columns([1, 8])
+with col1:
+    st.image("assets/logo.png", width=50)
+
+with col2:
+    st.markdown("### Inventario CT International")
+
+
+
+sales, stock = st.tabs(["Ventas","Inventario"])
+
+# ===========================================================
+#                       ANÁLISIS VENTAS
+# ===========================================================
+
+with sales:
+    left, right = st.columns([1.3, 3.7])
+
+    with left:
+
+        analysis_lvl,branch,include_outliers,categories,products,main_element,element_title,period_start,period_end,selected_elements,element_column,is_element,is_global_element = left_section(period_start,period_end)        
+        
     with right:
 
 # -----------------------------------------------------------
@@ -358,6 +413,7 @@ with tab1:
 # -----------------------------------------------------------
 # KPIs (VENTAS)
 # -----------------------------------------------------------
+        in_branch = data["sucursal"]==branch
         filtered = data[is_element & in_branch].copy()
         filtered_current = filtered[is_in_period].copy()
         if filtered_current.empty:
@@ -499,7 +555,7 @@ with tab1:
         col1, col2 = st.columns(2)
         with col1:
                 st.markdown("**Mapa de calor de ventas (México)**")
-                merged = cached_prepare_sales_heatmap_data(
+                merged = cache_wrappers['prepare_sales_heatmap_data'](
                                                     data=global_data,
                                                     main_element=main_element,
                                                     element_column=element_column,
@@ -527,7 +583,7 @@ with tab1:
 # ===========================================================
 
 
-with tab2:
+with stock:
 
    left, right = st.columns([1.2, 3])
 
@@ -692,7 +748,7 @@ with tab2:
         col1, col2 = st.columns(2)
         with col1:
                 st.markdown("**Mapa de calor de ventas (México)**")
-                merged = cached_prepare_sales_heatmap_data(
+                merged = cache_wrappers['prepare_sales_heatmap_data'](
                                                     data=global_data,
                                                     main_element=main_element,
                                                     element_column=element_column,
