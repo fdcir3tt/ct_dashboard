@@ -6,12 +6,18 @@ from ct_sales_dashboard.graphs import *
 from ct_sales_dashboard.data_loader import *
 
 
-# -----------------------------------------------------------
-# CONFIGURACIÓN INICIAL
-# -----------------------------------------------------------
+st.set_page_config(
+    page_title="CT Dashboard",
+    layout="wide",  
+    initial_sidebar_state="collapsed" 
+)
+
+
+
+
 
 def make_cached(func):
-    """Factory to create cached version of any function"""
+    """Crea versiones cacheadas de funciones"""
     @st.cache_data
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -163,22 +169,6 @@ branch_list = list( data["sucursal"].unique() )
 frequent_branch_index = branch_list.index(frequent_branch)
 
 
-# -----------------------------------------------------------
-# FILTROS
-# -----------------------------------------------------------
-
-st.sidebar.header("Filtros")
-
-analysis_lvl = st.sidebar.radio("Nivel de análisis",options=["Productos","Categorías"] )
-outliers= st.sidebar.radio("Análisis con ventas anomalas incluídas", ['Sí','No'])
-branch = st.sidebar.selectbox("Sucursal", branch_list, index=frequent_branch_index)
-
-
-if outliers=='Sí':
-    include_outliers = True
-else: 
-    include_outliers = False
-
 if data.empty:
     print('Dataset vacío')
 
@@ -211,6 +201,22 @@ with tab1:
 # -----------------------------------------------------------
 # INFO DE PRODUCTO/CATEGORIA
 # -----------------------------------------------------------
+        st.markdown('**Filtros**')
+        col1, col2 = st.columns(2)
+        with col1 :
+            analysis_lvl = pick_main_element(label='Nivel de análisis',options=["Productos","Categorías"],default='Productos',key='Nivel de análisis seleccionado')
+        with col2 :
+            outliers= pick_main_element(label='Análisis con ventas anomalas incluídas',options= ['Sí','No'],default='Sí',key='Incluir ventas anómalas')
+        
+        
+        branch = st.selectbox("Sucursal", branch_list, index=frequent_branch_index)
+
+
+        if outliers=='Sí':
+            include_outliers = True
+        else: 
+            include_outliers = False
+
         if analysis_lvl=="Productos":
                 categories = []
                 products = pick_elements(label="Producto(s)",options=product_list,default=[top_product],key="Sucursal Productos Seleccionados")
@@ -224,11 +230,11 @@ with tab1:
 
             if analysis_lvl=="Productos":
                 main_element = pick_main_element(label="Producto de análisis",options= products,key="producto de análisis",default=top_product)
-                element_title= f"**Producto:** {main_element}"
+                element_title= f"**producto:** {main_element}"
 
             if analysis_lvl=="Categorías":
                 main_element = pick_main_element(label="Categoría de análisis",options= categories,key="categoría de análisis",default=top_category)
-                element_title = f"**Categoría:** {main_element}"
+                element_title = f"**categoría:** {main_element}"
                 
 
         with col2:
@@ -262,7 +268,7 @@ with tab1:
             clients_str+=client+','
         clients_str = clients_str[:-1]
 
-        st.markdown(element_title)
+        st.markdown(f'**Información de** {element_title}')
         if analysis_lvl=="Productos":
             st.table(pd.DataFrame({
                     "": [
@@ -352,20 +358,21 @@ with tab1:
 # -----------------------------------------------------------
 # KPIs (VENTAS)
 # -----------------------------------------------------------
-        filtered = data[is_element & is_in_period & in_branch].copy()
-
-        if filtered.empty:
+        filtered = data[is_element & in_branch].copy()
+        filtered_current = filtered[is_in_period].copy()
+        if filtered_current.empty:
             st.warning("No hay datos para el elemento seleccionado en este periodo.")
             st.stop()
 
-        total_branch_sales = round ( filtered["quantity"].sum() ,2 )
-        total_branch_cost = round ( filtered["cost"].sum() ,2 )
-        total_branch_profit = round( filtered["income"].sum() - total_branch_cost ,2 )
+        total_branch_sales = round ( filtered_current["quantity"].sum() ,2 )
+        total_branch_cost = round ( filtered_current["cost"].sum() ,2 )
+        total_branch_profit = round( filtered_current["income"].sum() - total_branch_cost ,2 )
         branch_inventory_t_ratio = 0
 
         col1, col2, col3 = st.columns(3)
         previous_period = ( pd.to_datetime(period_start)-datetime.timedelta(days=30) <= filtered["date"] ) & ( filtered["date"] <= pd.to_datetime(period_start) ) 
         filtered_prev = filtered[previous_period]
+        
         prev_sales = filtered_prev["quantity"].sum()
         prev_cost = filtered_prev["cost"].sum()
         prev_profit = filtered_prev["income"].sum() - prev_cost
@@ -375,13 +382,18 @@ with tab1:
         profit_rate = growth_rate(total_branch_profit, prev_profit)
         cost_rate = growth_rate(total_branch_cost, prev_cost)
 
+        sales_color = "#0cb91a" if sales_rate >= 0 else "#ef4444" 
+        profit_color = "#0cb91a" if profit_rate >= 0 else "#ef4444" 
+        cost_color = "#0cb91a" if cost_rate >= 0 else "#ef4444" 
+
         with col1:
             st.markdown(
                 f'''
                 <div class="kpi-title">
                     <h3>Unidades Vendidas</h3>
                     <h2>{total_branch_sales:,}</h2>
-                    <p>{5:+}%</p>
+                    <p style="color: {sales_color}; font-weight: 600;">
+                    {sales_rate:+.1f}%</p>
                 </div>
                 ''',
                 unsafe_allow_html=True
@@ -393,7 +405,8 @@ with tab1:
                 <div class="kpi-title">
                     <h3>Ganancia (MXN)</h3>
                     <h2>${total_branch_profit:,}</h2>
-                    <p>{2:+}%</p>
+                    <p style="color: {profit_color}; font-weight: 600;">
+                    {profit_rate:+.1f}% </p>
                 </div>
                 ''',
                 unsafe_allow_html=True
@@ -405,15 +418,16 @@ with tab1:
                 <div class="kpi-title">
                     <h3>Costo (MXN)</h3>
                     <h2>${total_branch_cost:,}</h2>
-                    <p>{5:+}%</p>
+                    <p style="color: {cost_color}; font-weight: 600;">
+                    {cost_rate:+.1f}%</p>
                 </div>
                 ''',
                 unsafe_allow_html=True
             )
 
-        global_filtered = global_data [is_global_element & is_in_period].copy()
-
-        if filtered.empty:
+        global_filtered = global_data [is_global_element].copy()
+        global_filtered_current = global_filtered[is_in_period]
+        if global_filtered.empty:
             st.warning("No hay datos para el elemento seleccionado en este periodo.")
             st.stop()
 
@@ -423,12 +437,27 @@ with tab1:
         
 
         col1, col2, col3 = st.columns(3)
+        previous_period = ( pd.to_datetime(period_start)-datetime.timedelta(days=30) <= global_filtered['date'] ) & ( global_filtered['date'] <= pd.to_datetime(period_start) ) 
+        global_filtered_prev = global_filtered[previous_period]
+       
+        global_prev_sales = global_filtered_prev["quantity"].sum()
+        global_prev_cost = global_filtered_prev["cost"].sum()
+        global_prev_profit = global_filtered_prev["income"].sum() - global_prev_cost
+
+
+        global_sales_rate = growth_rate(total_sales, global_prev_sales)
+        global_profit_rate = growth_rate(total_profit, global_prev_profit)
+        global_cost_rate = growth_rate(total_cost, global_prev_cost)
+        global_sales_color = "#0cb91a" if global_sales_rate >= 0 else "#ef4444" 
+        global_profit_color = "#0cb91a" if global_profit_rate >= 0 else "#ef4444" 
+        global_cost_color = "#0cb91a" if global_cost_rate >= 0 else "#ef4444"
         with col1:
             st.markdown(f'''
                         <div class="kpi-title">
                             <h3>Unidades Vendidas</h3>
                             <h2>{total_sales:,} </h2>
-                            <p>- {3.1}</p>
+                            <p style="color: {global_sales_color}; font-weight: 600;">
+                            {global_sales_rate:+.1f}%</p>
                         </div>
                         ''', 
                         unsafe_allow_html=True)
@@ -437,7 +466,8 @@ with tab1:
                         <div class="kpi-title">
                             <h3>Ganancia Total (MXN)</h3>
                             <h2>${total_profit:,} </h2>
-                            <p>+ {2}</p>
+                            <p style="color: {global_profit_color}; font-weight: 600;">
+                            {global_profit_rate:+.1f}%</p>
                         </div>
                         ''',
                         unsafe_allow_html=True)
@@ -446,7 +476,8 @@ with tab1:
                         <div class="kpi-title">
                             <h3>Costo Total (MXN)</h3>
                             <h2>${total_cost:,}</h2>
-                            <p>+{10}</p>
+                            <p style="color: {global_cost_color}; font-weight: 600;">
+                            {global_cost_rate:+.1f}%</p>
                         </div>''',
                         unsafe_allow_html=True)
 

@@ -156,6 +156,52 @@ html, body, [class*="css"] {
     box-shadow: 0 0 0 1px #2563eb;
 }
 
+
+/* st.selectbox styling */
+[data-testid="stSelectbox"] {
+    padding: 0.4rem;
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* Selectbox label */
+[data-testid="stSelectbox"] label {
+    color: #1e3a8a !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* Selectbox input box */
+[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+    background-color: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    min-height: 38px;
+}
+
+/* Selected value text */
+[data-testid="stSelectbox"] div[data-baseweb="select"] input {
+    color: #1e3a8a !important;
+    font-size: 0.875rem;
+}
+
+/* Hover */
+[data-testid="stSelectbox"] div[data-baseweb="select"]:hover > div {
+    border-color: #94a3b8 !important;
+}
+
+/* Focus */
+[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within > div {
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 1px #2563eb;
+}
+
+/* Dropdown arrow icon */
+[data-testid="stSelectbox"] svg {
+    fill: #64748b;
+}
+
 /* Dropdown list */
 div[data-baseweb="popover"] ul {
     background-color: #eff6ff !important;
@@ -342,5 +388,6 @@ div[data-baseweb="popover"] li:hover {
 
 
 
-/* Remove Streamlit footer */
+#MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
+header {visibility: hidden;}
