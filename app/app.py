@@ -15,7 +15,9 @@ def make_cached(func):
         return func(*args, **kwargs)
     return wrapper
 
-def pick_date(label: str, default: datetime.datetime = None, key: str = "selected_date"):
+def pick_date(label: str, 
+              default: datetime.datetime = None, 
+              key: str = "selected_date"):
     
     if key not in st.session_state:
         st.session_state[key] = default
@@ -23,27 +25,53 @@ def pick_date(label: str, default: datetime.datetime = None, key: str = "selecte
     return st.date_input(label, value=st.session_state[key], key=key)
 
 
-def pick_elements(label: str,options:list,default: list[str]= None, key: str = "selected_elements"):
+def pick_elements(label: str,
+                  options:list,
+                  default: list[str]= None, 
+                  key: str = "selected_elements"):
+    
     if key not in st.session_state:
         st.session_state[key] = default
-    return st.multiselect(label, options ,
-                                    default = default,
-                                    max_selections= 4 ,
-                                    key=key)
+
+    return st.multiselect(label, 
+                          options ,
+                          default = default,
+                          max_selections= 4 ,
+                          key=key)
     
 
-def pick_main_element(label: str,options:list,default: str= None, key: str = "selected_element"):
+def pick_main_element(label: str,
+                      options:list,
+                      default: str= None, 
+                      key: str = "selected_element"):
+    
     if key not in st.session_state:
         st.session_state[key] = default
     
-    return st.radio(label=label,options= options ,key=key)
+    return st.radio(label=label,
+                    options= options,
+                    key=key)
 
+def pick_branch(label:str,
+                options:list,
+                index:int,
+                key:str='selected branch'):
+    
+    if key not in st.session_state:
+        st.session_state[key] = index
+
+    return st.selectbox(label=label, 
+                              options=options,
+                              index=index,
+                              key=key)
 
 def load_css(file_name):
+
     with open(file_name) as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 def growth_rate(current, previous):
+
     if previous == 0:
         return 0
     return round(((current - previous) / previous) * 100, 2)
@@ -115,25 +143,29 @@ def calculate_frequent_branch(data:pd.DataFrame,top_product:str)->str:
     return frequent_branch
 
 
-def left_section(period_start,period_end):
+def left_section(period_start,
+                 period_end,
+                 tab:str):
 
-    def filters(*args,**kwargs)->tuple:
+    def filters(tab:str)->tuple:
         st.markdown('**Filtros**')
         col1, col2 = st.columns(2)
         with col1 :
             analysis_lvl = pick_main_element(label='Nivel de análisis',
                                              options=["Productos","Categorías"],
                                              default='Productos',
-                                             key='Nivel de análisis seleccionado')
+                                             key=f'Nivel de análisis {tab} seleccionado')
         with col2 :
             outliers= pick_main_element(label='Análisis con ventas anomalas incluídas',
                                         options= ['Sí','No'],
                                         default='Sí',
-                                        key='Incluir ventas anómalas')
+                                        key=f'Incluir {tab} anómalas')
             
-        branch = st.selectbox(label='Sucursal', 
-                              options=branch_list,
-                              index=frequent_branch_index)
+        branch = pick_branch(label='Sucursal',
+                             options=branch_list,
+                             index=frequent_branch_index,
+                             key=f'Sucursal seleccionada {tab}')
+        
 
 
         if outliers=='Sí':
@@ -146,35 +178,47 @@ def left_section(period_start,period_end):
                 products = pick_elements(label="Producto(s)",
                                          options=product_list,
                                          default=[top_product],
-                                         key="Sucursal Productos Seleccionados")
+                                         key=f"Sucursal Productos Seleccionados {tab}")
             
         if analysis_lvl=="Categorías":
                 products = []
                 categories = pick_elements(label="Categoría(s)",
                                            options=category_list,
                                            default=[top_category],
-                                           key="Sucursal Categorías Seleccionadas")
+                                           key=f"Sucursal Categorías Seleccionadas {tab}")
         
         return analysis_lvl,branch,include_outliers,categories,products
     
-    def analysis_element_and_period_select(start_date,end_date):
+    def analysis_element_and_period_select(start_date,end_date,tab):
         col1,col2 = st.columns(2)
         with col1:
 
-            if analysis_lvl=="Productos":
-                main_element = pick_main_element(label="Producto de análisis",options= products,key="producto de análisis",default=top_product)
+            if analysis_lvl=='Productos':
+                main_element = pick_main_element(label='Producto de análisis',
+                                                 options= products,
+                                                 key=f'producto de análisis {tab}',
+                                                 default=top_product)
                 element_title= f"**producto:** {main_element}"
 
-            if analysis_lvl=="Categorías":
-                main_element = pick_main_element(label="Categoría de análisis",options= categories,key="categoría de análisis",default=top_category)
-                element_title = f"**categoría:** {main_element}"
+            if analysis_lvl=='Categorías':
+                main_element = pick_main_element(label='Categoría de análisis',
+                                                 options= categories,
+                                                 key=f'categoría de análisis {tab}',
+                                                 default=top_category)
+                element_title = f'**categoría:** {main_element}'
         with col2:
-            st.markdown("Periodo")
-            period_start = pick_date(label="Inicio",default=start_date,key="Sucursal Inicio")
-            period_end = pick_date(label="Fin",default=end_date,key="Sucursal Fin")
+            st.markdown('Periodo')
+            period_start = pick_date(label='Inicio',
+                                     default=start_date,
+                                     key=f'Sucursal Inicio {tab}')
+            period_end = pick_date(label='Fin',
+                                   default=end_date,
+                                   key=f'Sucursal Fin {tab}')
         return main_element,element_title,period_start,period_end
 
-    def element_selection(analysis_lvl,products,categories,*args,**kwargs):
+    def element_selection(analysis_lvl,
+                          products,
+                          categories):
         elements={"Productos":products,
                             "Categorías":categories}[analysis_lvl]
         
@@ -184,7 +228,7 @@ def left_section(period_start,period_end):
     
     def element_info(data:pd.DataFrame,
                      selected_element:str,
-                     element_column:str,*args,**kwargs):
+                     element_column:str,):
         
         is_element = data[element_column]== selected_element
         filtered = data[is_element]
@@ -232,21 +276,18 @@ def left_section(period_start,period_end):
                         clients_str
                     ]
                 }))
-    
-    
-    
-    
-    analysis_lvl,branch,include_outliers,categories,products = filters()
+
+
+    analysis_lvl,branch,include_outliers,categories,products = filters(tab)
  
-    main_element,element_title,period_start,period_end = analysis_element_and_period_select(start_date=period_start,end_date=period_end)
+    main_element,element_title,period_start,period_end = analysis_element_and_period_select(start_date=period_start,
+                                                                                            end_date=period_end,
+                                                                                            tab=tab)
  
     selected_elements,element_column = element_selection(analysis_lvl=analysis_lvl,
                                                          products=products,
                                                          categories=categories)
-    
 
-    is_global_element = global_data[element_column]==main_element
-    is_element = data[element_column]== main_element
     
     element_info(data=data,
                  selected_element=main_element,
@@ -254,7 +295,294 @@ def left_section(period_start,period_end):
 
         
         
-    return analysis_lvl,branch,include_outliers,categories,products,main_element,element_title,period_start,period_end,selected_elements,element_column,is_element,is_global_element
+    return analysis_lvl,branch,include_outliers,main_element,element_title,period_start,period_end,selected_elements,element_column
+
+def right_section(data:pd.DataFrame,
+                  global_data:pd.DataFrame,
+                  main_element:str,
+                  selected_elements:list,
+                  element_column:str,
+                  branch:str,
+                  include_outliers :bool,
+                  period_start,period_end,
+                  analysis_lvl:str,
+                  tab:str,
+                  branch_storage:dict=None):
+    
+    def sales_plots(data:pd.DataFrame,
+                    selected_elements:list,
+                    element_column:str,
+                    branch:str,
+                    include_outliers :bool,
+                    period_start,period_end):
+
+        branch_period_sales_fig = period_sales(data=data,
+                                        selected_elements=selected_elements,
+                                        element_column=element_column,
+                                        branch=branch,
+                                        outliers = include_outliers,
+                                        start_date=period_start,end_date=period_end)
+        global_period_sales_fig = period_sales(data=data,
+                                        selected_elements=selected_elements,
+                                        element_column=element_column,
+                                        outliers = include_outliers,
+                                        start_date=period_start,end_date=period_end)
+
+            
+        st.markdown("### Ventas Diarias")
+            
+        col1, col2 = st.columns(2)
+        with col1:
+            st.pyplot(branch_period_sales_fig)
+        with col2:
+            st.pyplot(global_period_sales_fig)
+
+    def inventory_plots(inventory:pd.DataFrame,
+                        branch_storage:dict,
+                        selected_elements:list,
+                        element_column:str,
+                        branch:str,
+                        period_start,
+                        period_end):   
+                 
+            branch_period_inventory_fig = period_inventory(data=inventory,
+                                        branch_storage=branch_storage,
+                                        selected_elements=selected_elements,
+                                        element_column=element_column,
+                                        branch=branch,
+                                        start_date=period_start,end_date=period_end)
+
+            global_period_inventory_fig = period_inventory(data=inventory,
+                                        branch_storage=branch_storage,
+                                        selected_elements=selected_elements,
+                                        element_column=element_column,
+                                        start_date=period_start,end_date=period_end)
+            
+            st.markdown("### Existencia Diaria")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.pyplot(branch_period_inventory_fig)
+            with col2:
+                st.pyplot(global_period_inventory_fig) 
+
+    def histogram_plots(data:pd.DataFrame,
+                        element_column:str,
+                        branch:str,
+                        include_outliers :bool,
+                        period_start,period_end):
+        c1, c2 = st.columns(2)
+
+        with c1:
+                branch_histogram = sales_hist(data=data,
+                            main_element=main_element,
+                            element_column=element_column,
+                            branch=branch,
+                            outliers = include_outliers,
+                            start_date=period_start,end_date=period_end)
+
+                st.markdown(f"**{branch}**")
+                st.pyplot(branch_histogram)
+
+        with c2:
+                global_histogram = sales_hist(data=data,
+                            main_element=main_element,
+                            element_column=element_column,
+                            outliers = include_outliers,
+                            start_date=period_start,end_date=period_end)
+
+                st.markdown("**Global**")
+                st.pyplot(global_histogram)
+
+    def kpi_display(data:pd.DataFrame,
+                    selected_element:str,
+                    element_column:str,
+                    period_start,
+                    period_end,
+                    branch:str=None):
+        
+        
+        
+        mask =  (data[element_column]== selected_element)
+        if branch:
+            mask &= (data["sucursal"]==branch)
+        filtered = data[mask].copy()
+
+        current_period = ( pd.to_datetime(period_start) <= filtered['date'] ) & \
+                          ( filtered['date'] <= pd.to_datetime(period_end) ) 
+        
+        previous_period = ( pd.to_datetime(period_start)-datetime.timedelta(days=30) <= filtered['date'] ) & \
+                          ( filtered['date'] <= pd.to_datetime(period_start) ) 
+        
+        
+
+        filtered_current = filtered[current_period].copy()
+        filtered_prev = filtered[previous_period].copy()
+
+        if filtered_current.empty:
+                st.warning("No hay datos para el elemento seleccionado en este periodo.")
+                st.stop()
+
+        total_sales = filtered_current['quantity'].sum() 
+        total_cost = round ( filtered_current['cost'].sum() ,2 )
+        total_profit = round( filtered_current['income'].sum() - total_cost ,2 )
+    
+        prev_sales = filtered_prev["quantity"].sum()
+        prev_cost = filtered_prev["cost"].sum()
+        prev_profit = filtered_prev["income"].sum() - prev_cost
+
+
+        sales_rate = growth_rate(total_sales, prev_sales)
+        profit_rate = growth_rate(total_profit, prev_profit)
+        cost_rate = growth_rate(total_cost, prev_cost)
+
+        sales_color = "#0cb91a" if sales_rate >= 0 else "#ef4444" 
+        profit_color = "#0cb91a" if profit_rate >= 0 else "#ef4444" 
+        cost_color = "#0cb91a" if cost_rate >= 0 else "#ef4444" 
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown(
+                    f'''
+                    <div class="kpi-title">
+                        <h3>Unidades Vendidas</h3>
+                        <h2>{total_sales:,}</h2>
+                        <p style="color: {sales_color}; font-weight: 600;">
+                        {sales_rate:+.1f}%</p>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True
+                )
+
+        with col2:
+            st.markdown(
+                    f'''
+                    <div class="kpi-title">
+                        <h3>Ganancia (MXN)</h3>
+                        <h2>${total_profit:,}</h2>
+                        <p style="color: {profit_color}; font-weight: 600;">
+                        {profit_rate:+.1f}% </p>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True
+                )
+
+        with col3:
+            st.markdown(
+                    f'''
+                    <div class="kpi-title">
+                        <h3>Costo (MXN)</h3>
+                        <h2>${total_cost:,}</h2>
+                        <p style="color: {cost_color}; font-weight: 600;">
+                        {cost_rate:+.1f}%</p>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True
+                )
+
+    def priority_and_map_plots(global_data:pd.DataFrame,
+                               main_element:str,
+                               element_column:str,
+                               period_start,
+                               period_end,
+                               include_outliers:bool,
+                               branch:str,
+                               analysis_lvl:str):  
+              
+        product_priorities = abc_bar_chart(data=global_data,
+                                                branch=branch,
+                                                start_date=period_start,
+                                                end_date=period_end,
+                                                type="productos")
+
+        category_priorities = abc_bar_chart(data=global_data,
+                                                branch=branch,
+                                                start_date=period_start,
+                                                end_date=period_end,
+                                                type="categorias")
+
+            
+        col1, col2 = st.columns(2)
+        with col1:
+                st.markdown("**Mapa de calor de ventas (México)**")
+                merged = cache_wrappers['prepare_sales_heatmap_data'](
+                                                        data=global_data,
+                                                        main_element=main_element,
+                                                        element_column=element_column,
+                                                        start_date=period_start,
+                                                        end_date=period_end,
+                                                        outliers = include_outliers,
+                                                    )
+
+                map_obj, selected_state = render_sales_heat_map(merged, 
+                                                                    main_element,
+                                                                    map_key="Ventas Mapa")
+        with col2:
+            if analysis_lvl=="Productos":
+                st.pyplot(product_priorities)
+            if analysis_lvl=="Categorías":
+                st.pyplot(category_priorities)
+
+    if tab=='ventas':
+        sales_plots(data,
+                    selected_elements,
+                    element_column,
+                    branch,
+                    include_outliers,
+                    period_start,period_end
+                    )
+
+    if tab=='inventario':
+        inventory_plots(inventory=data,
+                        branch_storage=branch_storage,
+                        selected_elements=selected_elements,
+                        element_column=element_column,
+                        branch=branch,
+                        period_start=period_start,
+                        period_end=period_end)
+    
+    histogram_plots(data,
+                    element_column,
+                    branch,
+                    include_outliers,
+                    period_start,period_end
+                    )
+    
+    # KPIs de Sucursal
+    kpi_display(data=data,
+                selected_element=main_element,
+                element_column=element_column,
+                period_start=period_start,
+                period_end=period_end,
+                branch=branch
+                )
+    # KPIs Globales
+    kpi_display(data=global_data,
+                selected_element=main_element,
+                element_column=element_column,
+                period_start=period_start,
+                period_end=period_end
+                ) 
+                
+    priority_and_map_plots(    global_data=global_data,
+                               main_element=main_element,
+                               element_column=element_column,
+                               period_start=period_start,
+                               period_end=period_end,
+                               include_outliers=include_outliers,
+                               branch=branch,
+                               analysis_lvl=analysis_lvl)                
+
+
+
+
+
+
+
+
+# ===========================================================
+#                       MAIN
+# ===========================================================
+
 
 st.set_page_config(
     page_title="CT Dashboard",
@@ -265,9 +593,6 @@ st.set_page_config(
 load_css("assets/styles.css")
 
 
-# -----------------------------------------------------------
-# CACHE WRAPPERS
-# -----------------------------------------------------------
 funcs = [
          load_branches,
          load_storage,
@@ -282,9 +607,9 @@ for f in funcs:
     cache_wrappers[f.__name__]= make_cached(f)
 
 
-# -----------------------------------------------------------
-# CARGA DE DATOS
-# -----------------------------------------------------------
+# ===========================================================
+#                       CARGA DE DATOS
+# ===========================================================
 
 branch_storage = cache_wrappers['load_storage']()
 inventory = cache_wrappers['load_inventory']()
@@ -297,9 +622,9 @@ global_data = cache_wrappers['identify_outlier_sales'](global_data)
 data = global_data.copy()
 
 
-# -----------------------------------------------------------
-# VALORES PREDETERMINADOS
-# -----------------------------------------------------------
+# ===========================================================
+#                       VALORES PREDETERMINADOS
+# ===========================================================
 
 today = datetime.date.today() 
 period_start = pd.to_datetime( datetime.date(today.year, today.month, 1) )
@@ -316,9 +641,8 @@ product_list = list( data["productId"].unique() )
 category_list = list( data["category"].unique() )
 branch_list = list( data["sucursal"].unique() )
 
+
 # Sucursal en donde se vende más seguido el producto más vendido
-
-
 frequent_branch = calculate_frequent_branch(data=data,
                                             top_product=top_product)
 frequent_branch_index = branch_list.index(frequent_branch)
@@ -327,9 +651,9 @@ if data.empty:
     print('Dataset vacío')
 
 
-# -----------------------------------------------------------
-# LOGO Y TITULO
-# -----------------------------------------------------------
+# ===========================================================
+#                       LOGO Y TITULO
+# ===========================================================
 
 col1, col2 = st.columns([1, 8])
 with col1:
@@ -342,6 +666,7 @@ with col2:
 
 sales, stock = st.tabs(["Ventas","Inventario"])
 
+
 # ===========================================================
 #                       ANÁLISIS VENTAS
 # ===========================================================
@@ -350,233 +675,24 @@ with sales:
     left, right = st.columns([1.3, 3.7])
 
     with left:
-
-        analysis_lvl,branch,include_outliers,categories,products,main_element,element_title,period_start,period_end,selected_elements,element_column,is_element,is_global_element = left_section(period_start,period_end)        
-        
+        analysis_lvl,branch,include_outliers,main_element,element_title,period_start,period_end,selected_elements,element_column = left_section(period_start,
+                                                                                                                                                period_end,
+                                                                                                                                                tab='ventas')        
+    
     with right:
-
-# -----------------------------------------------------------
-# SUCURSAL Y GLOBAL 
-# -----------------------------------------------------------
-        
-        branch_period_sales_fig = period_sales(data=data,
-                                    selected_elements=selected_elements,
-                                    element_column=element_column,
-                                    branch=branch,
-                                    outliers = include_outliers,
-                                    start_date=period_start,end_date=period_end)
-        global_period_sales_fig = period_sales(data=data,
-                                    selected_elements=selected_elements,
-                                    element_column=element_column,
-                                    outliers = include_outliers,
-                                    start_date=period_start,end_date=period_end)
+        right_section(data=data,
+                      global_data=global_data,
+                      main_element=main_element,
+                      selected_elements=selected_elements,
+                      element_column=element_column,
+                      branch=branch,
+                      include_outliers =include_outliers,
+                      period_start=period_start,
+                      period_end=period_end,
+                      analysis_lvl=analysis_lvl,
+                      tab='ventas')
 
         
-        st.markdown("### Ventas Diarias")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.pyplot(branch_period_sales_fig)
-        with col2:
-            st.pyplot(global_period_sales_fig)
-
-# -----------------------------------------------------------
-# HISTOGRAMA Y MAPA CALOR
-# -----------------------------------------------------------
-
-        c1, c2 = st.columns(2)
-
-        with c1:
-                branch_histogram = sales_hist(data=data,
-                          main_element=main_element,
-                          element_column=element_column,
-                          branch=branch,
-                          outliers = include_outliers,
-                          start_date=period_start,end_date=period_end)
-
-                st.markdown(f"**{branch}**")
-                st.pyplot(branch_histogram)
-
-        with c2:
-                global_histogram = sales_hist(data=data,
-                          main_element=main_element,
-                          element_column=element_column,
-                          outliers = include_outliers,
-                          start_date=period_start,end_date=period_end)
-
-                st.markdown("**Global**")
-                st.pyplot(global_histogram)
-                
-                
-
-
-# -----------------------------------------------------------
-# KPIs (VENTAS)
-# -----------------------------------------------------------
-        in_branch = data["sucursal"]==branch
-        filtered = data[is_element & in_branch].copy()
-        filtered_current = filtered[is_in_period].copy()
-        if filtered_current.empty:
-            st.warning("No hay datos para el elemento seleccionado en este periodo.")
-            st.stop()
-
-        total_branch_sales = round ( filtered_current["quantity"].sum() ,2 )
-        total_branch_cost = round ( filtered_current["cost"].sum() ,2 )
-        total_branch_profit = round( filtered_current["income"].sum() - total_branch_cost ,2 )
-        branch_inventory_t_ratio = 0
-
-        col1, col2, col3 = st.columns(3)
-        previous_period = ( pd.to_datetime(period_start)-datetime.timedelta(days=30) <= filtered["date"] ) & ( filtered["date"] <= pd.to_datetime(period_start) ) 
-        filtered_prev = filtered[previous_period]
-        
-        prev_sales = filtered_prev["quantity"].sum()
-        prev_cost = filtered_prev["cost"].sum()
-        prev_profit = filtered_prev["income"].sum() - prev_cost
-
-
-        sales_rate = growth_rate(total_branch_sales, prev_sales)
-        profit_rate = growth_rate(total_branch_profit, prev_profit)
-        cost_rate = growth_rate(total_branch_cost, prev_cost)
-
-        sales_color = "#0cb91a" if sales_rate >= 0 else "#ef4444" 
-        profit_color = "#0cb91a" if profit_rate >= 0 else "#ef4444" 
-        cost_color = "#0cb91a" if cost_rate >= 0 else "#ef4444" 
-
-        with col1:
-            st.markdown(
-                f'''
-                <div class="kpi-title">
-                    <h3>Unidades Vendidas</h3>
-                    <h2>{total_branch_sales:,}</h2>
-                    <p style="color: {sales_color}; font-weight: 600;">
-                    {sales_rate:+.1f}%</p>
-                </div>
-                ''',
-                unsafe_allow_html=True
-            )
-
-        with col2:
-            st.markdown(
-                f'''
-                <div class="kpi-title">
-                    <h3>Ganancia (MXN)</h3>
-                    <h2>${total_branch_profit:,}</h2>
-                    <p style="color: {profit_color}; font-weight: 600;">
-                    {profit_rate:+.1f}% </p>
-                </div>
-                ''',
-                unsafe_allow_html=True
-            )
-
-        with col3:
-            st.markdown(
-                f'''
-                <div class="kpi-title">
-                    <h3>Costo (MXN)</h3>
-                    <h2>${total_branch_cost:,}</h2>
-                    <p style="color: {cost_color}; font-weight: 600;">
-                    {cost_rate:+.1f}%</p>
-                </div>
-                ''',
-                unsafe_allow_html=True
-            )
-
-        global_filtered = global_data [is_global_element].copy()
-        global_filtered_current = global_filtered[is_in_period]
-        if global_filtered.empty:
-            st.warning("No hay datos para el elemento seleccionado en este periodo.")
-            st.stop()
-
-        total_sales = round( global_filtered["quantity"].sum() , 2 )
-        total_cost = round( global_filtered["cost"].sum() , 2 )
-        total_profit = round( global_filtered["income"].sum() - total_cost ,2 )
-        
-
-        col1, col2, col3 = st.columns(3)
-        previous_period = ( pd.to_datetime(period_start)-datetime.timedelta(days=30) <= global_filtered['date'] ) & ( global_filtered['date'] <= pd.to_datetime(period_start) ) 
-        global_filtered_prev = global_filtered[previous_period]
-       
-        global_prev_sales = global_filtered_prev["quantity"].sum()
-        global_prev_cost = global_filtered_prev["cost"].sum()
-        global_prev_profit = global_filtered_prev["income"].sum() - global_prev_cost
-
-
-        global_sales_rate = growth_rate(total_sales, global_prev_sales)
-        global_profit_rate = growth_rate(total_profit, global_prev_profit)
-        global_cost_rate = growth_rate(total_cost, global_prev_cost)
-        global_sales_color = "#0cb91a" if global_sales_rate >= 0 else "#ef4444" 
-        global_profit_color = "#0cb91a" if global_profit_rate >= 0 else "#ef4444" 
-        global_cost_color = "#0cb91a" if global_cost_rate >= 0 else "#ef4444"
-        with col1:
-            st.markdown(f'''
-                        <div class="kpi-title">
-                            <h3>Unidades Vendidas</h3>
-                            <h2>{total_sales:,} </h2>
-                            <p style="color: {global_sales_color}; font-weight: 600;">
-                            {global_sales_rate:+.1f}%</p>
-                        </div>
-                        ''', 
-                        unsafe_allow_html=True)
-        with col2:
-            st.markdown(f'''
-                        <div class="kpi-title">
-                            <h3>Ganancia Total (MXN)</h3>
-                            <h2>${total_profit:,} </h2>
-                            <p style="color: {global_profit_color}; font-weight: 600;">
-                            {global_profit_rate:+.1f}%</p>
-                        </div>
-                        ''',
-                        unsafe_allow_html=True)
-        with col3:
-            st.markdown(f'''
-                        <div class="kpi-title">
-                            <h3>Costo Total (MXN)</h3>
-                            <h2>${total_cost:,}</h2>
-                            <p style="color: {global_cost_color}; font-weight: 600;">
-                            {global_cost_rate:+.1f}%</p>
-                        </div>''',
-                        unsafe_allow_html=True)
-
-
-
-# -----------------------------------------------------------
-# PRIORIDADES
-# -----------------------------------------------------------
-        
-        product_priorities = abc_bar_chart(data=global_data,
-                                            branch=branch,
-                                            start_date=period_start,end_date=period_end,type="productos")
-
-        category_priorities = abc_bar_chart(data=global_data,
-                                            branch=branch,
-                                            start_date=period_start,end_date=period_end,type="categorias")
-
-        
-        col1, col2 = st.columns(2)
-        with col1:
-                st.markdown("**Mapa de calor de ventas (México)**")
-                merged = cache_wrappers['prepare_sales_heatmap_data'](
-                                                    data=global_data,
-                                                    main_element=main_element,
-                                                    element_column=element_column,
-                                                    start_date=period_start,
-                                                    end_date=period_end,
-                                                    outliers = include_outliers,
-                                                )
-
-                map_obj, selected_state = render_sales_heat_map(merged, 
-                                                                main_element,
-                                                                map_key="Ventas Mapa")
-        with col2:
-            if analysis_lvl=="Productos":
-                st.pyplot(product_priorities)
-            if analysis_lvl=="Categorías":
-                st.pyplot(category_priorities)
-            
-        
-
-
-
 
 # ===========================================================
 #                       ANÁLISIS INVENTARIO
@@ -589,182 +705,27 @@ with stock:
 
    with left:
 
-        
-# -----------------------------------------------------------
-# INFO DE PRODUCTO/CATEGORIA
-# -----------------------------------------------------------
-        filtered = data[is_element]
+        _= left_section(period_start=period_start,
+                        period_end=period_end,
+                        tab='inventario')
 
-        if filtered.empty:
-            st.warning("No hay datos para el elemento seleccionado en este periodo.")
-            st.stop()
-        cost_per_unit = round(data["cost"].iloc[0],2)
-        price_range =( round(data["price"].min(),2) , round( data["price"].max(),2) )
-        category = filtered["category"].iloc[0]
-        top_clients = list ( top_n(filtered,element_column,type="cliente")["clientId"] )
-
-        clients_str=''
-        for client in top_clients:
-            clients_str+=client+','
-        clients_str = clients_str[:-1]
-
-
-        products = st.multiselect("Producto(s)", product_list ,
-                                    default = [ top_product ],
-                                    max_selections= 4 )
-        if analysis_lvl=="Productos":
-            st.markdown(f"**Producto:** {main_element}")
-
-        if analysis_lvl=="Categorías":
-            st.markdown(f"**Categoría:** {main_element}")
-
-        st.markdown("Periodo")
-        period_start_global = pick_date(label="Inicio",default=period_start,key="Global Inicio")
-        period_end_global = pick_date(label="Fin",default=period_end,key="Global Fin")
-
-        if analysis_lvl=="Productos":
-    
-            st.table(pd.DataFrame({
-                "": [
-                    "Código",
-                    "Categoría",
-                    "Costo por unidad(MXN)",
-                    "Precio por unidad(MXN)",
-                    "Clientes frecuentes"
-                ],
-                "Valor": [
-                    str(main_element),
-                    str(category),
-                    str(cost_per_unit),
-                    str(price_range[1]),
-                    str(clients_str)
-                ]
-            }))
-        if analysis_lvl=="Categorías":
-        
-            st.table(pd.DataFrame({
-                "": [
-                    "Categoría",
-                    "Clientes frecuentes"
-                ],
-                "Valor": [
-                    category,
-                    clients_str
-                ]
-            }))
    with right:
-
-# -----------------------------------------------------------
-# INVENTARIO
-# -----------------------------------------------------------
-        
-        branch_period_inventory_fig = period_inventory(data=inventory,
-                                    branch_storage=branch_storage,
-                                    selected_elements=selected_elements,
-                                    element_column=element_column,
-                                    branch=branch,
-                                    start_date=period_start_global,end_date=period_end_global)
-
-        global_period_inventory_fig = period_inventory(data=inventory,
-                                    branch_storage=branch_storage,
-                                    selected_elements=selected_elements,
-                                    element_column=element_column,
-                                    start_date=period_start_global,end_date=period_end_global)
-        st.markdown("### Existencia Diaria")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.pyplot(branch_period_inventory_fig)
-        with col2:
-            st.pyplot(global_period_inventory_fig)
-
-
-# -----------------------------------------------------------
-# HISTOGRAMA Y MAPA CALOR
-# -----------------------------------------------------------
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-                branch_histogram = sales_hist(data=data,
-                          main_element=main_element,
-                          element_column=element_column,
-                          branch=branch,
-                          outliers=include_outliers,
-                          start_date=period_start_global,end_date=period_end_global)
-
-                st.markdown(f"**{branch}**")
-                st.pyplot(branch_histogram)
-
-        with col2:
-                global_histogram = sales_hist(data=data,
-                          main_element=main_element,
-                          element_column=element_column,
-                          outliers=include_outliers,
-                          start_date=period_start_global,end_date=period_end_global)
-
-                st.markdown("**Global**")
-                st.pyplot(global_histogram)
-
-                
-
-
-
-# -----------------------------------------------------------
-# KPIs (INVENTARIO)
-# -----------------------------------------------------------
-        filtered = global_data [is_global_element & is_in_period]
-
-        if filtered.empty:
-            st.warning("No hay datos para el elemento seleccionado en este periodo.")
-            st.stop()
-
-        total_sales = round( filtered["quantity"].sum() , 2 )
-        total_cost = round( filtered["cost"].sum() , 2 )
-        total_profit = round( filtered["income"].sum() - total_cost ,2 )
-        
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown(f'<div class="kpi-title"><h3>Unidades Vendidas</h3><h2>{total_sales:,} </h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
-        with col2:
-            st.markdown(f'<div class="kpi-title"><h3>Ganancia Total (MXN)</h3><h2>${total_profit:,} </h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
-        with col3:
-            st.markdown(f'<div class="kpi-title"><h3>Costo Total (MXN)</h3><h2>${total_cost:,}</h2><p>+ ritmo ejemplo</p></div>', unsafe_allow_html=True)
+       right_section( data=inventory,
+                      branch_storage=branch_storage,
+                      global_data=global_data,
+                      main_element=main_element,
+                      selected_elements=selected_elements,
+                      element_column=element_column,
+                      branch=branch,
+                      include_outliers =include_outliers,
+                      period_start=period_start,
+                      period_end=period_end,
+                      analysis_lvl=analysis_lvl,
+                      tab='inventario')
 
 
 
 
-# -----------------------------------------------------------
-# PRIORIDADES
-# -----------------------------------------------------------
-
-        product_priorities = abc_bar_chart(data=global_data,
-                                            branch=branch,
-                                            start_date=period_start_global,end_date=period_end_global,type="productos")
-
-        category_priorities = abc_bar_chart(data=global_data,
-                                            branch=branch,
-                                            start_date=period_start_global,end_date=period_end_global,type="categorias")
-        col1, col2 = st.columns(2)
-        with col1:
-                st.markdown("**Mapa de calor de ventas (México)**")
-                merged = cache_wrappers['prepare_sales_heatmap_data'](
-                                                    data=global_data,
-                                                    main_element=main_element,
-                                                    element_column=element_column,
-                                                    start_date=period_start_global,
-                                                    end_date=period_end_global,
-                                                    outliers=include_outliers,
-                                                )
-
-                map_obj, selected_state = render_sales_heat_map(merged, 
-                                                                main_element,
-                                                                map_key="Global Mapa")
-        with col2:
-            if analysis_lvl=="Productos":
-                st.pyplot(product_priorities)
-            if analysis_lvl=="Categorías":
-                st.pyplot(category_priorities)
 
 
 

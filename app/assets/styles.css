@@ -156,7 +156,6 @@ html, body, [class*="css"] {
     box-shadow: 0 0 0 1px #2563eb;
 }
 
-
 /* st.selectbox styling */
 [data-testid="stSelectbox"] {
     padding: 0.4rem;
@@ -180,10 +179,12 @@ html, body, [class*="css"] {
     min-height: 38px;
 }
 
-/* Selected value text */
-[data-testid="stSelectbox"] div[data-baseweb="select"] input {
-    color: #1e3a8a !important;
-    font-size: 0.875rem;
+/* Selected value text - Multiple selectors to ensure it works */
+[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+[data-testid="stSelectbox"] div[data-baseweb="select"] span,
+[data-testid="stSelectbox"] div[data-baseweb="select"] div {
+    color: #0b39b6 !important;
+    font-size: 0.875rem !important;
 }
 
 /* Hover */
@@ -199,7 +200,7 @@ html, body, [class*="css"] {
 
 /* Dropdown arrow icon */
 [data-testid="stSelectbox"] svg {
-    fill: #64748b;
+    fill: #64748b !important;
 }
 
 /* Dropdown list */
