@@ -633,8 +633,6 @@ period_end = pd.to_datetime( today )
 
 
 # Producto con cantidad de unidades más vendidas dentro de periodo
-is_in_period = ( period_start <= data["date"] ) & ( data["date"] <= period_end )
-
 top_product,top_category = calculate_top_product_and_category(data)
 
 product_list = list( data["productId"].unique() )
