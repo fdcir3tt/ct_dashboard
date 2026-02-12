@@ -134,7 +134,7 @@ def period_sales(data: pd.DataFrame,
                  selected_elements: list[str] ,
                  element_column:str ,
                  start_date, end_date,
-                 outliers:bool,
+                 outliers:bool=None,
                  branch:str=None,
                  val:bool=False,**kwargs)->Figure:
     """
@@ -169,15 +169,14 @@ def period_sales(data: pd.DataFrame,
     df = data.copy()
     # Filtro por rango de fechas
     in_period = (df['date'] >= start_date) & (df['date'] <= end_date)
-
     # Filtro por productos o categorías
     in_selected = df[element_column].isin(selected_elements)
     
 
-    # Filtro por outlier 
-    outlier_filter =  df['is_outlier']==outliers
-    
-    mask = in_period & in_selected & outlier_filter
+    mask = in_period & in_selected
+    if outliers:
+        mask &= df["is_outlier"] == outliers
+
     df = df[mask]
 
     if df.empty:
@@ -409,8 +408,8 @@ def sales_velocity(data:pd.DataFrame,
                    selected_elements:list,
                    element_column: str,
                    branch:str,
-                   outliers:bool,
                    start_date,end_date,
+                   outliers:bool=None,
                    val:bool=False,**kwargs):
     
     if data.empty:
@@ -448,9 +447,11 @@ def sales_velocity(data:pd.DataFrame,
 
     # Filtro por sucursal 
     in_branch = df["sucursal"]==branch
-    outlier_filter =  df['is_outlier']==outliers
     
-    mask = in_period & in_selected & outlier_filter
+    
+    mask = in_period & in_selected & in_branch
+    if outliers:
+        mask &= df["is_outlier"] == outliers
     df = df[mask]
     
 
@@ -592,7 +593,7 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,
                                main_element: str,
                                element_column: str,
                                start_date,end_date,
-                               outliers:bool,
+                               outliers:bool=None,
                                val:bool=False,**kwargs)->pd.DataFrame:
     
     if data.empty or "date" not in data or element_column not in data:
