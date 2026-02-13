@@ -156,11 +156,19 @@ def left_section(period_start,
                                              default='Productos',
                                              key=f'Nivel de análisis {tab} seleccionado')
         with col2 :
-            outliers= pick_main_element(label='Análisis con ventas anomalas incluídas',
-                                        options= ['Sí','No'],
-                                        default='Sí',
-                                        key=f'Incluir {tab} anómalas')
-            
+            if tab=='ventas':
+                outliers= pick_main_element(label='Análisis con ventas anomalas incluídas',
+                                            options= ['Sí','No'],
+                                            default='Sí',
+                                            key=f'Incluir {tab} anómalas')
+                if outliers=='Sí':
+                    include_outliers = True
+                else: 
+                    include_outliers = False
+            else:
+                include_outliers = None 
+                
+                       
         branch = pick_branch(label='Sucursal',
                              options=branch_list,
                              index=frequent_branch_index,
@@ -168,10 +176,7 @@ def left_section(period_start,
         
 
 
-        if outliers=='Sí':
-            include_outliers = True
-        else: 
-            include_outliers = False
+        
 
         if analysis_lvl=="Productos":
                 categories = []
@@ -397,7 +402,6 @@ def right_section(data:pd.DataFrame,
                     selected_element:str,
                     element_column:str,
                     period_start,
-                    period_end,
                     branch:str=None):
         
         
@@ -406,9 +410,9 @@ def right_section(data:pd.DataFrame,
         if branch:
             mask &= (data["sucursal"]==branch)
         filtered = data[mask].copy()
-
+        
         current_period = ( pd.to_datetime(period_start) <= filtered['date'] ) & \
-                          ( filtered['date'] <= pd.to_datetime(period_end) ) 
+                          ( filtered['date'] <= pd.to_datetime(period_start)+datetime.timedelta(days=30) ) 
         
         previous_period = ( pd.to_datetime(period_start)-datetime.timedelta(days=30) <= filtered['date'] ) & \
                           ( filtered['date'] <= pd.to_datetime(period_start) ) 
@@ -539,7 +543,7 @@ def right_section(data:pd.DataFrame,
                         branch=branch,
                         period_start=period_start,
                         period_end=period_end)
-    
+        return None
     histogram_plots(data,
                     element_column,
                     branch,
@@ -552,7 +556,6 @@ def right_section(data:pd.DataFrame,
                 selected_element=main_element,
                 element_column=element_column,
                 period_start=period_start,
-                period_end=period_end,
                 branch=branch
                 )
     # KPIs Globales
@@ -560,7 +563,6 @@ def right_section(data:pd.DataFrame,
                 selected_element=main_element,
                 element_column=element_column,
                 period_start=period_start,
-                period_end=period_end
                 ) 
                 
     priority_and_map_plots(    global_data=global_data,
@@ -703,7 +705,7 @@ with stock:
 
    with left:
 
-        _= left_section(period_start=period_start,
+        inv_analysis_lvl,inv_branch,_,inv_main_element,element_title,inv_period_start,inv_period_end,inv_selected_elements,inv_element_column = left_section(period_start=period_start,
                         period_end=period_end,
                         tab='inventario')
 
@@ -711,14 +713,14 @@ with stock:
        right_section( data=inventory,
                       branch_storage=branch_storage,
                       global_data=global_data,
-                      main_element=main_element,
-                      selected_elements=selected_elements,
-                      element_column=element_column,
-                      branch=branch,
+                      main_element=inv_main_element,
+                      selected_elements=inv_selected_elements,
+                      element_column=inv_element_column,
+                      branch=inv_branch,
                       include_outliers =include_outliers,
-                      period_start=period_start,
-                      period_end=period_end,
-                      analysis_lvl=analysis_lvl,
+                      period_start=inv_period_start,
+                      period_end=inv_period_end,
+                      analysis_lvl=inv_analysis_lvl,
                       tab='inventario')
 
 
