@@ -90,12 +90,11 @@ def identify_outlier_sales(data: pd.DataFrame,
     bounds_dict = df.groupby(element_column)['quantity'].apply(calculate_iqr_bounds).to_dict()
     
     df['iqr_bounds'] = df[element_column].map(bounds_dict)
-    df['is_outlier'] = df['quantity'].between(
+    df['is_outlier'] = ~df['quantity'].between(
                                               df['iqr_bounds'].str[0], 
                                               df['iqr_bounds'].str[1]
                                               )
 
-    print('Ventas anomalas detectadas correctamente !')
     df = df.drop(columns='iqr_bounds')
     return df
 
