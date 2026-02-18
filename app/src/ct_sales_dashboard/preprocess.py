@@ -137,6 +137,7 @@ def process_data(invoices,product_codes,exchange_rates,branches,products,categor
         df = df.rename(columns={"nombre":"category"})
 
         os.makedirs("data/processed",exist_ok=True)
+        df = df.drop_duplicates(subset=['folio','productId','date','clientId'])
         df.to_parquet('data/processed/facturas_ventas.parquet',index=False)
 
     
