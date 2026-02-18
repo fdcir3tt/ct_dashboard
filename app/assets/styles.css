@@ -387,6 +387,33 @@ div[data-baseweb="popover"] li:hover {
 }
 
 
+/* st.warning styling */
+[data-testid="stAlert"] {
+    padding: 0.6rem 0.8rem;
+    background-color: #ffffff !important;
+    border-radius: 10px !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    border: 1px solid #cbd5e1 !important;
+}
+
+/* Remove default yellow background */
+[data-testid="stAlert"] div[role="alert"] {
+    background-color: #f8fafc !important;
+    color: #1e3a8a !important;
+    border-radius: 8px;
+}
+
+/* Warning icon */
+[data-testid="stAlert"] svg {
+    fill: #2563eb !important;
+}
+
+/* Warning text */
+[data-testid="stAlert"] p {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #1e3a8a !important;
+}
 
 
 #MainMenu {visibility: hidden;}
