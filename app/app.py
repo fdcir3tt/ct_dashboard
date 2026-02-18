@@ -401,14 +401,16 @@ def right_section(data:pd.DataFrame,
                     selected_element:str,
                     element_column:str,
                     period_start,
+                    include_outliers:bool,
                     branch:str=None):
         
-        
-        
-        mask =  (data[element_column]== selected_element)
+        df = data.copy()
+        mask =  (df[element_column]== selected_element)
         if branch:
-            mask &= (data["sucursal"]==branch)
-        filtered = data[mask].copy()
+            mask &= (df["sucursal"]==branch)
+        if not include_outliers:
+            mask &= df["is_outlier"] == include_outliers
+        filtered = df[mask]
         
         current_period = ( pd.to_datetime(period_start) <= filtered['date'] ) & \
                           ( filtered['date'] <= pd.to_datetime(period_start)+datetime.timedelta(days=30) ) 
@@ -493,12 +495,14 @@ def right_section(data:pd.DataFrame,
               
         product_priorities = abc_bar_chart(data=global_data,
                                                 branch=branch,
+                                                include_outliers=include_outliers,
                                                 start_date=period_start,
                                                 end_date=period_end,
                                                 type="productos")
 
         category_priorities = abc_bar_chart(data=global_data,
                                                 branch=branch,
+                                                include_outliers=include_outliers,
                                                 start_date=period_start,
                                                 end_date=period_end,
                                                 type="categorias")
@@ -543,11 +547,12 @@ def right_section(data:pd.DataFrame,
                         period_start=period_start,
                         period_end=period_end)
         return None
-    histogram_plots(data,
-                    element_column,
-                    branch,
-                    include_outliers,
-                    period_start,period_end
+    histogram_plots(data=data,
+                    element_column=element_column,
+                    branch=branch,
+                    include_outliers=include_outliers,
+                    period_start=period_start,
+                    period_end=period_end
                     )
     
     # KPIs de Sucursal
@@ -555,6 +560,7 @@ def right_section(data:pd.DataFrame,
                 selected_element=main_element,
                 element_column=element_column,
                 period_start=period_start,
+                include_outliers=include_outliers,
                 branch=branch
                 )
     # KPIs Globales
@@ -562,6 +568,7 @@ def right_section(data:pd.DataFrame,
                 selected_element=main_element,
                 element_column=element_column,
                 period_start=period_start,
+                include_outliers=include_outliers,
                 ) 
                 
     priority_and_map_plots(    global_data=global_data,

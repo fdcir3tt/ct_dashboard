@@ -697,6 +697,7 @@ def abc_bar_chart(data:pd.DataFrame,
                   start_date:str,
                   end_date:str,
                   branch:str,
+                  include_outliers:bool,
                   type:str="productos",
                   val:bool=False,**kwargs):
     
@@ -719,10 +720,16 @@ def abc_bar_chart(data:pd.DataFrame,
     end_date   = pd.to_datetime(end_date)
 
     data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    df = data.copy()
 
-    is_in_period = ( start_date <= data["date"] ) & ( data["date"] <= end_date )
-    in_branch = data["sucursal"] == branch
-    df_filtered = data[is_in_period&in_branch]
+    is_in_period = ( start_date <= df["date"] ) & ( df["date"] <= end_date )
+    in_branch = df["sucursal"] == branch
+
+    mask = is_in_period&in_branch
+    if not include_outliers:
+        mask &= df["is_outlier"] == include_outliers
+
+    df_filtered = df[mask]
 
 
     df_summary = (
