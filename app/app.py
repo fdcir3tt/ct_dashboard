@@ -28,7 +28,7 @@ def pick_date(label: str,
 def pick_elements(label: str,
                   options:list,
                   default: list[str]= None, 
-                  key: str = "selected_elements"):
+                  key: str = "selected_elements")->list[str]:
     
     if key not in st.session_state:
         st.session_state[key] = default
@@ -43,7 +43,7 @@ def pick_elements(label: str,
 def pick_main_element(label: str,
                       options:list,
                       default: str= None, 
-                      key: str = "selected_element"):
+                      key: str = "selected_element")->str:
     
     if key not in st.session_state:
         st.session_state[key] = default
@@ -55,7 +55,7 @@ def pick_main_element(label: str,
 def pick_branch(label:str,
                 options:list,
                 index:int,
-                key:str='selected branch'):
+                key:str='selected branch')->str:
     
     if key not in st.session_state:
         st.session_state[key] = index
@@ -76,7 +76,7 @@ def growth_rate(current, previous):
         return 0
     return round(((current - previous) / previous) * 100, 2)
 
-def calculate_iqr_bounds(sales_series):
+def calculate_iqr_bounds(sales_series)->tuple[float,float]:
     q1 = sales_series.quantile(0.25)
     q3 = sales_series.quantile(0.75)
     iqr = q3 - q1
@@ -84,7 +84,7 @@ def calculate_iqr_bounds(sales_series):
 
 
 def identify_outlier_sales(data: pd.DataFrame,
-                           element_column:str='productId')->pd.DataFrame:
+                           element_column:str)->pd.DataFrame:
     df = data.copy()
 
     bounds_dict = df.groupby(element_column)['quantity'].apply(calculate_iqr_bounds).to_dict()
@@ -144,9 +144,9 @@ def calculate_frequent_branch(data:pd.DataFrame,top_product:str)->str:
 
 def left_section(period_start,
                  period_end,
-                 tab:str):
+                 tab:str)->tuple[str,str,bool,str,str,str,str,list,str]:
 
-    def filters(tab:str)->tuple:
+    def filters(tab:str)->tuple[str,str,bool,list,list]:
         st.markdown('**Filtros**')
         col1, col2 = st.columns(2)
         with col1 :
@@ -324,12 +324,12 @@ def right_section(data:pd.DataFrame,
                                         selected_elements=selected_elements,
                                         element_column=element_column,
                                         branch=branch,
-                                        outliers = include_outliers,
+                                        include_outliers = include_outliers,
                                         start_date=period_start,end_date=period_end)
         global_period_sales_fig = period_sales(data=data,
                                         selected_elements=selected_elements,
                                         element_column=element_column,
-                                        outliers = include_outliers,
+                                        include_outliers = include_outliers,
                                         start_date=period_start,end_date=period_end)
 
             
@@ -381,7 +381,7 @@ def right_section(data:pd.DataFrame,
                             main_element=main_element,
                             element_column=element_column,
                             branch=branch,
-                            outliers = include_outliers,
+                            include_outliers = include_outliers,
                             start_date=period_start,end_date=period_end)
 
                 st.markdown(f"**{branch}**")
@@ -391,7 +391,7 @@ def right_section(data:pd.DataFrame,
                 global_histogram = sales_hist(data=data,
                             main_element=main_element,
                             element_column=element_column,
-                            outliers = include_outliers,
+                            include_outliers = include_outliers,
                             start_date=period_start,end_date=period_end)
 
                 st.markdown("**Global**")
@@ -513,7 +513,7 @@ def right_section(data:pd.DataFrame,
                                                         element_column=element_column,
                                                         start_date=period_start,
                                                         end_date=period_end,
-                                                        outliers = include_outliers,
+                                                        include_outliers = include_outliers,
                                                     )
 
                 map_obj, selected_state = render_sales_heat_map(merged, 
@@ -617,7 +617,7 @@ inventory = cache_wrappers['load_inventory']()
 
 global_data = cache_wrappers['load_sales_invoices']()
 global_data['income'] = global_data['price'] * global_data['quantity']
-global_data = cache_wrappers['identify_outlier_sales'](global_data)
+global_data = cache_wrappers['identify_outlier_sales'](global_data,element_column='productId')
 
 
 data = global_data.copy()

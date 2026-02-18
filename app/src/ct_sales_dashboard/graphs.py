@@ -134,7 +134,7 @@ def period_sales(data: pd.DataFrame,
                  selected_elements: list[str] ,
                  element_column:str ,
                  start_date, end_date,
-                 outliers:bool=None,
+                 include_outliers:bool=None,
                  branch:str=None,
                  val:bool=False,**kwargs)->Figure:
     """
@@ -174,8 +174,8 @@ def period_sales(data: pd.DataFrame,
     
 
     mask = in_period & in_selected
-    if outliers:
-        mask &= df["is_outlier"] == outliers
+    if not include_outliers:
+        mask &= df["is_outlier"] == include_outliers
 
     df = df[mask]
 
@@ -532,7 +532,7 @@ def sales_hist(data: pd.DataFrame,
                main_element: str,
                element_column: str,
                start_date,end_date,
-               outliers:bool,
+               include_outliers:bool,
                branch: str = None,
                val: bool = False,):
     """
@@ -559,8 +559,8 @@ def sales_hist(data: pd.DataFrame,
 
     if branch:
         mask &= df["sucursal"] == branch
-    if outliers:
-        mask &= df["is_outlier"] == outliers
+    if not include_outliers:
+        mask &= df["is_outlier"] == include_outliers
 
     df = df.loc[mask, ["quantity"]].dropna()
 
@@ -593,7 +593,7 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,
                                main_element: str,
                                element_column: str,
                                start_date,end_date,
-                               outliers:bool=None,
+                               include_outliers:bool=None,
                                val:bool=False,**kwargs)->pd.DataFrame:
     
     if data.empty or "date" not in data or element_column not in data:
@@ -608,8 +608,8 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,
         (df[element_column] == main_element )
     )
 
-    if outliers:
-        mask &= df["is_outlier"] == outliers
+    if not include_outliers:
+        mask &= df["is_outlier"] == include_outliers
 
     df_filtered = df[mask]
 
