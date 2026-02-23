@@ -13,6 +13,8 @@ import time
 
 from dotenv import load_dotenv
 from pymongo import MongoClient 
+from pymongo.database import Database
+from pymongo.errors import PyMongoError
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
@@ -80,18 +82,24 @@ category_table=os.getenv('CDB_CATEGORY_TABLE')
 product_table=os.getenv('CDB_PRODUCT_TABLE')
 
 
-def connect_to_DB(conn_uri,db_name)-> MongoClient:
+def connect_to_DB(conn_uri,db_name)-> Database|None:
     """
     Docstring for connect_to_DB
     
     :return: Cliente de mongoDB
     :rtype: Any
     """
+    try:
+        client = MongoClient(conn_uri,
+                             compressors="zstd,snappy,zlib",
+                             maxPoolSize=5)
+        return client[db_name]
+    except PyMongoError as e:
+        print(f"No se pudo realizar conexión con base de datos:{e}")
+        return None
+    
 
-    client = MongoClient(conn_uri,compressors="zstd,snappy,zlib",maxPoolSize=5)
-    db = client[db_name]
-
-    return db
+    
 
 def get_mysql_connection():
     return mysql.connector.connect(
@@ -145,7 +153,10 @@ def get_query(query:str,connection_str:str=conn_str)->pd.DataFrame:
         print(f"Error al intentar conectarse a la base de datos: {e}")
 
 
-def get_documents(database:None,collection:str,filters:dict=None,projection:dict=None) -> Documents:
+def get_documents(database:None,
+                  collection:str,
+                  filters:dict=None,
+                  projection:dict=None) -> Documents:
     """
     Función que regresa lista de documentos extraídos de la colección de existencia
     
@@ -157,14 +168,19 @@ def get_documents(database:None,collection:str,filters:dict=None,projection:dict
     else:
         db = connect_to_DB(API_CONN,API_NAME)
 
-
-    collection = db[collection]
-    cursor = collection.find(filters, projection=projection,batch_size=BATCH_SIZE)
+    if db is None:
+        return []
+    else:
+        collection = db[collection]
+        try:
+            cursor = collection.find(filters, projection=projection,batch_size=BATCH_SIZE)
+            
+            result_docs= list(cursor) 
+            return result_docs
+        except PyMongoError as e:
+            print(f"No se pudieron extraer los documentos correctamente:{e}")
+            return []
         
-    result_docs= list(cursor) 
-    return result_docs
-
-
 def get_product_cost_dict(query_fn=get_query)-> dict :
     """
     Función que consulta el datawarehouse para conseguir los costos de productos y los regresa
@@ -556,18 +572,20 @@ def load_inventory()->pd.DataFrame:
     db_name = os.getenv("HIST_MONGO_DB")
 
     database = connect_to_DB(conn_uri,db_name)
+    if database is not None:
+        hist_collection = os.getenv("EXISTENCE_HIST_COLLECTION")
+        docs = get_documents(database,hist_collection)
 
-    hist_collection = os.getenv("EXISTENCE_HIST_COLLECTION")
-    docs = get_documents(database,hist_collection)
+        df = pd.DataFrame(data=docs)
+        df["productId"]= df["productoReferencia"].apply( lambda x:x['codigo'])
 
-    df = pd.DataFrame(data=docs)
-    df["productId"]= df["productoReferencia"].apply( lambda x:x['codigo'])
+        df = df.drop(columns=["activo",'_id','productoReferencia']).rename(columns={"fechaRegistro":"date","costo":"cost","almacenes":"existence"})
+        df["date"] = df['date'].dt.strftime('%Y-%m-%d')
+        df["date"] = pd.to_datetime(df["date"])
 
-    df = df.drop(columns=["activo",'_id','productoReferencia']).rename(columns={"fechaRegistro":"date","costo":"cost","almacenes":"existence"})
-    df["date"] = df['date'].dt.strftime('%Y-%m-%d')
-    df["date"] = pd.to_datetime(df["date"])
-
-    return df
+        return df
+    else:
+        return pd.DataFrame()
 
 
 def load_branches()->pd.DataFrame:
@@ -575,31 +593,38 @@ def load_branches()->pd.DataFrame:
     db_name = os.getenv("API_MONGO_DB")
 
     database = connect_to_DB(conn_uri,db_name)
+    if database is None:
+        return pd.DataFrame()
+        
+    else:
+        collection = os.getenv("BRANCHES_COLLECTION")
+        docs = get_documents(database,collection)
 
-    collection = os.getenv("BRANCHES_COLLECTION")
-    docs = get_documents(database,collection)
-
-    branches = pd.DataFrame(docs)
-    return branches
-    
+        branches = pd.DataFrame(docs)
+        return branches
+        
 
 
 
 def load_storage()->dict:
     branches = load_branches()
-    branches = branches[["nemonico","sucursal"]]
-    branches = branches.set_index("nemonico")["sucursal"].to_dict()
 
-    branch_storage={}
-    for key,branch in branches.items():
-        if branch in branch_storage.keys():
-            branch_storage[branch].append(key)
-            continue
+    if not branches.empty :
+        branches = branches[["nemonico","sucursal"]]
+        branches = branches.set_index("nemonico")["sucursal"].to_dict()
 
-        branch_storage[branch]=[key]
+        branch_storage={}
+        for key,branch in branches.items():
+            if branch in branch_storage.keys():
+                branch_storage[branch].append(key)
+                continue
 
-    return branch_storage
+            branch_storage[branch]=[key]
 
+        return branch_storage
+    else:
+        return {}
+    
 def load_raw_exchange_rates()->pd.DataFrame:
     if os.path.exists("data/raw"):
         for path in os.listdir("data/raw"):

@@ -35,7 +35,6 @@ def pick_elements(label: str,
 
     return st.multiselect(label, 
                           options ,
-                          default = default,
                           max_selections= 4 ,
                           key=key)
     

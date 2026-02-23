@@ -278,7 +278,7 @@ def period_inventory(data: pd.DataFrame,
     """
     
     # --- Validaciones básicas ---
-    if data.empty:
+    if data.empty or (not branch_storage):
         
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)

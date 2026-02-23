@@ -22,16 +22,27 @@ def main():
 
         subprocess.run(["python", "scripts/shapefile_extraction.py"])
     
+    
     print(" ="*25)
     print("||   Comenzando ingesta de datos históricos  ||")
     print(" ="*25)
-    subprocess.run(["python", "scripts/ingest.py"])
 
+    try:
+        subprocess.run(["python", "scripts/ingest.py"])
+    except Exception as e :
+        print(f"No se pudo realizar ingesta de datos históricos :{e}")
+
+    
     print(" ="*25)
     print("||   Comenzando actualización de conversiones de moneda  ||")
     print(" ="*25)
-    subprocess.run(["python", "scripts/exchange_rates_update.py"])
-    print("Actualizaciones completas!!")
+    try:
+        subprocess.run(["python", "scripts/exchange_rates_update.py"])
+    except Exception as e :
+        print(f"No se pudo realizar actualización de conversiones USD a MXN :{e}")
+
+    print("Proceso de actualización completo !!")
+
 # -----------------------------------------------------------
 # CARGAR DATOS
 # -----------------------------------------------------------
