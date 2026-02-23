@@ -113,7 +113,8 @@ def get_mysql_connection():
 # QUERIES
 # -----------------------------------------------------------
 
-def build_query(start_date:Date,end_date:Date)->str:
+def build_query(start_date:Date,
+                end_date:Date)->str:
     """
     Recibe fecha de inicio y final de periodo y regresa un query
     utilizado para la extracción de la tabla de facturas de venta.
@@ -139,7 +140,8 @@ def build_query(start_date:Date,end_date:Date)->str:
             """
     return query
 
-def get_query(query:str,connection_str:str=conn_str)->pd.DataFrame:    
+def get_query(query:str,
+              connection_str:str=conn_str)->pd.DataFrame:    
     try:
         
         conn = pyodbc.connect(connection_str)
@@ -594,13 +596,25 @@ def load_branches()->pd.DataFrame:
 
     database = connect_to_DB(conn_uri,db_name)
     if database is None:
-        return pd.DataFrame()
+        if os.path.exists('data/backup/branches.parquet'):
+            return pd.read_parquet('data/backup/branches.parquet')
+        else:
+            return pd.DataFrame()
         
     else:
         collection = os.getenv("BRANCHES_COLLECTION")
         docs = get_documents(database,collection)
 
         branches = pd.DataFrame(docs)
+        
+        branches.drop(columns=['correos','_id','logs','__v','connect'],inplace=True)
+        branches = branches.astype(dtype={'nemonico':'str',
+                                          'sucursal':'str',
+                                          'homoclave':'str'})
+        
+        os.makedirs('data/backup',exist_ok=True)
+        branches.to_parquet('data/backup/branches.parquet',index=False)
+        
         return branches
         
 

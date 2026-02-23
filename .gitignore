@@ -7,6 +7,7 @@ gadm41_MEX_shp/
 __pycache__/
 .pytest_cache/
 data
+log
 # Archivos
 .env
 
