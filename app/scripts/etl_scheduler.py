@@ -10,7 +10,7 @@ def run_etl():
 
 MAX_SLEEP = 3600 * 6
 
-schedule.every().day.at("17:15").do(run_etl)
+schedule.every().day.at("13:00").do(run_etl)
 
 while True:
     now = datetime.now()
