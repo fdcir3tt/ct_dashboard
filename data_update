@@ -1,1 +1,0 @@
-0 13 * * * /usr/local/bin/python3 /app/scripts/etl_pipeline.py

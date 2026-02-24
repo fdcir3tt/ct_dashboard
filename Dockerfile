@@ -10,7 +10,6 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Instalar dependencias de sistema
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    cron \
     gnupg2 \
     lsb-release \
     build-essential \
@@ -43,18 +42,12 @@ WORKDIR /app
 
 COPY app/pyproject.toml app/poetry.lock* /app/ 
 COPY app/ /app/ 
-COPY data_update /etc/cron.d/dashboard_data_update
+
 
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi
 
-
-RUN chmod 0644 /etc/cron.d/dashboard_data_update \
-    && crontab /etc/cron.d/dashboard_data_update \
-
+RUN chmod +x /app/start.sh
 
 EXPOSE 8501
-CMD cron && \ 
-    PYTHONPATH=/app python scripts/etl_pipeline.py && \
-    PYTHONPATH=/app streamlit run app.py --server.address=0.0.0.0 --server.port=8501
-
+CMD /app/start.sh

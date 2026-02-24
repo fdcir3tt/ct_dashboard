@@ -102,7 +102,13 @@ def sales_filters(df:pd.DataFrame)->pd.DataFrame:
     df = df[mask]
     return df
 
-def process_data(invoices,product_codes,exchange_rates,branches,products,categories,update:bool=False):
+def process_data(invoices:pd.DataFrame,
+                 product_codes:pd.DataFrame,
+                 exchange_rates:pd.DataFrame,
+                 branches:pd.DataFrame,
+                 products,
+                 categories,
+                 update:bool=False):
     """
     Agarra el dataset limpio y listo para procesar para generar las variables 
     útiles/relevantes en el dashboard. 
