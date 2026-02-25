@@ -8,8 +8,8 @@ from ct_sales_dashboard.data_loader import *
 
 def make_cached(func):
     """Crea versiones cacheadas de funciones"""
-    @wraps(func)
     @st.cache_data(ttl=3600*12)
+    @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
     return wrapper
@@ -577,11 +577,6 @@ def right_section(data:pd.DataFrame,
                                include_outliers=include_outliers,
                                branch=branch,
                                analysis_lvl=analysis_lvl)                
-
-
-
-
-
 
 
 
