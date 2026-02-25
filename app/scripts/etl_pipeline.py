@@ -3,9 +3,9 @@ import subprocess,warnings
 
 warnings.filterwarnings('ignore')
 
+from pathlib import Path
 from ct_sales_dashboard.data_loader import *
 from ct_sales_dashboard.preprocess import *
-
 
 
 def main():
@@ -15,7 +15,7 @@ def main():
 # -----------------------------------------------------------
     print("Revisando actualizaciones ...")
 
-    if ( not os.path.exists("data/raw/gadm41_MEX_shp") ):
+    if ( not os.path.exists(DATA_PATH/'raw'/'gadm41_MEX_shp') ):
         print(" ="*25)
         print("||   Comenzando extracción de archivos geográficos   ||")
         print(" ="*25)

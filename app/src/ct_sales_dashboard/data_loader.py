@@ -48,7 +48,7 @@ INVOICES_TABLE_SCHEMA ='dbo'
 INVOICES_COLUMNS=os.getenv("INVOICES_DATA_COLUMNS")
 
 ## Columnas producto
-PRODUCT_TABLE_NAME = os.getenv("ART_TABLE_NAME")
+PRODUCT_TABLE_NAME = os.getenv("PRODUCT_TABLE_NAME")
 PRODUCT_COLUMNS= os.getenv("PRODUCT_COLUMNS")
 
 # ===========================================================
@@ -104,6 +104,7 @@ def get_mysql_connection():
 # ===========================================================
 #                           QUERIES
 # ===========================================================
+
 def build_query(start_date:Date,
                 end_date:Date)->str:
     """
@@ -250,7 +251,8 @@ def get_last_processed_offset(offset_file: str) -> int:
         return last_offset
     return 0
 
-def save_last_processed_offset(offset_file: str, offset: int):
+def save_last_processed_offset(offset_file: str,
+                               offset: int):
     """
     Save the last processed offset to a JSON file.
     """
@@ -265,7 +267,7 @@ def fetch_and_write_chunk(query:str,
                           chunk_size:int,
                           connection_str:str,
                           order_column:str, 
-                          temp_dir:str,**kwargs)->int:
+                          temp_dir:Path,**kwargs)->int:
     
     conn = pyodbc.connect(connection_str)
 
@@ -277,18 +279,21 @@ def fetch_and_write_chunk(query:str,
     conn.close()
 
     if not df.empty:
-        temp_file = os.path.join(temp_dir, f'chunk_{chunk_index}.parquet')
-        df.to_parquet(temp_file, index=False,engine="pyarrow")
+        temp_file = temp_dir/ f'chunk_{chunk_index}.parquet'
+        save_file_safe(data=df,file_path=temp_file)
+        
     return chunk_index
 
 def extract_table_parallel(query:str,
-                           output_file: str,connection_str: str,
+                           output_file: Path,
+                           connection_str: str,
                            chunk_percent: float = 10,
                            table_name: str = INVOICES_TABLE,
                            schema: str = INVOICES_TABLE_SCHEMA,
                            order_column: str = INVOICES_COLUMNS.split(',')[3],
                            offset_file: str = 'last_offset.json',
-                           max_workers: int = 4,temp_dir:str='/tmp'):
+                           max_workers: int = 4,
+                           temp_dir:Path=Path('/tmp')):
     try:
         print("Conectando para obtener número de filas...")
         n_rows = int(get_query(
@@ -310,7 +315,7 @@ def extract_table_parallel(query:str,
 
         for i in range(total_chunks):
             chunk_offset = i * chunk_size + offset
-            chunk_file = os.path.join(temp_dir, f'chunk_{i}.parquet')
+            chunk_file = temp_dir/f'chunk_{i}.parquet' 
             if not os.path.exists(chunk_file):
                 remaining_chunks.append((i, chunk_offset))
             else:
@@ -359,7 +364,8 @@ def extract_table_parallel(query:str,
 
 
         for fname in chunk_files:
-            table = pq.read_table(os.path.join(temp_dir, fname))
+            table_path = temp_dir/fname
+            table = pq.read_table(table_path)
             if writer is None:
                 writer = pq.ParquetWriter(output_file, table.schema)
             else:
@@ -423,12 +429,22 @@ def get_usd_to_mxn(logger)->float:
         )
         return None
 
-# -----------------------------------------------------------
-# ACTUALIZACIÓN
-# -----------------------------------------------------------
+# ===========================================================
+#                      ACTUALIZACIÓN
+# ===========================================================
 
+def save_file_safe(data: pd.DataFrame, file_path: Path) -> None:
+    
+    file_path.parent.mkdir(parents=True, exist_ok=True)
 
-def update_table(table:str,latest_update:str,save_dir:str="data"):
+    tmp_path = file_path.with_suffix(file_path.suffix + ".tmp")
+    data.to_parquet(tmp_path, engine='pyarrow',index=False)
+
+    os.replace(tmp_path, file_path)
+
+def update_table(table:str,
+                 latest_update:Date,
+                 save_dir:Path=DATA_PATH):
     """ 
     Se especifica cual de las tablas de datos ocupa actualizarse y el último periodo
     que tiene registrado para no generar una consulta grande.
@@ -446,23 +462,26 @@ def update_table(table:str,latest_update:str,save_dir:str="data"):
     query = build_query (start_date=latest_update,end_date=TODAY)
 
     extract_table_parallel(query=query,
-                           output_file=f"{save_dir}/{table}_update.parquet",
+                           output_file=save_dir/f"{table}_update.parquet",
                            connection_str=conn_str)
     
-    update_df = pd.read_parquet(f"{save_dir}/{table}_update.parquet",dtype_backend="pyarrow")
+    update_df = pd.read_parquet(save_dir/f"{table}_update.parquet",dtype_backend="pyarrow")
     update_df = format_columns(update_df) 
 
-    outdated_df = pd.read_parquet(f"{save_dir}/{table}.parquet",dtype_backend="pyarrow")
+    outdated_df = pd.read_parquet(save_dir/f"{table}.parquet",dtype_backend="pyarrow")
     outdated_df = format_columns(outdated_df)
 
     df = pd.concat([outdated_df, update_df], ignore_index=True)
     df = df.drop_duplicates(subset=["productId","folio","date"])
-    os.makedirs(save_dir,exist_ok=True)
-    df.to_parquet(f"{save_dir}/{table}.parquet",engine="pyarrow",index=False)
+    
+    file_path=save_dir/f"{table}.parquet"
+    save_file_safe(data=df,file_path=file_path)
 
-    os.remove(f"{save_dir}/{table}_update.parquet")
+    os.remove(save_dir/f"{table}_update.parquet")
 
-def update_exchange_rates(logger,rates_dataframe:pd.DataFrame,rate:float=None)->pd.DataFrame:
+def update_exchange_rates(logger,
+                          rates_dataframe:pd.DataFrame,
+                          rate:float=None)->pd.DataFrame:
     if rate is None:
         rate = get_usd_to_mxn(logger=logger)
     new_rate =pd.DataFrame(
@@ -483,9 +502,10 @@ def update_exchange_rates(logger,rates_dataframe:pd.DataFrame,rate:float=None)->
 # ===========================================================
 
 def load_product_codes():
-    desc_data_file_exists = os.path.exists(DATA_PATH / 'raw' / 'codigos_productos.parquet')
+    file_path = DATA_PATH / 'raw' / 'codigos_productos.parquet'
+    desc_data_file_exists = os.path.exists(file_path)
     if desc_data_file_exists:
-        df = pd.read_parquet(DATA_PATH / 'raw' / 'codigos_productos.parquet')
+        df = pd.read_parquet(file_path)
     else:
         query = f""" 
                     SELECT {PRODUCT_COLUMNS}
@@ -508,13 +528,15 @@ def load_product_codes():
         df["sell_coin"] = df["sell_coin"].astype("int8[pyarrow]")
 
         df = df.astype({'productId':'string'}) 
-        os.makedirs(DATA_PATH/'raw',exist_ok=True)
-        df.to_parquet(DATA_PATH/'raw'/'codigos_productos.parquet',index=False)
+
+        save_file_safe(data=df,file_path=file_path)
+        
 
     return df
 
 def load_categories():
     file_path = DATA_PATH/'raw'/'categorias.parquet'
+    
     categories_exist = os.path.exists(file_path)
     if categories_exist:
         df = pd.read_parquet(file_path)
@@ -530,7 +552,8 @@ def load_categories():
         conn_mysql.close()
 
         df = pd.DataFrame(rows_category)
-        df.to_parquet(file_path)
+        save_file_safe(data=df,file_path=file_path)
+        
     return df
 
 def load_products():
@@ -550,7 +573,7 @@ def load_products():
         conn_mysql.close()
 
         df = pd.DataFrame(rows_products)
-        df.to_parquet(file_path) 
+        save_file_safe(data=df,file_path=file_path)
     return df 
 
 def load_invoices(start_date:Date= Date(TODAY.year,TODAY.month,1),
@@ -574,9 +597,7 @@ def load_invoices(start_date:Date= Date(TODAY.year,TODAY.month,1),
         
         current_df = pd.read_parquet(source_file_path)
         current_df = format_columns(current_df)
-        current_df.to_parquet(source_file_path,
-                              engine="pyarrow",
-                              index=False)
+        save_file_safe(data=current_df,file_path=source_file_path)
 
     latest_period = current_df['date'].max().date()
     not_updated = latest_period < end_date
@@ -641,13 +662,11 @@ def load_branches()->pd.DataFrame:
                                           'sucursal':'str',
                                           'homoclave':'str'})
         
-        os.makedirs(DATA_PATH/'backup',exist_ok=True)
-        branches.to_parquet(backup_file_path,index=False)
+        save_file_safe(data=branches,file_path=backup_file_path)
+        
         
         return branches
         
-
-
 
 def load_storage()->dict:
     branches = load_branches()

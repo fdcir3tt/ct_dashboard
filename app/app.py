@@ -6,11 +6,10 @@ from ct_sales_dashboard.graphs import *
 from ct_sales_dashboard.data_loader import *
 
 
-
 def make_cached(func):
     """Crea versiones cacheadas de funciones"""
-    @st.cache_data
     @wraps(func)
+    @st.cache_data(ttl=3600*12)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
     return wrapper

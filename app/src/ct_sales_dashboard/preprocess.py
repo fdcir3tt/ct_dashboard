@@ -3,13 +3,14 @@ import pandas as pd
 import json
 import datetime
 import numpy as np
-
+from pathlib import Path
 
 
 
 Date = datetime.datetime
 Document =  dict[str, any]
 Documents = list[Document]
+DATA_PATH = Path('data')
 
 
 def time_period(start_date: datetime.datetime,end_date: datetime.datetime = datetime.datetime.today()) -> list:
@@ -67,7 +68,7 @@ def process_exchange_rates(data:pd.DataFrame):
     df = data.copy()
     
     # Imputación 
-    rates = pd.read_parquet('data/raw/usd_mxn_rates.parquet')
+    rates = pd.read_parquet(DATA_PATH/'raw'/'usd_mxn_rates.parquet')
     rates.index = rates.index.date.astype('datetime64[ns]')
     rates.index.name = 'date'
     period = pd.DataFrame(data=time_period(start_date=datetime.datetime(2020,1,1) ),columns=["date"])
@@ -78,8 +79,9 @@ def process_exchange_rates(data:pd.DataFrame):
 
     processed_rates = fill_exchange_rates(rates_dataframe=merged)
     processed_rates = processed_rates.set_index("date") 
-    os.makedirs("data/processed",exist_ok=True)
-    processed_rates.to_parquet("data/processed/conversion_usd_mxn.parquet")
+    os.makedirs(DATA_PATH/'processed',exist_ok=True)
+    processed_rates.to_parquet(DATA_PATH/'processed'/'conversion_usd_mxn_tmp.parquet')
+    os.replace(DATA_PATH/'processed'/'conversion_usd_mxn_tmp.parquet',DATA_PATH/'processed'/'conversion_usd_mxn.parquet')
 
    
 def normalize_coins(df:pd.DataFrame)->pd.DataFrame:
@@ -114,22 +116,26 @@ def process_data(invoices:pd.DataFrame,
     útiles/relevantes en el dashboard. 
 
     """
-    
-    data_exists= os.path.exists("data/processed/facturas_ventas.parquet")
+    file_path = DATA_PATH/'processed'/'facturas_ventas.parquet'
+    data_exists= os.path.exists(file_path)
     if (data_exists)&(not update):
-        df=pd.read_parquet("data/processed/facturas_ventas.parquet")
+        df=pd.read_parquet(file_path)
         return df
     else:
-        df = invoices.merge(product_codes,how="inner",on="productId")
-        df = df.merge(exchange_rates,how="inner",on="date")
+        df = invoices.merge(product_codes,
+                            how="inner",on="productId")
+        df = df.merge(exchange_rates,
+                      how="inner",on="date")
         
         df = normalize_coins(df)
         df = sales_filters(df)
 
         df['branchId']= df['folio'].str.extract( r'(?P<branchId>[A-Za-z]+)' )
-        df = df.merge(branches[["nemonico","sucursal","homoclave"]],how="inner",left_on="branchId",right_on="homoclave")
+        df = df.merge(branches[["nemonico","sucursal","homoclave"]],
+                      how="inner",left_on="branchId",right_on="homoclave")
     
-        products = products.merge(categories,how="left",on="idCategoria")
+        products = products.merge(categories,
+                                  how="left",on="idCategoria")
         products = products [["clave","nombre"]]
 
         # Columna de estados
@@ -139,11 +145,12 @@ def process_data(invoices:pd.DataFrame,
         df["state"] = df["sucursal"].map(states_dict).fillna("UNKNOWN")
 
         # Categorías
-        df = df.merge(products,how="left",left_on="productId",right_on="clave")
+        df = df.merge(products,
+                      how="left",left_on="productId",right_on="clave")
         df = df.rename(columns={"nombre":"category"})
 
-        os.makedirs("data/processed",exist_ok=True)
+        os.makedirs(DATA_PATH/'processed',exist_ok=True)
         df = df.drop_duplicates(subset=['folio','productId','date','clientId'])
-        df.to_parquet('data/processed/facturas_ventas.parquet',index=False)
-
+        df.to_parquet(DATA_PATH/'processed'/'facturas_ventas_tmp.parquet',index=False)
+        os.replace(DATA_PATH/'processed'/'facturas_ventas_tmp.parquet', file_path)
     
