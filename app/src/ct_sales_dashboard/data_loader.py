@@ -11,6 +11,7 @@ import datetime
 import requests
 import time
 
+from pathlib import Path
 from dotenv import load_dotenv
 from pymongo import MongoClient 
 from pymongo.database import Database
@@ -19,74 +20,65 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
 warnings.filterwarnings('ignore')
-# -----------------------------------------------------------
-# SETUP 
-# -----------------------------------------------------------
 
-BATCH_SIZE = 500
-HISTORIC_CONN = os.getenv("HIST_MONGO_URI")
-HIST_NAME= os.getenv("HIST_MONGO_DB")
-API_CONN = os.getenv("API_MONGO_URI")
-API_NAME = os.getenv("API_MONGO_DB")
-EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY")
+# ===========================================================
+#                           CONFIG
+# ===========================================================
 
-Date = datetime.datetime
+Date = datetime.date
 Document =  dict[str, any]
 Documents = list[Document]
 
-## Columnas Factura
+DATA_PATH= Path('data')
+TODAY= Date.today()
+BATCH_SIZE = 500 # número de documentos colectados por batch
+EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY")
 
-table_name=os.getenv("SALES_TABLE_NAME")
-date_col=os.getenv("SALES_DATE_COLUMN")
-schema=os.getenv("DB_SCHEMA")
-data_columns=os.getenv("SALES_DATA_COLUMNS")
-sales_art_col=os.getenv("SALES_ARTICLE_COLUMN")
-price_col=os.getenv("SALES_PRICE")
+# Tabla de existencias historicas
+HISTORIC_CONN = os.getenv("HIST_MONGO_URI")
+HIST_NAME= os.getenv("HIST_MONGO_DB")
+
+# Tabla de existencias
+API_CONN = os.getenv("API_MONGO_URI")
+API_NAME = os.getenv("API_MONGO_DB")
+
+## Columnas Factura
+INVOICES_TABLE=os.getenv("INVOICES_TABLE_NAME")
+INVOICES_TABLE_SCHEMA ='dbo' 
+INVOICES_COLUMNS=os.getenv("INVOICES_DATA_COLUMNS")
 
 ## Columnas producto
+PRODUCT_TABLE_NAME = os.getenv("ART_TABLE_NAME")
+PRODUCT_COLUMNS= os.getenv("PRODUCT_COLUMNS")
 
-table = os.getenv("ART_TABLE_NAME")
-art_col = os.getenv("ARTICLE_COLUMN")
-art_desc = os.getenv("ARTICLE_DESCRIPTION")
-art_cost = os.getenv("ARTICLE_COST")
-art_cost_coin = os.getenv("ARTICLE_COST_COIN")
-art_price_coin = os.getenv("ARTICLE_PRICE_COIN")
+# ===========================================================
+#                           CONEXIÓN
+# ===========================================================
 
-
-today = datetime.date.today()
-yesterday = today - datetime.timedelta(days=1)
-start_date = datetime.date(today.year, today.month, 1)
-end_date = today
-
-
-# -----------------------------------------------------------
-# CONEXIÓN
-# -----------------------------------------------------------
-driver=os.getenv("DWH_DRIVER")
-ip=os.getenv("DWH_IP")
-uid=os.getenv("DWH_UID")
-pwd=os.getenv("DWH_PASSWORD")
+DATA_WAREHOUSE_DRIVER=os.getenv("DATA_WAREHOUSE_DRIVER")
+DATA_WAREHOUSE_DB_NAME=os.getenv("DATA_WAREHOUSE_DB_NAME")
+DATA_WAREHOUSE_IP=os.getenv("DATA_WAREHOUSE_IP")
+DATA_WAREHOUSE_USER_ID=os.getenv("DATA_WAREHOUSE_USER_ID")
+DATA_WAREHOUSE_USER_PWD=os.getenv("DATA_WAREHOUSE_USER_PWD")
 
 conn_str = (
-    f'DRIVER={{{driver}}};'
-    f'SERVER={ ip };'  # SQL server Ip
-    'DATABASE=DWH;'  # Nombre de base
-    f'UID={uid};'  # User id
-    f'PWD={pwd}'   # Password
+    f'DRIVER={{{DATA_WAREHOUSE_DRIVER}}};'
+    f'SERVER={ DATA_WAREHOUSE_IP };'  
+    f'DATABASE={DATA_WAREHOUSE_DB_NAME};'  
+    f'UID={DATA_WAREHOUSE_USER_ID};'  
+    f'PWD={DATA_WAREHOUSE_USER_PWD}'   
 )
 
+PRODUCT_CATEGORY_TABLE_NAME=os.getenv('PRODUCT_CATEGORY_TABLE_NAME')
+PRODUCT_CATALOGUE_TABLE_NAME=os.getenv('PRODUCT_CATALOGUE_TABLE_NAME')
 
 
-
-category_table=os.getenv('CDB_CATEGORY_TABLE')
-product_table=os.getenv('CDB_PRODUCT_TABLE')
-
-
-def connect_to_DB(conn_uri,db_name)-> Database|None:
+def connect_to_DB(conn_uri:str,
+                  db_name:str)-> Database|None:
     """
-    Docstring for connect_to_DB
+    Docstring 
     
-    :return: Cliente de mongoDB
+    :return: Base de datos de mongoDB
     :rtype: Any
     """
     try:
@@ -106,13 +98,12 @@ def get_mysql_connection():
     host=os.getenv("CDB_IP"),
     user=os.getenv("CDB_UID"),
     password=os.getenv("CDB_PASSWORD"),
-    database=os.getenv('CDB_DATABASE')
+    database=os.getenv('CDB_NAME')
 )
 
-# -----------------------------------------------------------
-# QUERIES
-# -----------------------------------------------------------
-
+# ===========================================================
+#                           QUERIES
+# ===========================================================
 def build_query(start_date:Date,
                 end_date:Date)->str:
     """
@@ -131,11 +122,13 @@ def build_query(start_date:Date,
         print("Periodo invalido detectado, fecha inicio igual a fecha final")
         return None
     
+    invoice_date_col = INVOICES_COLUMNS.split(',')[3]
+    invoice_price_col = INVOICES_COLUMNS.split(',')[4]
     query = f"""
-                SELECT {data_columns}
-                FROM {schema}.{table_name}
-                WHERE {date_col} BETWEEN '{start_date}' AND '{end_date}'
-                AND {price_col} > 0 
+                SELECT {INVOICES_COLUMNS}
+                FROM {INVOICES_TABLE_SCHEMA}.{INVOICES_TABLE}
+                WHERE {invoice_date_col} BETWEEN '{start_date}' AND '{end_date}'
+                AND {invoice_price_col} > 0 
 
             """
     return query
@@ -175,7 +168,9 @@ def get_documents(database:None,
     else:
         collection = db[collection]
         try:
-            cursor = collection.find(filters, projection=projection,batch_size=BATCH_SIZE)
+            cursor = collection.find(filters, 
+                                     projection=projection,
+                                     batch_size=BATCH_SIZE)
             
             result_docs= list(cursor) 
             return result_docs
@@ -191,12 +186,10 @@ def get_product_cost_dict(query_fn=get_query)-> dict :
     :return: Regresa un diccionario donde las llaves son el código del producto (productId) y los valores el costo correspondiente
     :rtype: dict
     """
-    table = os.getenv("ART_TABLE_NAME")
-    art_col = os.getenv("ARTICLE_COLUMN")
-    art_cost = os.getenv("ARTICLE_COST")
-
-    query = f""" SELECT {art_col},{art_cost} 
-                 FROM {table}
+    product_code_col= PRODUCT_COLUMNS.split(',')[2]
+    product_cost_col= PRODUCT_COLUMNS.split(',')[2]
+    query = f""" SELECT {product_code_col},{product_cost_col} 
+                 FROM {PRODUCT_TABLE_NAME}
             """
     df = query_fn(query)
     if df is None or df.empty:
@@ -204,14 +197,14 @@ def get_product_cost_dict(query_fn=get_query)-> dict :
             "No se pudo obtener costos de productos. "
             "Revisa la conexión ODBC y variables de entorno."
         )    
-    #cost_dict = df.set_index(art_col).to_dict(orient="index")
-    return dict(zip(df[art_col], df[art_cost]))
+    
+    return dict(zip(df[product_code_col], df[product_cost_col]))
 
 
 
-# -----------------------------------------------------------
+# ===========================================================
 # TRANSFORMACIONES
-# -----------------------------------------------------------
+# ===========================================================
 
 
 def format_columns(df:pd.DataFrame):
@@ -241,9 +234,9 @@ def format_columns(df:pd.DataFrame):
     return df
 
 
-# -----------------------------------------------------------
-# EXTRACCIÓN
-# -----------------------------------------------------------
+# ===========================================================
+#                       EXTRACCIÓN
+# ===========================================================
 
 
 def get_last_processed_offset(offset_file: str) -> int:
@@ -266,8 +259,13 @@ def save_last_processed_offset(offset_file: str, offset: int):
 
 
 
-def fetch_and_write_chunk(query:str,chunk_index:int, offset:int, chunk_size:int, connection_str:str, order_column:str, 
-temp_dir:str,**kwargs)->int:
+def fetch_and_write_chunk(query:str,
+                          chunk_index:int,
+                          offset:int,
+                          chunk_size:int,
+                          connection_str:str,
+                          order_column:str, 
+                          temp_dir:str,**kwargs)->int:
     
     conn = pyodbc.connect(connection_str)
 
@@ -283,9 +281,14 @@ temp_dir:str,**kwargs)->int:
         df.to_parquet(temp_file, index=False,engine="pyarrow")
     return chunk_index
 
-def extract_table_parallel(query:str,output_file: str,connection_str: str,chunk_percent: float = 10,table_name: str = table_name,schema: str = schema,order_column: str = date_col,offset_file: str = 'last_offset.json',
-max_workers: int = 4,temp_dir:str='/tmp'
-):
+def extract_table_parallel(query:str,
+                           output_file: str,connection_str: str,
+                           chunk_percent: float = 10,
+                           table_name: str = INVOICES_TABLE,
+                           schema: str = INVOICES_TABLE_SCHEMA,
+                           order_column: str = INVOICES_COLUMNS.split(',')[3],
+                           offset_file: str = 'last_offset.json',
+                           max_workers: int = 4,temp_dir:str='/tmp'):
     try:
         print("Conectando para obtener número de filas...")
         n_rows = int(get_query(
@@ -383,7 +386,7 @@ max_workers: int = 4,temp_dir:str='/tmp'
         print(f" Error crítico: {e}")
 
 
-def get_usd_to_mxn(logger,date:datetime.datetime = datetime.datetime.today())->float:
+def get_usd_to_mxn(logger)->float:
     
     url = "https://api.fxratesapi.com/latest"
     params = {
@@ -438,9 +441,9 @@ def update_table(table:str,latest_update:str,save_dir:str="data"):
     save_dir(str,optional):
 
     """
-    if latest_update==today:
+    if latest_update==TODAY:
         return None
-    query = build_query (start_date=latest_update,end_date=today)
+    query = build_query (start_date=latest_update,end_date=TODAY)
 
     extract_table_parallel(query=query,
                            output_file=f"{save_dir}/{table}_update.parquet",
@@ -464,7 +467,7 @@ def update_exchange_rates(logger,rates_dataframe:pd.DataFrame,rate:float=None)->
         rate = get_usd_to_mxn(logger=logger)
     new_rate =pd.DataFrame(
             {"exchange_rate": [rate]   },
-            index=pd.DatetimeIndex( [datetime.datetime.today()], name="date")  )
+            index=pd.DatetimeIndex( [TODAY], name="date")  )
     
     new_rate.index = new_rate.index.astype("datetime64[ns]")
         
@@ -475,95 +478,116 @@ def update_exchange_rates(logger,rates_dataframe:pd.DataFrame,rate:float=None)->
         )
     return updated_rates
 
-# -----------------------------------------------------------
-# CARGA
-# -----------------------------------------------------------
+# ===========================================================
+#                       CARGA
+# ===========================================================
 
 def load_product_codes():
-    desc_data_file_exists = os.path.exists("data/raw/codigos_productos.parquet")
+    desc_data_file_exists = os.path.exists(DATA_PATH / 'raw' / 'codigos_productos.parquet')
     if desc_data_file_exists:
-        df = pd.read_parquet('data/raw/codigos_productos.parquet')
+        df = pd.read_parquet(DATA_PATH / 'raw' / 'codigos_productos.parquet')
     else:
         query = f""" 
-                    SELECT {art_col},{art_desc},{art_cost},{art_cost_coin},{art_price_coin}
-                    FROM {table}
+                    SELECT {PRODUCT_COLUMNS}
+                    FROM {PRODUCT_TABLE_NAME}
         """
+        product_code_col=PRODUCT_COLUMNS.split(',')[0]
+        product_desc_col=PRODUCT_COLUMNS.split(',')[1]
+        product_cost_col=PRODUCT_COLUMNS.split(',')[2]
+        product_cost_coin_col=PRODUCT_COLUMNS.split(',')[3]
+        product_price_coin_col=PRODUCT_COLUMNS.split(',')[4]
 
         df = get_query(query)
-        df = df.rename(columns={art_col:'productId',art_desc:'description',art_cost:'cost',art_cost_coin:'buy_coin',art_price_coin:'sell_coin'})
+        df = df.rename(columns={product_code_col:'productId',
+                                product_desc_col:'description',
+                                product_cost_col:'cost',
+                                product_cost_coin_col:'buy_coin',
+                                product_price_coin_col:'sell_coin'})
+        
         df["buy_coin" ] = df["buy_coin"].astype("int8[pyarrow]")
         df["sell_coin"] = df["sell_coin"].astype("int8[pyarrow]")
+
         df = df.astype({'productId':'string'}) 
-        os.makedirs("data/raw",exist_ok=True)
-        df.to_parquet('data/raw/codigos_productos.parquet',index=False)
+        os.makedirs(DATA_PATH/'raw',exist_ok=True)
+        df.to_parquet(DATA_PATH/'raw'/'codigos_productos.parquet',index=False)
 
     return df
 
 def load_categories():
-    categories_exist = os.path.exists("data/raw/categorias.parquet")
+    file_path = DATA_PATH/'raw'/'categorias.parquet'
+    categories_exist = os.path.exists(file_path)
     if categories_exist:
-        df = pd.read_parquet("data/raw/categorias.parquet")
+        df = pd.read_parquet(file_path)
         
     else:
         conn_mysql = get_mysql_connection()
         cursor = conn_mysql.cursor(dictionary=True)  # devuelve resultados como diccionarios
 
-        cursor.execute(f"SELECT * FROM {category_table};")
+        cursor.execute(f"SELECT * FROM {PRODUCT_CATEGORY_TABLE_NAME};")
         rows_category = cursor.fetchall()
 
         cursor.close()
         conn_mysql.close()
 
         df = pd.DataFrame(rows_category)
-        df.to_parquet("data/raw/categorias.parquet")
+        df.to_parquet(file_path)
     return df
 
 def load_products():
-    products_exist = os.path.exists("data/raw/productos.parquet")
+    file_path = DATA_PATH/'raw'/'productos.parquet'
+    products_exist = os.path.exists(file_path)
     if products_exist:
         
-        df = pd.read_parquet("data/raw/productos.parquet")
+        df = pd.read_parquet(file_path)
         
     else:
         conn_mysql=get_mysql_connection()
         cursor = conn_mysql.cursor(dictionary=True)  # devuelve resultados como diccionarios
-        cursor.execute(f"SELECT * FROM {product_table};")
+        cursor.execute(f"SELECT * FROM {PRODUCT_CATALOGUE_TABLE_NAME};")
         rows_products = cursor.fetchall()
         
         cursor.close()
         conn_mysql.close()
 
         df = pd.DataFrame(rows_products)
-        df.to_parquet("data/raw/productos.parquet") 
+        df.to_parquet(file_path) 
     return df 
 
-def load_invoices(start_date:str=start_date,end_date:str=end_date)->pd.DataFrame:
+def load_invoices(start_date:Date= Date(TODAY.year,TODAY.month,1),
+                  end_date:Date= TODAY)->pd.DataFrame:
     """
     Revisa si esta actualizada la base de facturas con el periodo específicado para no hacer la consulta completa. 
     """
     
-    source_file = "data/raw/facturas.parquet"
-    if os.path.exists("data/raw/facturas.parquet"):
-        current_df = pd.read_parquet("data/raw/facturas.parquet")
+    source_file_path = DATA_PATH/'raw'/'facturas.parquet'
+    if os.path.exists(source_file_path):
+        current_df = pd.read_parquet(source_file_path)
         current_df = format_columns(current_df)
     else:
         current_df = pd.DataFrame()
 
     if current_df.empty:
         query = build_query(start_date,end_date)
-        extract_table_parallel(query= query ,output_file= source_file ,connection_str= conn_str)
-        current_df = pd.read_parquet(source_file)
+        extract_table_parallel(query= query ,
+                               output_file= source_file_path ,
+                               connection_str= conn_str)
+        
+        current_df = pd.read_parquet(source_file_path)
         current_df = format_columns(current_df)
-        current_df.to_parquet(source_file,engine="pyarrow",index=False)
+        current_df.to_parquet(source_file_path,
+                              engine="pyarrow",
+                              index=False)
 
-    latest_period = current_df["date"].max().date()
+    latest_period = current_df['date'].max().date()
     not_updated = latest_period < end_date
     if not_updated:
-        update_table(save_dir="data/raw",table="facturas",latest_update=latest_period)
+        update_table(save_dir=DATA_PATH/'raw',
+                     table='facturas',
+                     latest_update=latest_period)
 
 
     
-    df = pd.read_parquet(source_file)
+    df = pd.read_parquet(source_file_path)
     
     return df
 
@@ -581,7 +605,11 @@ def load_inventory()->pd.DataFrame:
         df = pd.DataFrame(data=docs)
         df["productId"]= df["productoReferencia"].apply( lambda x:x['codigo'])
 
-        df = df.drop(columns=["activo",'_id','productoReferencia']).rename(columns={"fechaRegistro":"date","costo":"cost","almacenes":"existence"})
+        df =( df.drop(columns=["activo",'_id','productoReferencia'])
+                .rename(columns={"fechaRegistro":"date",
+                                 "costo":"cost",
+                                 "almacenes":"existence"}))
+        
         df["date"] = df['date'].dt.strftime('%Y-%m-%d')
         df["date"] = pd.to_datetime(df["date"])
 
@@ -595,9 +623,10 @@ def load_branches()->pd.DataFrame:
     db_name = os.getenv("API_MONGO_DB")
 
     database = connect_to_DB(conn_uri,db_name)
+    backup_file_path= DATA_PATH/'backup'/'branches.parquet'
     if database is None:
-        if os.path.exists('data/backup/branches.parquet'):
-            return pd.read_parquet('data/backup/branches.parquet')
+        if os.path.exists(backup_file_path):
+            return pd.read_parquet(backup_file_path)
         else:
             return pd.DataFrame()
         
@@ -612,8 +641,8 @@ def load_branches()->pd.DataFrame:
                                           'sucursal':'str',
                                           'homoclave':'str'})
         
-        os.makedirs('data/backup',exist_ok=True)
-        branches.to_parquet('data/backup/branches.parquet',index=False)
+        os.makedirs(DATA_PATH/'backup',exist_ok=True)
+        branches.to_parquet(backup_file_path,index=False)
         
         return branches
         
@@ -640,34 +669,44 @@ def load_storage()->dict:
         return {}
     
 def load_raw_exchange_rates()->pd.DataFrame:
-    if os.path.exists("data/raw"):
-        for path in os.listdir("data/raw"):
-            match_group = re.match(pattern="^historical_data_usd_mxn_",string=path)
+    dir_path=DATA_PATH/'raw'
+    if os.path.exists(dir_path):
+        for path in os.listdir(dir_path):
+            match_group = re.match(pattern='^historical_data_usd_mxn_',
+                                   string=path)
             if match_group:
-                file_path = "data/raw"+"/"+path
+                file_path = dir_path/path
                 break
     else:
         return None
     df = pd.read_csv(file_path,sep=";")
     df = df[["Date","Close"]]
-    df = df.rename(columns={"Date":"date","Close":"exchange_rate"})
-    df = df.astype({"date":"datetime64[ns]","exchange_rate":"float"})
-    df = df.set_index("date")
+
+    df = (df.rename(columns={"Date":"date",
+                            "Close":"exchange_rate"})
+
+            .astype({"date":"datetime64[ns]",
+                    "exchange_rate":"float"})
+
+            .set_index("date"))
+    
     return df
 
 def load_exchange_rates():
-    processed = os.path.exists("data/processed/conversion_usd_mxn.parquet")
+    file_path=DATA_PATH/'processed'/'conversion_usd_mxn.parquet'
+    processed = os.path.exists(file_path)
     if processed:
-        df = pd.read_parquet("data/processed/conversion_usd_mxn.parquet")
+        df = pd.read_parquet(file_path)
         return df
     else: 
         return None
 
 
 def load_sales_invoices():
-    processed = os.path.exists("data/processed/facturas_ventas.parquet")
+    file_path=DATA_PATH/'processed'/'facturas_ventas.parquet'
+    processed = os.path.exists(file_path)
     if processed:
-        df = pd.read_parquet("data/processed/facturas_ventas.parquet")
+        df = pd.read_parquet(file_path)
         return df
     else: 
         return None
