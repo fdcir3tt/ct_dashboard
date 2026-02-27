@@ -21,7 +21,7 @@ def load_css(file_name):
 
 
 def load_authenticator():
-    with open("auth.yml") as file:
+    with open("config.yml") as file:
         config = yaml.load(file, Loader=SafeLoader)
 
     authenticator = stauth.Authenticate(

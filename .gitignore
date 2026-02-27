@@ -10,7 +10,7 @@ data
 log
 # Archivos
 .env
-auth.yml
+config.yml
 
 # Excepciones
 !app/data/raw/historical_data_usd_mxn_2008-12-31_to_2026-01-20.csv
