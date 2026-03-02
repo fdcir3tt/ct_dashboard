@@ -417,6 +417,16 @@ def right_section(data:pd.DataFrame,
         total_profit = round( df['income'].sum() - total_cost ,2 )
         return total_sales,total_cost,total_profit
     
+    def inventory_kpis(data:pd.DataFrame)->tuple[int,float,float]:
+        df = data.copy()
+        latest_register=df['date']==df['date'].max()
+        current_stock = df[latest_register]['stock'].iloc[0]
+
+        df['difference'] = df['stock'].diff().fillna(0)
+        positive_supply = df['difference']>0
+        supplied_stock = df[positive_supply]['difference'].sum()
+        return current_stock,supplied_stock
+    
     def kpi_display(data:pd.DataFrame,
                     selected_element:str,
                     element_column:str,
@@ -499,7 +509,46 @@ def right_section(data:pd.DataFrame,
                         ''',
                         unsafe_allow_html=True
                     )
+        if tab=='inventario':
+            current_stock,current_supplied= inventory_kpis(data=filtered_current)
+            prev_stock,prev_supplied = inventory_kpis(data=filtered_prev)
+            
+            stock_rate = growth_rate(current_stock, prev_stock)
+            supply_rate = growth_rate(current_supplied, prev_supplied)
+            
 
+            stock_color = "#0cb91a" if stock_rate >= 0 else "#ef4444" 
+            supply_color = "#0cb91a" if supply_rate >= 0 else "#ef4444" 
+             
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.markdown(
+                        f'''
+                        <div class="kpi-title">
+                            <h3>Unidades existentes</h3>
+                            <h2>{current_stock:,}</h2>
+                            <p style="color: {stock_color}; font-weight: 600;">
+                            {stock_rate:+.1f}%</p>
+                        </div>
+                        ''',
+                        unsafe_allow_html=True
+                    )
+
+            with col2:
+                st.markdown(
+                        f'''
+                        <div class="kpi-title">
+                            <h3>Unidades surtidas</h3>
+                            <h2>${current_supplied:,}</h2>
+                            <p style="color: {supply_color}; font-weight: 600;">
+                            {supply_rate:+.1f}% </p>
+                        </div>
+                        ''',
+                        unsafe_allow_html=True
+                    )
+
+            
     def priority_and_map_plots(global_data:pd.DataFrame|None,
                                inventory:pd.DataFrame|None,
                                main_element:str,
@@ -618,7 +667,24 @@ def right_section(data:pd.DataFrame,
                         period_start=period_start,
                         period_end=period_end)
         
-    
+
+        # KPIs de Sucursal
+        kpi_display(data=data,
+                    selected_element=main_element,
+                    element_column=element_column,
+                    period_start=period_start,
+                    include_outliers=include_outliers,
+                    branch=branch,
+                    tab=tab
+                    )
+        # KPIs Globales
+        kpi_display(data=data,
+                    selected_element=main_element,
+                    element_column=element_column,
+                    period_start=period_start,
+                    include_outliers=include_outliers,
+                    tab=tab
+                    )
         priority_and_map_plots( global_data=None,
                                 inventory=data,
                                 main_element=main_element,
@@ -628,7 +694,8 @@ def right_section(data:pd.DataFrame,
                                 include_outliers=include_outliers,
                                 branch=branch,
                                 analysis_lvl=analysis_lvl,
-                                tab=tab)                
+                                tab=tab)   
+                     
 
 
 
