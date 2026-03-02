@@ -4,6 +4,7 @@ import yaml
 import streamlit_authenticator as stauth
 import streamlit.components.v1 as components
 import datetime
+import json
 from yaml.loader import SafeLoader
 from functools import wraps
 
@@ -20,6 +21,14 @@ month_dict={  1:"Enero",
                   10:"Octubre",
                   11:"Noviembre",
                   12:"Diciembre"}
+
+def add_states_column(data:pd.DataFrame)->pd.DataFrame:
+    df = data.copy()
+    with open("states_dict.json", "r", encoding="utf-8") as f:
+            states_dict = json.load(f)
+
+    df["state"] = df["sucursal"].map(states_dict).fillna("UNKNOWN")
+    return df
 
 def top_n(data:pd.DataFrame,
           element_column,

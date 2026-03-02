@@ -497,50 +497,71 @@ def right_section(data:pd.DataFrame,
                     unsafe_allow_html=True
                 )
 
-    def priority_and_map_plots(global_data:pd.DataFrame,
+    def priority_and_map_plots(global_data:pd.DataFrame|None,
+                               inventory:pd.DataFrame|None,
                                main_element:str,
                                element_column:str,
                                period_start,
                                period_end,
                                include_outliers:bool,
                                branch:str,
-                               analysis_lvl:str):  
-              
-        product_priorities = abc_bar_chart(data=global_data,
-                                                branch=branch,
-                                                include_outliers=include_outliers,
-                                                start_date=period_start,
-                                                end_date=period_end,
-                                                type="productos")
+                               analysis_lvl:str,
+                               tab:str):  
+        if tab=='ventas':
+            product_priorities = abc_bar_chart(data=global_data,
+                                                    branch=branch,
+                                                    include_outliers=include_outliers,
+                                                    start_date=period_start,
+                                                    end_date=period_end,
+                                                    type="productos")
 
-        category_priorities = abc_bar_chart(data=global_data,
-                                                branch=branch,
-                                                include_outliers=include_outliers,
-                                                start_date=period_start,
-                                                end_date=period_end,
-                                                type="categorias")
+            category_priorities = abc_bar_chart(data=global_data,
+                                                    branch=branch,
+                                                    include_outliers=include_outliers,
+                                                    start_date=period_start,
+                                                    end_date=period_end,
+                                                    type="categorias")
 
+            col1, col2 = st.columns(2)
+            with col1:
+                    st.markdown(f"**Mapa de calor de {tab} (México)**")
+                    merged = cached_functions['prepare_sales_heatmap_data'](
+                                                            data=global_data,
+                                                            main_element=main_element,
+                                                            element_column=element_column,
+                                                            start_date=period_start,
+                                                            end_date=period_end,
+                                                            include_outliers = include_outliers,
+                                                            tab= tab
+                                                        )
+
+                    map_obj, selected_state = render_sales_heat_map(merged=merged, 
+                                                                    main_element=main_element,
+                                                                    tab=tab,
+                                                                    map_key=f"{tab} Mapa")
             
-        col1, col2 = st.columns(2)
-        with col1:
-                st.markdown("**Mapa de calor de ventas (México)**")
-                merged = cached_functions['prepare_sales_heatmap_data'](
-                                                        data=global_data,
-                                                        main_element=main_element,
-                                                        element_column=element_column,
-                                                        start_date=period_start,
-                                                        end_date=period_end,
-                                                        include_outliers = include_outliers,
-                                                    )
+            with col2:
+                if analysis_lvl=="Productos":
+                    st.pyplot(product_priorities)
+                if analysis_lvl=="Categorías":
+                    st.pyplot(category_priorities)
 
-                map_obj, selected_state = render_sales_heat_map(merged, 
-                                                                    main_element,
-                                                                    map_key="Ventas Mapa")
-        with col2:
-            if analysis_lvl=="Productos":
-                st.pyplot(product_priorities)
-            if analysis_lvl=="Categorías":
-                st.pyplot(category_priorities)
+        if tab=='inventario':
+            st.markdown(f"**Mapa de calor de {tab} (México)**")
+            merged = cached_functions['prepare_sales_heatmap_data'](
+                                                            data=inventory,
+                                                            main_element=main_element,
+                                                            element_column=element_column,
+                                                            start_date=period_start,
+                                                            end_date=period_end,
+                                                            include_outliers = include_outliers,
+                                                            tab= tab
+                                                        )
+
+            map_obj, selected_state = render_sales_heat_map(merged=merged, 
+                                                            main_element=main_element,
+                                                            tab=tab,
+                                                            map_key=f"{tab} Mapa")
 
     if tab=='ventas':
         sales_plots(data,
@@ -550,6 +571,38 @@ def right_section(data:pd.DataFrame,
                     include_outliers,
                     period_start,period_end
                     )
+        histogram_plots(data=data,
+                    element_column=element_column,
+                    branch=branch,
+                    include_outliers=include_outliers,
+                    period_start=period_start,
+                    period_end=period_end
+                    )
+        # KPIs de Sucursal
+        kpi_display(data=data,
+                    selected_element=main_element,
+                    element_column=element_column,
+                    period_start=period_start,
+                    include_outliers=include_outliers,
+                    branch=branch
+                    )
+        # KPIs Globales
+        kpi_display(data=global_data,
+                    selected_element=main_element,
+                    element_column=element_column,
+                    period_start=period_start,
+                    include_outliers=include_outliers,
+                    )
+        priority_and_map_plots(global_data=global_data,
+                                inventory=None,
+                                main_element=main_element,
+                                element_column=element_column,
+                                period_start=period_start,
+                                period_end=period_end,
+                                include_outliers=include_outliers,
+                                branch=branch,
+                                analysis_lvl=analysis_lvl,
+                                tab=tab) 
 
     if tab=='inventario':
         inventory_plots(inventory=data,
@@ -559,39 +612,18 @@ def right_section(data:pd.DataFrame,
                         branch=branch,
                         period_start=period_start,
                         period_end=period_end)
-        return None
-    histogram_plots(data=data,
-                    element_column=element_column,
-                    branch=branch,
-                    include_outliers=include_outliers,
-                    period_start=period_start,
-                    period_end=period_end
-                    )
+        
     
-    # KPIs de Sucursal
-    kpi_display(data=data,
-                selected_element=main_element,
-                element_column=element_column,
-                period_start=period_start,
-                include_outliers=include_outliers,
-                branch=branch
-                )
-    # KPIs Globales
-    kpi_display(data=global_data,
-                selected_element=main_element,
-                element_column=element_column,
-                period_start=period_start,
-                include_outliers=include_outliers,
-                ) 
-                
-    priority_and_map_plots(global_data=global_data,
-                               main_element=main_element,
-                               element_column=element_column,
-                               period_start=period_start,
-                               period_end=period_end,
-                               include_outliers=include_outliers,
-                               branch=branch,
-                               analysis_lvl=analysis_lvl)                
+        priority_and_map_plots( global_data=None,
+                                inventory=data,
+                                main_element=main_element,
+                                element_column=element_column,
+                                period_start=period_start,
+                                period_end=period_end,
+                                include_outliers=include_outliers,
+                                branch=branch,
+                                analysis_lvl=analysis_lvl,
+                                tab=tab)                
 
 
 

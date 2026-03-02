@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 from pymongo import MongoClient 
 from pymongo.database import Database
 from pymongo.errors import PyMongoError
+from ct_sales_dashboard.utils import add_states_column,time_period
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
@@ -613,33 +614,6 @@ def load_invoices(start_date:Date= Date(TODAY.year,TODAY.month,1),
     return df
 
 
-def load_inventory()->pd.DataFrame:
-
-    conn_uri = os.getenv("HIST_MONGO_URI")
-    db_name = os.getenv("HIST_MONGO_DB")
-
-    database = connect_to_DB(conn_uri,db_name)
-    if database is not None:
-        hist_collection = os.getenv("EXISTENCE_HIST_COLLECTION")
-        docs = get_documents(database,hist_collection)
-
-        df = pd.DataFrame(data=docs)
-        df["productId"]= df["productoReferencia"].apply( lambda x:x['codigo'])
-
-        df =( df.drop(columns=["activo",'_id','productoReferencia'])
-                .rename(columns={"fechaRegistro":"date",
-                                 "costo":"cost",
-                                 "almacenes":"existence"}))
-        
-        df["date"] = df['date'].dt.strftime('%Y-%m-%d')
-        df["date"] = pd.to_datetime(df["date"])
-        df['storage_id'] = df['existence']
-        df = df.explode('storage_id')
-        df['stock']=df.apply( lambda row: row['existence'].get(row['storage_id'], 0), axis=1 )
-        df.drop(columns='existence',inplace=True)
-        return df
-    else:
-        return pd.DataFrame()
 
 
 def load_branches()->pd.DataFrame:
@@ -689,7 +663,58 @@ def load_storage()->dict:
         return branch_storage
     else:
         return {}
-    
+
+
+def load_inventory()->pd.DataFrame:
+
+    conn_uri = os.getenv("HIST_MONGO_URI")
+    db_name = os.getenv("HIST_MONGO_DB")
+
+    database = connect_to_DB(conn_uri,db_name)
+    if database is not None:
+        hist_collection = os.getenv("EXISTENCE_HIST_COLLECTION")
+        docs = get_documents(database,hist_collection)
+
+        df = pd.DataFrame(data=docs)
+        df["productId"]= df["productoReferencia"].apply( lambda x:x['codigo'])
+
+        df =( df.drop(columns=["activo",'_id','productoReferencia'])
+                .rename(columns={"fechaRegistro":"date",
+                                 "costo":"cost",
+                                 "almacenes":"existence"}))
+        
+        df["date"] = df['date'].dt.strftime('%Y-%m-%d')
+        df["date"] = pd.to_datetime(df["date"])
+        df['storage_id'] = df['existence']
+        df = df.explode('storage_id')
+        df['stock']=df.apply( lambda row: row['existence'].get(row['storage_id'], 0), axis=1 )
+        df.drop(columns='existence',inplace=True)
+
+        start_date = df['date'].min()
+        end_date = df['date'].max()
+       
+        storages = load_storage()
+        period = pd.DataFrame(data=time_period(start_date=start_date,end_date=end_date ),
+                          columns=["date"])
+        period = period.assign(key=1)
+        storages_df = pd.DataFrame({'storage_id': storages})
+        storages_df['key'] = 1
+        period = period.merge(storages_df, on='key').drop('key', axis=1)    
+        period = period.explode('storage_id')
+        df = period.merge(right=df,how='left',on=['date','storage_id'])
+        df['stock'] = df['stock'].fillna(value=0)
+
+
+        branches = load_branches()
+        df = df.merge(right=branches[['nemonico','sucursal']],left_on='storage_id',right_on='nemonico')
+        df = df.drop(columns=['nemonico','cost'])
+
+        df = add_states_column(data=df)
+        df['productId'] = df['productId'].dropna()
+        return df
+    else:
+        return pd.DataFrame()
+
 def load_raw_exchange_rates()->pd.DataFrame:
     dir_path=DATA_PATH/'raw'
     if os.path.exists(dir_path):

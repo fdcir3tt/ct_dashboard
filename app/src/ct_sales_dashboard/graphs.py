@@ -8,7 +8,7 @@ import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
 
 
-from ct_sales_dashboard.utils import time_period,month_dict
+from ct_sales_dashboard.utils import time_period,month_dict,add_states_column
 from streamlit_folium import st_folium
 from matplotlib.ticker import MaxNLocator
 from matplotlib.figure import Figure
@@ -211,6 +211,11 @@ def period_inventory(data: pd.DataFrame,
         ax.axis("off")
         return (fig, df) if val else fig
     
+    df["month"] = df["date"].dt.month
+    df["year"] = df["date"].dt.year
+    month = month_dict[ df["month"].iloc[0] ]
+    year = df["year"].iloc[0]
+    
     if branch:
         storages = branch_storage[branch]
         mask &= df['storage_id'].isin(storages)
@@ -222,25 +227,9 @@ def period_inventory(data: pd.DataFrame,
         mask &= df['storage_id'].isin(storages)
 
     df = df[mask] 
-
-    period = pd.DataFrame(data=time_period(start_date=start_date,end_date=end_date ),
-                          columns=["date"])
-    period = period.assign(key=1)
-    storages_df = pd.DataFrame({'storage_id': storages})
-    storages_df['key'] = 1
-    period = period.merge(storages_df, on='key').drop('key', axis=1)
-    
-    period = period.explode('storage_id')
-
-    df = period.merge(right=df,how='left',on=['date','storage_id'])
-    df['stock'] = df['stock'].fillna(value=0)
     df['total_stock']= df.groupby(['date','productId'])['stock'].transform('sum')
     
 
-    df["month"] = df["date"].dt.month
-    df["year"] = df["date"].dt.year
-    month = month_dict[ df["month"].iloc[0] ]
-    year = df["year"].iloc[0]
     
     
     # Líneas interpoladas
@@ -303,129 +292,6 @@ def period_inventory(data: pd.DataFrame,
     plt.grid(False)
     plt.legend()
     plt.tight_layout()
-    
-    return (fig, plot_df) if val else fig
-
-def sales_velocity(data:pd.DataFrame,
-                   selected_elements:list,
-                   element_column: str,
-                   branch:str,
-                   start_date,end_date,
-                   outliers:bool=None,
-                   val:bool=False,**kwargs):
-    
-    if data.empty:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return (fig, data) if val else fig
-
-    if "date" not in data or element_column not in data:
-        
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return (fig, data) if val else fig
-    
-    df = data.copy()
-
-    df['sales_velocity'] = (
-    df['sales_day']
-        .rolling(window=2)
-        .mean()
-        .interpolate(method="linear", limit_direction="both")
-)
-
-    df['date'] = pd.to_datetime(df['date'], errors='coerce')
-
-    
-    start_date = pd.to_datetime(start_date)
-    end_date   = pd.to_datetime(end_date)
-
-
-    in_period = ( start_date <= df['date'] ) & ( df['date'] <= end_date )
-    # Filtro por productos o categorías
-    in_selected = data[element_column].isin(selected_elements)
-
-    # Filtro por sucursal 
-    in_branch = df["sucursal"]==branch
-    
-    
-    mask = in_period & in_selected & in_branch
-    if outliers:
-        mask &= df["is_outlier"] == outliers
-    df = df[mask]
-    
-
-    if df.empty:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return (fig, df) if val else fig
-    
-    month = month_dict[ df["month"].iloc[0] ]
-    year = df["year"].iloc[0]
-    
-    
-    # Líneas interpoladas
-    
-        
-    fig, ax = plt.subplots(figsize=(12, 6))
-    plt.style.use("seaborn-v0_8")
-    
-    colors = ["#e63947","#39e6c9","#0400ff","#e43d0a"]
-    no_data_color = "#ee08db"
-    i = 0
-    for id in selected_elements:
-        is_element = df[element_column]==id
-        plot_df = df[is_element]
-        if plot_df.empty:
-            ax.plot(plot_df["date"], plot_df["sales_velocity"], label= id+" (no hay datos)",
-                marker="o", color=no_data_color)
-            continue
-        ax.plot(plot_df["date"], plot_df["sales_velocity"], label= id,
-                marker="o", color=colors[i])
-        
-    # === Recta de tendencia === #
-        # Convertir fechas a valores numéricos (ordinales)
-        
-        x = mdates.date2num(plot_df["date"])
-        y = plot_df["sales_velocity"]
-
-        # Ajuste lineal
-        coeffs = np.polyfit(x, y, 1)  # pendiente y ordenada
-        trend_fn = np.poly1d(coeffs)
-
-        # Recta suavizada para graficar
-        x_smooth = np.linspace(x.min(), x.max(), 200)
-        y_smooth = trend_fn(x_smooth)
-
-        # Graficar recta de tendencia
-        ax.plot(mdates.num2date(x_smooth), y_smooth,
-                color=colors[i], linewidth=2, linestyle="--",
-                label="Tendencia")
-        i+=1
-
-
-
-
-
-    # Título y etiquetas
-    ax.set_title("Rápidez de Ventas (ventas/día)", fontsize=16, fontweight="bold")
-    ax.set_xlabel("Fecha")
-    ax.set_ylabel("Rápidez (cantidad/día)")
-    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-
-   
-    # Eje X limpio
-    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-    fig.autofmt_xdate(rotation=45, ha="right")  
-
-    
-    ax.grid(False)
-    ax.legend()
-    fig.tight_layout()
     
     return (fig, plot_df) if val else fig
 
@@ -494,6 +360,7 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,
                                main_element: str,
                                element_column: str,
                                start_date,end_date,
+                               tab:str,
                                include_outliers:bool=None,
                                val:bool=False,**kwargs)->pd.DataFrame:
     
@@ -516,21 +383,36 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,
 
     if df_filtered.empty:
         return None
-
-    total_sales_per_state = (
-        df_filtered.groupby("state")["quantity"]
-        .sum()
-        .reset_index()
-    )
-
+    
     mexico = load_mexico_shp()
-    merged = mexico.merge(total_sales_per_state, on="state", how="left")
-    merged["quantity"] = merged["quantity"].fillna(0)
+    if tab=='ventas':
+
+        total_sales_per_state = (
+            df_filtered.groupby("state")["quantity"]
+            .sum()
+            .reset_index()
+        )
+        merged = mexico.merge(total_sales_per_state, on="state", how="left")
+        merged["quantity"] = merged["quantity"].fillna(0)
+
+    if tab=='inventario':
+        mask = ( (df_filtered['date'] >= pd.to_datetime(end_date) - pd.Timedelta(days=1)) &
+                 (df_filtered['date'] <= pd.to_datetime(end_date)) )
+        df_filtered = df_filtered[mask]
+        total_inventory_per_state = (
+            df_filtered.groupby("state")["stock"]
+            .sum()
+            .reset_index()
+        )
+        merged = mexico.merge(total_inventory_per_state, on="state", how="left")
+        merged["stock"] = merged["stock"].fillna(0)
+    
 
     return (merged,df_filtered) if val else merged
 
 def render_sales_heat_map(merged: pd.DataFrame,
                           main_element: str,
+                          tab:str,
                           map_key:str=None)->tuple[folium.Map,str]:
     if merged is None:
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -549,9 +431,15 @@ def render_sales_heat_map(merged: pd.DataFrame,
         touchZoom=False,
     )
 
+    if tab=='ventas':
+        variable='quantity'
+    if tab=='inventario':
+        variable='stock'
+
+
     title_html = f"""
     <h3 align="center" style="font-size:20px">
-        <b>Ventas de {main_element} por Estado</b>
+        <b>{tab.capitalize()} de {main_element} por Estado</b>
     </h3>
     """
     m.get_root().html.add_child(folium.Element(title_html))
@@ -559,20 +447,20 @@ def render_sales_heat_map(merged: pd.DataFrame,
     folium.Choropleth(
         geo_data=merged,
         data=merged,
-        columns=["state", "quantity"],
+        columns=["state", variable],
         key_on="feature.properties.state",
         fill_color="Blues",
         fill_opacity=0.8,
         line_opacity=0,
         nan_fill_color="white",
-        legend_name="Ventas",
+        legend_name=tab.capitalize(),
     ).add_to(m)
 
     folium.GeoJson(
         merged,
         tooltip=folium.GeoJsonTooltip(
-            fields=["NAME_1", "quantity"],
-            aliases=["Estado", "Ventas"],
+            fields=["NAME_1", variable],
+            aliases=["Estado", tab.capitalize()],
         ),
         name="Estados",
         style_function=lambda x: {
