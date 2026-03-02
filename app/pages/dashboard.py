@@ -409,12 +409,20 @@ def right_section(data:pd.DataFrame,
 
                 st.markdown("**Global**")
                 st.pyplot(global_histogram)
-
+    
+    def sales_kpis(data:pd.DataFrame)->tuple[int,float,float]:
+        df = data.copy()
+        total_sales = df['quantity'].sum() 
+        total_cost = round ( df['cost'].sum() ,2 )
+        total_profit = round( df['income'].sum() - total_cost ,2 )
+        return total_sales,total_cost,total_profit
+    
     def kpi_display(data:pd.DataFrame,
                     selected_element:str,
                     element_column:str,
                     period_start,
                     include_outliers:bool,
+                    tab:str,
                     branch:str=None):
         
         df = data.copy()
@@ -440,62 +448,57 @@ def right_section(data:pd.DataFrame,
                 st.warning("No hay datos para el elemento seleccionado en este periodo.")
                 st.stop()
 
-        total_sales = filtered_current['quantity'].sum() 
-        total_cost = round ( filtered_current['cost'].sum() ,2 )
-        total_profit = round( filtered_current['income'].sum() - total_cost ,2 )
-    
-        prev_sales = filtered_prev["quantity"].sum()
-        prev_cost = filtered_prev["cost"].sum()
-        prev_profit = filtered_prev["income"].sum() - prev_cost
+        if tab=='ventas':
+            current_sales,current_cost,current_profit = sales_kpis(data=filtered_current)
+            prev_sales,prev_cost,prev_profit = sales_kpis(data=filtered_prev)
+            
+            sales_rate = growth_rate(current_sales, prev_sales)
+            profit_rate = growth_rate(current_profit, prev_profit)
+            cost_rate = growth_rate(current_cost, prev_cost)
 
+            sales_color = "#0cb91a" if sales_rate >= 0 else "#ef4444" 
+            profit_color = "#0cb91a" if profit_rate >= 0 else "#ef4444" 
+            cost_color = "#0cb91a" if cost_rate >= 0 else "#ef4444" 
 
-        sales_rate = growth_rate(total_sales, prev_sales)
-        profit_rate = growth_rate(total_profit, prev_profit)
-        cost_rate = growth_rate(total_cost, prev_cost)
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.markdown(
+                        f'''
+                        <div class="kpi-title">
+                            <h3>Unidades Vendidas</h3>
+                            <h2>{current_sales:,}</h2>
+                            <p style="color: {sales_color}; font-weight: 600;">
+                            {sales_rate:+.1f}%</p>
+                        </div>
+                        ''',
+                        unsafe_allow_html=True
+                    )
 
-        sales_color = "#0cb91a" if sales_rate >= 0 else "#ef4444" 
-        profit_color = "#0cb91a" if profit_rate >= 0 else "#ef4444" 
-        cost_color = "#0cb91a" if cost_rate >= 0 else "#ef4444" 
+            with col2:
+                st.markdown(
+                        f'''
+                        <div class="kpi-title">
+                            <h3>Ganancia (MXN)</h3>
+                            <h2>${current_profit:,}</h2>
+                            <p style="color: {profit_color}; font-weight: 600;">
+                            {profit_rate:+.1f}% </p>
+                        </div>
+                        ''',
+                        unsafe_allow_html=True
+                    )
 
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown(
-                    f'''
-                    <div class="kpi-title">
-                        <h3>Unidades Vendidas</h3>
-                        <h2>{total_sales:,}</h2>
-                        <p style="color: {sales_color}; font-weight: 600;">
-                        {sales_rate:+.1f}%</p>
-                    </div>
-                    ''',
-                    unsafe_allow_html=True
-                )
-
-        with col2:
-            st.markdown(
-                    f'''
-                    <div class="kpi-title">
-                        <h3>Ganancia (MXN)</h3>
-                        <h2>${total_profit:,}</h2>
-                        <p style="color: {profit_color}; font-weight: 600;">
-                        {profit_rate:+.1f}% </p>
-                    </div>
-                    ''',
-                    unsafe_allow_html=True
-                )
-
-        with col3:
-            st.markdown(
-                    f'''
-                    <div class="kpi-title">
-                        <h3>Costo (MXN)</h3>
-                        <h2>${total_cost:,}</h2>
-                        <p style="color: {cost_color}; font-weight: 600;">
-                        {cost_rate:+.1f}%</p>
-                    </div>
-                    ''',
-                    unsafe_allow_html=True
-                )
+            with col3:
+                st.markdown(
+                        f'''
+                        <div class="kpi-title">
+                            <h3>Costo (MXN)</h3>
+                            <h2>${current_cost:,}</h2>
+                            <p style="color: {cost_color}; font-weight: 600;">
+                            {cost_rate:+.1f}%</p>
+                        </div>
+                        ''',
+                        unsafe_allow_html=True
+                    )
 
     def priority_and_map_plots(global_data:pd.DataFrame|None,
                                inventory:pd.DataFrame|None,
@@ -584,7 +587,8 @@ def right_section(data:pd.DataFrame,
                     element_column=element_column,
                     period_start=period_start,
                     include_outliers=include_outliers,
-                    branch=branch
+                    branch=branch,
+                    tab=tab
                     )
         # KPIs Globales
         kpi_display(data=global_data,
@@ -592,6 +596,7 @@ def right_section(data:pd.DataFrame,
                     element_column=element_column,
                     period_start=period_start,
                     include_outliers=include_outliers,
+                    tab=tab
                     )
         priority_and_map_plots(global_data=global_data,
                                 inventory=None,
