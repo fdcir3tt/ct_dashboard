@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import streamlit.components.v1 as components
+
+
+from functools import wraps
 from typing import List,Callable,Tuple,Dict
 from ct_sales_dashboard.utils import protect_page
-from functools import wraps
+from ct_sales_dashboard.utils import top_n
 from ct_sales_dashboard.graphs import *
 from ct_sales_dashboard.data_loader import *
 
@@ -582,7 +584,7 @@ def right_section(data:pd.DataFrame,
                 include_outliers=include_outliers,
                 ) 
                 
-    priority_and_map_plots(    global_data=global_data,
+    priority_and_map_plots(global_data=global_data,
                                main_element=main_element,
                                element_column=element_column,
                                period_start=period_start,
@@ -729,7 +731,7 @@ def main():
 
     with left:
 
-            inv_analysis_lvl,inv_branch,_,inv_main_element,element_title,inv_period_start,inv_period_end,inv_selected_elements,inv_element_column = left_section(data=data,
+        inv_analysis_lvl,inv_branch,_,inv_main_element,element_title,inv_period_start,inv_period_end,inv_selected_elements,inv_element_column = left_section(    data=data,
                                                                                                                                                                  period_start=period_start,
                                                                                                                                                                  period_end=period_end,
                                                                                                                                                                  branch_list=branch_list,
@@ -741,7 +743,7 @@ def main():
                                                                                                                                                                  tab='inventario')
 
     with right:
-        right_section( data=inventory,
+        right_section(  data=inventory,
                         branch_storage=branch_storage,
                         global_data=global_data,
                         cached_functions=cache_wrappers,

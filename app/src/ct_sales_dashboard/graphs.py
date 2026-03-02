@@ -234,7 +234,7 @@ def period_inventory(data: pd.DataFrame,
 
     df = period.merge(right=df,how='left',on=['date','storage_id'])
     df['stock'] = df['stock'].fillna(value=0)
-    df['total_stock']= df.groupby(['date'])['stock'].transform('sum')
+    df['total_stock']= df.groupby(['date','productId'])['stock'].transform('sum')
     
 
     df["month"] = df["date"].dt.month
