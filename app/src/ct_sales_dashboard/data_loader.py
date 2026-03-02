@@ -633,7 +633,10 @@ def load_inventory()->pd.DataFrame:
         
         df["date"] = df['date'].dt.strftime('%Y-%m-%d')
         df["date"] = pd.to_datetime(df["date"])
-
+        df['storage_id'] = df['existence']
+        df = df.explode('storage_id')
+        df['stock']=df.apply( lambda row: row['existence'].get(row['storage_id'], 0), axis=1 )
+        df.drop(columns='existence',inplace=True)
         return df
     else:
         return pd.DataFrame()

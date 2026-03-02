@@ -3,10 +3,13 @@ import geopandas as gpd
 import numpy as np
 import folium
 import warnings
-from streamlit_folium import st_folium
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
+
+
+from ct_sales_dashboard.utils import time_period,month_dict
+from streamlit_folium import st_folium
 from matplotlib.ticker import MaxNLocator
 from matplotlib.figure import Figure
 
@@ -21,110 +24,6 @@ def load_mexico_shp():
     mexico["state"] = mexico["NAME_1"].str.upper()
     return mexico
 
-
-month_dict={  1:"Enero",
-                  2:"Febrero",
-                  3:"Marzo",
-                  4:"Abril",
-                  5:"Mayo",
-                  6:"Junio",
-                  7:"Julio",
-                  8:"Agosto",
-                  9:"Septiembre",
-                  10:"Octubre",
-                  11:"Noviembre",
-                  12:"Diciembre"}
-# -----------------------------------------------------------
-# AUXILIARES
-# -----------------------------------------------------------
-
-
-def top_n(data:pd.DataFrame,element_column,type:str="producto",criteria:str="ventas_diarias",n:int=5)->list[str]:
-    """
-    Recibe el dataframe de datos del periodo especificado y regresa los mejores
-    'n' productos o categorías en base el criterio específicado.
-    """
-    type_dict= {"producto":"productId",
-                "categoria":"category",
-                "sucursal":"branchId",
-                "cliente":"clientId"}
-
-    criteria_dict={"ventas_diarias":"sales_day",
-                   "ventas_mensuales":"sales_month",
-                   "ganancia_total":"total_profit"}
-    
-    data["sales_day"] = data.groupby([element_column, "date"])["quantity"].transform("sum")
-    if n==1:
-        top_n= data[[type_dict[type],criteria_dict[criteria]]].sort_values(by=criteria_dict[criteria],ascending=False)[type_dict[type]].iloc[0]
-        return top_n
-    if n<0 :
-        df= data[[type_dict[type],criteria_dict[criteria]]].sort_values(by=criteria_dict[criteria],ascending=True).drop_duplicates()[:abs(n)]
-        return df
-    df= data[[type_dict[type],criteria_dict[criteria]]].sort_values(by=criteria_dict[criteria],ascending=False).drop_duplicates()[:n]
-
-    top_n= df
-
-    return top_n
-
-def frequency(data:pd.DataFrame,type:str="cliente")->pd.DataFrame:
-    """
-    Recibe el dataframe de datos del periodo especificado y regresa los ritmos de ventas promedio
-    en dicho periodo. 
-
-    """
-    if data.empty:
-        print("Dataset vacío")
-        return None
-    type_dict= {"producto":"productId",
-                "categoria":"category",
-                "sucursal":"branch",
-                "cliente":"client",
-                "dia":"weekday",
-                "mes":"month"}
-    
-    column = type_dict[type]
-    data["date"] = pd.to_datetime(data["date"])
-    start = data["date"].min().day
-    end = data["date"].max().day
-
-    period_length = end - start
-    df = data[[column,"date"]].value_counts().to_frame("count")
-    df["total"] = df.groupby(level=column)["count"].transform("sum") 
-    df["avg_rate"] = df["total"]/period_length
-    df = df.reset_index()
-    df = df[[column,"avg_rate"]].drop_duplicates().reset_index().drop(columns="index")
-    return df
-
-def frequent_clients(data:pd.DataFrame,level:str="producto",n:int=5)->list[str]:
-    level_dict={"producto":"productId"}
-    df = frequency(data)
-    df = df.sort_values(by="avg_rate",ascending=False)
-    frequent_clients = list( df[:n])
-    return frequent_clients
-
-def top_day(data:pd.DataFrame)->str:
-    weekday_dict={0:"Lunes",
-                  1:"Martes",
-                  2:"Miercoles",
-                  3:"Jueves",
-                  4:"Viernes",
-                  5:"Sábado",
-                  6:"Domingo"}
-    
-    data["date"] = pd.to_datetime(data["date"])
-    data["weekday"]=data["date"].dt.weekday
-    df = frequency(data,type="dia")
-    df = df.sort_values(by="avg_rate",ascending=False)
-    return weekday_dict[df["weekday"].iloc[0]]
-
-def top_month(data:pd.DataFrame)->str:
-
-    
-    data["date"] = pd.to_datetime(data["date"])
-    
-    df = frequency(data,type="mes")
-    df = df.sort_values(by="avg_rate",ascending=False)
-    return month_dict[df["month"].iloc[0]]
 
 # -----------------------------------------------------------
 # GRÄFICAS
@@ -267,7 +166,7 @@ def period_sales(data: pd.DataFrame,
     return (fig, plot_df) if val else fig
 
 def period_inventory(data: pd.DataFrame,
-                     branch_storage:dict[str], 
+                     branch_storage:dict[str,list[str]], 
                      selected_elements: list[str] ,
                      element_column:str ,
                      start_date, end_date,
@@ -300,49 +199,52 @@ def period_inventory(data: pd.DataFrame,
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
 
-    df = data.copy()
+    df = data.copy().reset_index(drop=True)
+    mask = ((df['date'] >= start_date) & (df['date'] <= end_date) & 
+             df[element_column].isin(selected_elements))
 
-    # Filtro por rango de fechas
-    in_period = (df['date'] >= start_date) & (df['date'] <= end_date)
-
-    # Filtro por productos o categorías
-    in_selected = df[element_column].isin(selected_elements)
-
-    mask = in_period & in_selected 
     df = df[mask]
 
     if df.empty:
-        
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
         ax.axis("off")
         return (fig, df) if val else fig
     
-    
-    # Inventario por sucursal
     if branch:
-        storages = branch_storage[branch] 
-        df["stock"] = 0
-        for s in storages:
-            df["stock"] = df["existence"].apply(lambda x: sum(x[s] for s in storages if isinstance(x, dict) and s in x))
+        storages = branch_storage[branch]
+        mask &= df['storage_id'].isin(storages)
     else:
-        df["stock"] = df["existence"].apply(lambda x: sum(x.values()))
+        storages = []
+        for b in branch_storage.values():
+            storages+=b
 
-    if df.empty:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return (fig, df) if val else fig
+        mask &= df['storage_id'].isin(storages)
+
+    df = df[mask] 
+
+    period = pd.DataFrame(data=time_period(start_date=start_date,end_date=end_date ),
+                          columns=["date"])
+    period = period.assign(key=1)
+    storages_df = pd.DataFrame({'storage_id': storages})
+    storages_df['key'] = 1
+    period = period.merge(storages_df, on='key').drop('key', axis=1)
     
+    period = period.explode('storage_id')
+
+    df = period.merge(right=df,how='left',on=['date','storage_id'])
+    df['stock'] = df['stock'].fillna(value=0)
+    df['total_stock']= df.groupby(['date'])['stock'].transform('sum')
+    
+
     df["month"] = df["date"].dt.month
     df["year"] = df["date"].dt.year
-
     month = month_dict[ df["month"].iloc[0] ]
     year = df["year"].iloc[0]
     
     
     # Líneas interpoladas
-    df["stock"] = df["stock"].interpolate(method="linear")
+    df["total_stock"] = df["total_stock"].interpolate(method="linear")
     
         
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -358,7 +260,7 @@ def period_inventory(data: pd.DataFrame,
             ax.plot(plot_df["date"], plot_df["stock"], label= id+" (no hay datos)",
                 marker="o", color=no_data_color)
             continue
-        ax.plot(plot_df["date"], plot_df["stock"], label= id,
+        ax.plot(plot_df["date"], plot_df["total_stock"], label= id,
                 marker="o", color=colors[i])
         
     # === Recta de tendencia === #
@@ -366,7 +268,7 @@ def period_inventory(data: pd.DataFrame,
     # Convertir fechas a valores numéricos (ordinales)
         
         x = mdates.date2num(plot_df["date"])
-        y = plot_df["stock"]
+        y = plot_df["total_stock"]
 
         # Ajuste lineal
         coeffs = np.polyfit(x, y, 1)  # pendiente y ordenada
@@ -586,7 +488,6 @@ def sales_hist(data: pd.DataFrame,
     fig.tight_layout()
 
     return (fig, df) if val else fig
-
 
 
 def prepare_sales_heatmap_data(data: pd.DataFrame, 

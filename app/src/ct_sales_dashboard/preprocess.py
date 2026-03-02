@@ -3,6 +3,7 @@ import pandas as pd
 import json
 import datetime
 import numpy as np
+from ct_sales_dashboard.utils import time_period
 from pathlib import Path
 
 
@@ -13,18 +14,7 @@ Documents = list[Document]
 DATA_PATH = Path('data')
 
 
-def time_period(start_date: datetime.datetime,end_date: datetime.datetime = datetime.datetime.today()) -> list:
-    if start_date > end_date:
-        raise ValueError("Fecha inicial debe tomar lugar antes que la fecha final de periodo")
 
-    dates = []
-    current = start_date
-
-    while current <= end_date:
-        dates.append(current)
-        current += datetime.timedelta(days=1)
-
-    return dates
 
 
 def fill_exchange_rates(rates_dataframe:pd.DataFrame)->pd.DataFrame:
@@ -71,6 +61,7 @@ def process_exchange_rates(data:pd.DataFrame):
     rates = pd.read_parquet(DATA_PATH/'raw'/'usd_mxn_rates.parquet')
     rates.index = rates.index.date.astype('datetime64[ns]')
     rates.index.name = 'date'
+
     period = pd.DataFrame(data=time_period(start_date=datetime.datetime(2020,1,1) ),columns=["date"])
     merged = period.merge(df,how="left",on="date")
     merged = merged.merge(rates,how='left',on='date',suffixes=('', '_fill'))
