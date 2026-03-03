@@ -4,8 +4,8 @@ import subprocess,warnings
 warnings.filterwarnings('ignore')
 
 from pathlib import Path
-from ct_sales_dashboard.data_loader import *
-from ct_sales_dashboard.preprocess import *
+from dashboard.data_loader import *
+from dashboard.preprocess import *
 
 
 def main():

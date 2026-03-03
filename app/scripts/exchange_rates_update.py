@@ -7,8 +7,8 @@ import warnings
 
 
 from dotenv import load_dotenv
-from ct_sales_dashboard.data_loader import load_raw_exchange_rates,load_exchange_rates,update_exchange_rates,get_usd_to_mxn
-from ct_sales_dashboard.preprocess import process_exchange_rates
+from dashboard.data_loader import load_raw_exchange_rates,load_exchange_rates,update_exchange_rates,get_usd_to_mxn
+from dashboard.preprocess import process_exchange_rates
 
 # -----------------------------------------------------------
 # SETUP 

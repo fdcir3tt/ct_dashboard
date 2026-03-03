@@ -5,10 +5,9 @@ import datetime
 
 from functools import wraps
 from typing import List,Callable,Tuple,Dict
-from ct_sales_dashboard.utils import protect_page
-from ct_sales_dashboard.utils import top_n
-from ct_sales_dashboard.graphs import *
-from ct_sales_dashboard.data_loader import *
+from dashboard.utils import protect_page,top_n
+from dashboard.graphs import *
+from dashboard.data_loader import *
 
 
 def make_cached(func:Callable):

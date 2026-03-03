@@ -1,5 +1,5 @@
 import streamlit as st
-from ct_sales_dashboard.utils import load_authenticator,load_css,clear_cookies
+from dashboard.utils import load_authenticator,load_css,clear_cookies
 
 
 
