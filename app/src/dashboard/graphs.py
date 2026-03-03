@@ -87,7 +87,7 @@ def period_sales(data: pd.DataFrame,
     
     # Filtro por sucursal 
     if branch:
-        in_branch = df["sucursal"]==branch
+        in_branch = df["branch"]==branch
         df = df[in_branch]
 
     if df.empty:
@@ -218,13 +218,13 @@ def period_inventory(data: pd.DataFrame,
     
     if branch:
         storages = branch_storage[branch]
-        mask &= df['storage_id'].isin(storages)
+        mask &= df['storageId'].isin(storages)
     else:
         storages = []
         for b in branch_storage.values():
             storages+=b
 
-        mask &= df['storage_id'].isin(storages)
+        mask &= df['storageId'].isin(storages)
 
     df = df[mask] 
     df['total_stock']= df.groupby(['date','productId'])['stock'].transform('sum')
@@ -326,7 +326,7 @@ def sales_hist(data: pd.DataFrame,
     )
 
     if branch:
-        mask &= df["sucursal"] == branch
+        mask &= df["branch"] == branch
     if not include_outliers:
         mask &= df["is_outlier"] == include_outliers
 
@@ -512,7 +512,7 @@ def abc_bar_chart(data:pd.DataFrame,
     df = data.copy()
 
     is_in_period = ( start_date <= df["date"] ) & ( df["date"] <= end_date )
-    in_branch = df["sucursal"] == branch
+    in_branch = df["branch"] == branch
 
     mask = is_in_period&in_branch
     if not include_outliers:
@@ -523,7 +523,7 @@ def abc_bar_chart(data:pd.DataFrame,
 
     df_summary = (
         df_filtered
-            .groupby([type_selected,"sucursal"],as_index=False)
+            .groupby([type_selected,"branch"],as_index=False)
             .agg(
                 total_sales=("quantity", "sum"),
                 min_cost=("cost", "min")  

@@ -122,7 +122,7 @@ def process_data(invoices:pd.DataFrame,
         df = sales_filters(df)
 
         df['branchId']= df['folio'].str.extract( r'(?P<branchId>[A-Za-z]+)' )
-        df = df.merge(branches[["nemonico","sucursal","homoclave"]],
+        df = df.merge(branches[["storageId","branch","homoclave"]],
                       how="inner",left_on="branchId",right_on="homoclave")
     
         products = products.merge(categories,
@@ -133,7 +133,7 @@ def process_data(invoices:pd.DataFrame,
         with open("states_dict.json", "r", encoding="utf-8") as f:
             states_dict = json.load(f)
 
-        df["state"] = df["sucursal"].map(states_dict).fillna("UNKNOWN")
+        df["state"] = df["branch"].map(states_dict).fillna("UNKNOWN")
 
         # Categorías
         df = df.merge(products,

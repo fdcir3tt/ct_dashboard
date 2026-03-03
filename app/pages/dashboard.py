@@ -139,7 +139,7 @@ def calculate_frequent_branch(data:pd.DataFrame,top_product:str)->str:
     is_top_product= data["productId"]==top_product
     frequent_branch= (
         data[is_top_product]
-        .groupby("sucursal")["date"]
+        .groupby("branch")["date"]
         .nunique() 
         .idxmax()
     )
@@ -416,14 +416,14 @@ def right_section(data:pd.DataFrame,
         total_profit = round( df['income'].sum() - total_cost ,2 )
         return total_sales,total_cost,total_profit
     
-    def inventory_kpis(data:pd.DataFrame)->tuple[int,float,float]:
+    def inventory_kpis(data:pd.DataFrame)->tuple[int,int]:
         df = data.copy()
         latest_register=df['date']==df['date'].max()
         current_stock = df[latest_register]['stock'].iloc[0]
 
         df['difference'] = df['stock'].diff().fillna(0)
         positive_supply = df['difference']>0
-        supplied_stock = df[positive_supply]['difference'].sum()
+        supplied_stock = int(df[positive_supply]['difference'].sum())
         return current_stock,supplied_stock
     
     def kpi_display(data:pd.DataFrame,
@@ -437,7 +437,7 @@ def right_section(data:pd.DataFrame,
         df = data.copy()
         mask =  (df[element_column]== selected_element)
         if branch:
-            mask &= (df["sucursal"]==branch)
+            mask &= (df["branch"]==branch)
         if not include_outliers:
             mask &= df["is_outlier"] == include_outliers
         filtered = df[mask]
@@ -455,7 +455,10 @@ def right_section(data:pd.DataFrame,
 
         if filtered_current.empty:
                 st.warning("No hay datos para el elemento seleccionado en este periodo.")
-                st.stop()
+                return None
+        if filtered_prev.empty:
+                st.warning("No hay datos del periodo previo para el elemento seleccionado en este periodo.")
+                
 
         if tab=='ventas':
             current_sales,current_cost,current_profit = sales_kpis(data=filtered_current)
@@ -539,7 +542,7 @@ def right_section(data:pd.DataFrame,
                         f'''
                         <div class="kpi-title">
                             <h3>Unidades surtidas</h3>
-                            <h2>${current_supplied:,}</h2>
+                            <h2>{current_supplied}</h2>
                             <p style="color: {supply_color}; font-weight: 600;">
                             {supply_rate:+.1f}% </p>
                         </div>
@@ -774,7 +777,7 @@ def main():
 
     product_list = list( data["productId"].unique() )
     category_list = list( data["category"].unique() )
-    branch_list = list( data["sucursal"].unique() )
+    branch_list = list( data["branch"].unique() )
 
 
     # Sucursal en donde se vende más seguido el producto más vendido

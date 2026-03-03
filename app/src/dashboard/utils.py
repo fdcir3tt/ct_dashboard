@@ -27,7 +27,7 @@ def add_states_column(data:pd.DataFrame)->pd.DataFrame:
     with open("states_dict.json", "r", encoding="utf-8") as f:
             states_dict = json.load(f)
 
-    df["state"] = df["sucursal"].map(states_dict).fillna("UNKNOWN")
+    df["state"] = df["branch"].map(states_dict).fillna("UNKNOWN")
     return df
 
 def top_n(data:pd.DataFrame,
@@ -41,7 +41,7 @@ def top_n(data:pd.DataFrame,
     """
     type_dict= {"producto":"productId",
                 "categoria":"category",
-                "sucursal":"branchId",
+                "branch":"branch",
                 "cliente":"clientId"}
 
     criteria_dict={"ventas_diarias":"sales_day",
@@ -73,7 +73,7 @@ def frequency(data:pd.DataFrame,
         return None
     type_dict= {"producto":"productId",
                 "categoria":"category",
-                "sucursal":"branch",
+                "branch":"branch",
                 "cliente":"client",
                 "dia":"weekday",
                 "mes":"month"}
