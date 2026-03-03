@@ -3,7 +3,7 @@ import pandas as pd
 import json
 import datetime
 import numpy as np
-from ct_sales_dashboard.utils import time_period
+from dashboard.utils import time_period
 from pathlib import Path
 
 

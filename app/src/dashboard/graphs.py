@@ -8,7 +8,7 @@ import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
 
 
-from ct_sales_dashboard.utils import time_period,month_dict,add_states_column
+from dashboard.utils import time_period,month_dict,add_states_column
 from streamlit_folium import st_folium
 from matplotlib.ticker import MaxNLocator
 from matplotlib.figure import Figure
