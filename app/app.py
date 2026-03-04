@@ -458,7 +458,7 @@ def right_section(data:pd.DataFrame,
                 return None
         if filtered_prev.empty:
                 st.warning("No hay datos del periodo previo para el elemento seleccionado en este periodo.")
-                
+                return None
 
         if tab=='ventas':
             current_sales,current_cost,current_profit = sales_kpis(data=filtered_current)
