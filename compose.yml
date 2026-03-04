@@ -8,7 +8,6 @@ services:
     volumes:
       - ./data:/app/data:Z
       - ./log/:/app/log:Z
-      - ./config.yml:/app/config.yml:Z
     env_file:
       - app/.env
     ports:
