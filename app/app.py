@@ -2,17 +2,20 @@ import streamlit as st
 import pandas as pd
 import datetime
 
-
 from functools import wraps
 from typing import List,Callable,Tuple,Dict
 from dashboard.utils import top_n
 from dashboard.graphs import *
 from dashboard.data_loader import *
 
+def load_css(file_name):
+
+    with open(file_name) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 def make_cached(func:Callable):
     """Crea versiones cacheadas de funciones"""
-    @st.cache_data(ttl=3600*12)
+    @st.cache_data(ttl=3600*12,show_spinner=False)
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
@@ -748,16 +751,16 @@ def main():
 # ===========================================================
 #                       CARGA DE DATOS
 # ===========================================================
+    with st.spinner("Cargando datos..."):
+        branch_storage = cache_wrappers['load_storage']()
+        inventory = cache_wrappers['load_inventory']()
 
-    branch_storage = cache_wrappers['load_storage']()
-    inventory = cache_wrappers['load_inventory']()
-
-    global_data = cache_wrappers['load_sales_invoices']()
-    global_data['income'] = global_data['price'] * global_data['quantity']
-    global_data = cache_wrappers['identify_outlier_sales'](global_data,element_column='productId')
+        global_data = cache_wrappers['load_sales_invoices']()
+        global_data['income'] = global_data['price'] * global_data['quantity']
+        global_data = cache_wrappers['identify_outlier_sales'](global_data,element_column='productId')
 
 
-    data = global_data.copy()
+        data = global_data.copy()
 
 
 # ===========================================================

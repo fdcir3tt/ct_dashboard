@@ -1,5 +1,5 @@
 [project]
-name = "ct_sales_dashboard"
+name = "dashboard"
 version = "0.1.0"
 description = "Dashboard de almacenamiento de productos que maneja CT International"
 authors = [
@@ -32,6 +32,8 @@ dependencies = [
     "streamlit-authenticator (>=0.4.2,<0.5.0)",
 ]
 
+[tool.poetry]
+packages = [{ include = "dashboard" }]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

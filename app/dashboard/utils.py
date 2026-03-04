@@ -1,12 +1,8 @@
-import streamlit as st
 import pandas as pd
 import yaml
-import streamlit_authenticator as stauth
-import streamlit.components.v1 as components
 import datetime
 import json
-from yaml.loader import SafeLoader
-from functools import wraps
+
 
 
 month_dict={  1:"Enero",
@@ -140,8 +136,5 @@ def time_period(start_date: datetime.datetime,
     return dates
 
 
-def load_css(file_name):
 
-    with open(file_name) as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 

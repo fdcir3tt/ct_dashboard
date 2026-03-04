@@ -5,6 +5,7 @@ __pycache__/
 tests/
 *.log
 app/data/processed/
+app/.venv/
 app/data/raw/*
 .env
 

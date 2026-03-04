@@ -4,9 +4,10 @@ import subprocess,warnings
 warnings.filterwarnings('ignore')
 
 from pathlib import Path
-from dashboard.data_loader import *
-from dashboard.preprocess import *
+from dashboard.data_loader import load_invoices,load_product_codes,load_exchange_rates,load_branches,load_categories,load_products
+from dashboard.preprocess import process_data
 
+DATA_PATH = Path('data')
 
 def main():
     
