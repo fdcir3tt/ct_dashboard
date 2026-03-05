@@ -139,7 +139,7 @@ def process_data(invoices:pd.DataFrame,
         df = df.merge(products,
                       how="left",left_on="productId",right_on="clave")
         df = df.rename(columns={"nombre":"category"})
-
+        df['date']=df['date'].astype('datetime64[ns]')
         os.makedirs(DATA_PATH/'processed',exist_ok=True)
         df = df.drop_duplicates(subset=['folio','productId','date','clientId'])
         df.to_parquet(DATA_PATH/'processed'/'facturas_ventas_tmp.parquet',index=False)

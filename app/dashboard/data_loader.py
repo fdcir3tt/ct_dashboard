@@ -689,6 +689,7 @@ def load_inventory()->pd.DataFrame:
         
         df["date"] = df['date'].dt.strftime('%Y-%m-%d')
         df["date"] = pd.to_datetime(df["date"])
+        df['date'] = df['date'].astype('datetime64[ns]')
         df['storageId'] = df['existence']
         df = df.explode('storageId')
         df['stock']=df.apply( lambda row: row['existence'].get(row['storageId'], 0), axis=1 )
@@ -715,6 +716,7 @@ def load_inventory()->pd.DataFrame:
 
         df = add_states_column(data=df)
         df['productId'] = df['productId'].dropna()
+        
         return df
     else:
         return pd.DataFrame()
