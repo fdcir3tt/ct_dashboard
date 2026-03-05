@@ -381,8 +381,7 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,
         merged["quantity"] = merged["quantity"].fillna(0)
 
     if tab=='inventario':
-        mask = ( (df_filtered['date'] >= pd.to_datetime(end_date) - pd.Timedelta(days=1)) &
-                 (df_filtered['date'] <= pd.to_datetime(end_date)) )
+        mask = ( (df_filtered['date'] == pd.to_datetime(end_date) ))
         df_filtered = df_filtered[mask]
         total_inventory_per_state = (
             df_filtered.groupby("state")["stock"]
@@ -395,12 +394,7 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,
 
     return (merged,df_filtered) if val else merged
 
-import folium
-from streamlit_folium import st_folium
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import io
-import base64
+
 
 def render_sales_heat_map(merged,
                                        main_element: str,
@@ -417,7 +411,7 @@ def render_sales_heat_map(merged,
 
     variable = "quantity" if tab == "ventas" else "stock"
 
-    # Create map
+    # Mapa
     m = folium.Map(
         location=[25, -90],
         zoom_start=4,
@@ -437,19 +431,17 @@ def render_sales_heat_map(merged,
     """
     m.get_root().html.add_child(folium.Element(title_html))
 
-    # Value range
+    # Rango de valores
     vmin = merged[variable].min()
     vmax = merged[variable].max()
 
-    # Normalize for colormap
+    # Normalizar colores
     norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
-
-    # Convert RGBA to HEX
     def rgba_to_hex(rgba):
         r, g, b, _ = rgba
         return '#{:02x}{:02x}{:02x}'.format(int(r*255), int(g*255), int(b*255))
 
-    # Polygon style function
+    # Estilos de poligonos 
     def style_function(feature):
         value = feature["properties"].get(variable)
         if value is not None:
@@ -470,18 +462,18 @@ def render_sales_heat_map(merged,
         tooltip=folium.GeoJsonTooltip(
             fields=["NAME_1", variable],
             aliases=["Estado", tab.capitalize()],
-            localize=True
+            localize=False
         )
     ).add_to(m)
 
-    # --- Horizontal colorbar at the top ---
+    # Barra horizontal
     fig, ax = plt.subplots(figsize=(6, 0.2))  # width x height
     cmap = mpl.cm.Blues
     mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
     ax.set_xticks([vmin, (vmin+vmax)/2, vmax])
     ax.set_yticks([])
 
-    # Save to PNG in memory
+    # Guardar a png en memoria
     buf = io.BytesIO()
     fig.savefig(buf, format='png', bbox_inches='tight', dpi=150)
     plt.close(fig)
@@ -489,7 +481,6 @@ def render_sales_heat_map(merged,
     img_base64 = base64.b64encode(buf.read()).decode('utf-8')
     img_html = f'<img src="data:image/png;base64,{img_base64}" style="width:100%;">'
 
-    # Inject colorbar overlay at top
     colorbar_div = f"""
     <div style="
         position: absolute;
@@ -504,18 +495,11 @@ def render_sales_heat_map(merged,
     </div>
     """
     m.get_root().html.add_child(folium.Element(colorbar_div))
-
-    # Render map in Streamlit
     map_data = st_folium(m, width=700, height=map_height, key=map_key)
 
-    # Capture selected state if drawn
-    selected_state = None
-    if map_data and "last_active_drawing" in map_data:
-        props = map_data["last_active_drawing"]
-        if props and "properties" in props:
-            selected_state = props["properties"].get("NAME_1")
+    
 
-    return m, selected_state
+    return m
 
 def abc_bar_chart(data:pd.DataFrame,
                   start_date:str,

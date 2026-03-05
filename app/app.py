@@ -561,20 +561,6 @@ def right_section(data:pd.DataFrame,
                         unsafe_allow_html=True
                     )
 
-    def tick_bar(merged:pd.DataFrame,tab:str):
-
-        variable = "quantity" if tab == "ventas" else "stock"
-        vmin = merged[variable].min()
-        vmax = merged[variable].max()
-        fig, ax = plt.subplots(figsize=(6, 0.2))  # width x height in inches
-        cmap = mpl.cm.Blues
-        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
-        cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
-        
-        ax.set_xticks([vmin, (vmin+vmax)/2, vmax])
-        ax.set_yticks([])
-
-        st.pyplot(fig)
     def priority_and_map_plots(global_data:pd.DataFrame|None,
                                inventory:pd.DataFrame|None,
                                main_element:str,
@@ -612,7 +598,7 @@ def right_section(data:pd.DataFrame,
                                                             include_outliers = include_outliers,
                                                             tab= tab
                                                         )
-                    map_obj, selected_state = render_sales_heat_map(merged=merged, 
+                    map_obj = render_sales_heat_map(merged=merged, 
                                                                     main_element=main_element,
                                                                     tab=tab,
                                                                     map_key=f"{tab} Mapa")
@@ -637,7 +623,7 @@ def right_section(data:pd.DataFrame,
                                                                 tab= tab
                                                             )
         
-                map_obj, selected_state = render_sales_heat_map(merged=merged, 
+                map_obj= render_sales_heat_map(merged=merged, 
                                                                 main_element=main_element,
                                                                 tab=tab,
                                                                 map_key=f"{tab} Mapa")
