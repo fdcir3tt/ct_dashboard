@@ -466,7 +466,10 @@ def right_section(data:pd.DataFrame,
         if filtered_prev.empty:
                 st.warning("No hay datos del periodo previo para el elemento seleccionado en este periodo.")
                 return None
-
+        if branch:
+            title = 'Sucursal'
+        else :
+            title = 'Global'
         if tab=='ventas':
             current_sales,current_cost,current_profit = sales_kpis(data=filtered_current)
             prev_sales,prev_cost,prev_profit = sales_kpis(data=filtered_prev)
@@ -484,7 +487,7 @@ def right_section(data:pd.DataFrame,
                 st.markdown(
                         f'''
                         <div class="kpi-title">
-                            <h3>Unidades Vendidas</h3>
+                            <h3>Ventas {title} </h3>
                             <h2>{current_sales:,}</h2>
                             <p style="color: {sales_color}; font-weight: 600;">
                             {sales_rate:+.1f}%</p>
@@ -497,7 +500,7 @@ def right_section(data:pd.DataFrame,
                 st.markdown(
                         f'''
                         <div class="kpi-title">
-                            <h3>Ganancia (MXN)</h3>
+                            <h3>Ganancia {title}</h3>
                             <h2>${current_profit:,}</h2>
                             <p style="color: {profit_color}; font-weight: 600;">
                             {profit_rate:+.1f}% </p>
@@ -510,7 +513,7 @@ def right_section(data:pd.DataFrame,
                 st.markdown(
                         f'''
                         <div class="kpi-title">
-                            <h3>Costo (MXN)</h3>
+                            <h3>Costo {title}</h3>
                             <h2>${current_cost:,}</h2>
                             <p style="color: {cost_color}; font-weight: 600;">
                             {cost_rate:+.1f}%</p>
@@ -535,8 +538,8 @@ def right_section(data:pd.DataFrame,
                 st.markdown(
                         f'''
                         <div class="kpi-title">
-                            <h3>Unidades existentes</h3>
-                            <h2>{current_stock:,}</h2>
+                            <h3>Existencia {title}</h3>
+                            <h2>{current_stock}</h2>
                             <p style="color: {stock_color}; font-weight: 600;">
                             {stock_rate:+.1f}%</p>
                         </div>
@@ -548,7 +551,7 @@ def right_section(data:pd.DataFrame,
                 st.markdown(
                         f'''
                         <div class="kpi-title">
-                            <h3>Unidades surtidas</h3>
+                            <h3>Compras {title}</h3>
                             <h2>{current_supplied}</h2>
                             <p style="color: {supply_color}; font-weight: 600;">
                             {supply_rate:+.1f}% </p>
