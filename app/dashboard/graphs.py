@@ -2,10 +2,14 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 import folium
+import branca.colormap as cm
 import warnings
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
+import matplotlib as mpl
+import io
+import base64
 
 
 from dataclasses import dataclass
@@ -391,33 +395,41 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,
 
     return (merged,df_filtered) if val else merged
 
-def render_sales_heat_map(merged: pd.DataFrame,
-                          main_element: str,
-                          tab:str,
-                          map_key:str=None)->tuple[folium.Map,str]:
+import folium
+from streamlit_folium import st_folium
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import io
+import base64
+
+def render_sales_heat_map(merged,
+                                       main_element: str,
+                                       tab: str,
+                                       map_key: str = None,
+                                       map_height: int = 300):
+    
     if merged is None:
         fig, ax = plt.subplots(figsize=(12, 6))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
+        ax.text(0.5, 0.5, "No hay datos disponibles",
+                ha="center", va="center", fontsize=14)
         ax.axis("off")
         return fig, None
 
+    variable = "quantity" if tab == "ventas" else "stock"
+
+    # Create map
     m = folium.Map(
-        location=[20, -90],
-        tiles=None,
+        location=[25, -90],
         zoom_start=4,
-        zoom_control=True,
-        scrollWheelZoom=True,
-        dragging=True,
+        tiles=None,
+        zoom_control=False,
+        scrollWheelZoom=False,
+        dragging=False,
         doubleClickZoom=False,
         touchZoom=False,
     )
 
-    if tab=='ventas':
-        variable='quantity'
-    if tab=='inventario':
-        variable='stock'
-
-
+    # Title
     title_html = f"""
     <h3 align="center" style="font-size:20px">
         <b>{tab.capitalize()} de {main_element} por Estado</b>
@@ -425,34 +437,78 @@ def render_sales_heat_map(merged: pd.DataFrame,
     """
     m.get_root().html.add_child(folium.Element(title_html))
 
-    folium.Choropleth(
-        geo_data=merged,
-        data=merged,
-        columns=["state", variable],
-        key_on="feature.properties.state",
-        fill_color="Blues",
-        fill_opacity=0.8,
-        line_opacity=0,
-        nan_fill_color="white",
-        legend_name=tab.capitalize(),
-    ).add_to(m)
+    # Value range
+    vmin = merged[variable].min()
+    vmax = merged[variable].max()
+
+    # Normalize for colormap
+    norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+
+    # Convert RGBA to HEX
+    def rgba_to_hex(rgba):
+        r, g, b, _ = rgba
+        return '#{:02x}{:02x}{:02x}'.format(int(r*255), int(g*255), int(b*255))
+
+    # Polygon style function
+    def style_function(feature):
+        value = feature["properties"].get(variable)
+        if value is not None:
+            rgba = mpl.cm.Blues(norm(value))
+            fill_color = rgba_to_hex(rgba)
+        else:
+            fill_color = "#ffffff"
+        return {
+            "fillColor": fill_color,
+            "color": "gray",
+            "weight": 0.6,
+            "fillOpacity": 0.8,
+        }
 
     folium.GeoJson(
         merged,
+        style_function=style_function,
         tooltip=folium.GeoJsonTooltip(
             fields=["NAME_1", variable],
             aliases=["Estado", tab.capitalize()],
-        ),
-        name="Estados",
-        style_function=lambda x: {
-            "color": "gray",
-            "weight": 0.5,
-            "fillOpacity": 0,
-        },
+            localize=True
+        )
     ).add_to(m)
 
-    map_data = st_folium(m, width=700, height=250,key=map_key)
+    # --- Horizontal colorbar at the top ---
+    fig, ax = plt.subplots(figsize=(6, 0.2))  # width x height
+    cmap = mpl.cm.Blues
+    mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
+    ax.set_xticks([vmin, (vmin+vmax)/2, vmax])
+    ax.set_yticks([])
 
+    # Save to PNG in memory
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    img_html = f'<img src="data:image/png;base64,{img_base64}" style="width:100%;">'
+
+    # Inject colorbar overlay at top
+    colorbar_div = f"""
+    <div style="
+        position: absolute;
+        top: 10px;         /* distance from top */
+        left: 50px;        /* horizontal offset */
+        width: 300px;      /* width of colorbar */
+        height: 30px;
+        z-index: 9999;
+        background-color: transparent;
+    ">
+        {img_html}
+    </div>
+    """
+    m.get_root().html.add_child(folium.Element(colorbar_div))
+
+    # Render map in Streamlit
+    map_data = st_folium(m, width=700, height=map_height, key=map_key)
+
+    # Capture selected state if drawn
     selected_state = None
     if map_data and "last_active_drawing" in map_data:
         props = map_data["last_active_drawing"]
@@ -460,8 +516,6 @@ def render_sales_heat_map(merged: pd.DataFrame,
             selected_state = props["properties"].get("NAME_1")
 
     return m, selected_state
-
-
 
 def abc_bar_chart(data:pd.DataFrame,
                   start_date:str,

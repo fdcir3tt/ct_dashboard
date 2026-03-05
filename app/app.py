@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import matplotlib as mpl
 
 from functools import wraps
 from typing import List,Callable,Tuple,Dict
@@ -560,7 +561,20 @@ def right_section(data:pd.DataFrame,
                         unsafe_allow_html=True
                     )
 
-            
+    def tick_bar(merged:pd.DataFrame,tab:str):
+
+        variable = "quantity" if tab == "ventas" else "stock"
+        vmin = merged[variable].min()
+        vmax = merged[variable].max()
+        fig, ax = plt.subplots(figsize=(6, 0.2))  # width x height in inches
+        cmap = mpl.cm.Blues
+        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+        cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
+        
+        ax.set_xticks([vmin, (vmin+vmax)/2, vmax])
+        ax.set_yticks([])
+
+        st.pyplot(fig)
     def priority_and_map_plots(global_data:pd.DataFrame|None,
                                inventory:pd.DataFrame|None,
                                main_element:str,
@@ -588,7 +602,7 @@ def right_section(data:pd.DataFrame,
 
             col1, col2 = st.columns(2)
             with col1:
-                    st.markdown(f"**Mapa de calor de {tab} (México)**")
+                    st.markdown(f"**Mapa de {tab}**")
                     merged = cached_functions['prepare_sales_heatmap_data'](
                                                             data=global_data,
                                                             main_element=main_element,
@@ -598,7 +612,6 @@ def right_section(data:pd.DataFrame,
                                                             include_outliers = include_outliers,
                                                             tab= tab
                                                         )
-
                     map_obj, selected_state = render_sales_heat_map(merged=merged, 
                                                                     main_element=main_element,
                                                                     tab=tab,
@@ -611,21 +624,23 @@ def right_section(data:pd.DataFrame,
                     st.pyplot(category_priorities)
 
         if tab=='inventario':
-            st.markdown(f"**Mapa de calor de {tab} (México)**")
-            merged = cached_functions['prepare_sales_heatmap_data'](
-                                                            data=inventory,
-                                                            main_element=main_element,
-                                                            element_column=element_column,
-                                                            start_date=period_start,
-                                                            end_date=period_end,
-                                                            include_outliers = include_outliers,
-                                                            tab= tab
-                                                        )
-
-            map_obj, selected_state = render_sales_heat_map(merged=merged, 
-                                                            main_element=main_element,
-                                                            tab=tab,
-                                                            map_key=f"{tab} Mapa")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**Mapa de {tab}**")
+                merged = cached_functions['prepare_sales_heatmap_data'](
+                                                                data=inventory,
+                                                                main_element=main_element,
+                                                                element_column=element_column,
+                                                                start_date=period_start,
+                                                                end_date=period_end,
+                                                                include_outliers = include_outliers,
+                                                                tab= tab
+                                                            )
+        
+                map_obj, selected_state = render_sales_heat_map(merged=merged, 
+                                                                main_element=main_element,
+                                                                tab=tab,
+                                                                map_key=f"{tab} Mapa")
 
     if tab=='ventas':
         sales_plots(data,
@@ -703,8 +718,8 @@ def right_section(data:pd.DataFrame,
                                 element_column=element_column,
                                 period_start=period_start,
                                 period_end=period_end,
-                                include_outliers=include_outliers,
                                 branch=branch,
+                                include_outliers=None,
                                 analysis_lvl=analysis_lvl,
                                 tab=tab)   
                      
