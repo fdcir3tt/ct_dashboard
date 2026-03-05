@@ -433,28 +433,32 @@ def right_section(data:pd.DataFrame,
                     selected_element:str,
                     element_column:str,
                     period_start,
-                    include_outliers:bool,
+                    include_outliers:bool|None,
                     tab:str,
                     branch:str=None):
         
         df = data.copy()
-        mask =  (df[element_column]== selected_element)
-        if branch:
-            mask &= (df["branch"]==branch)
-        if not include_outliers:
-            mask &= df["is_outlier"] == include_outliers
-        filtered = df[mask]
-        
-        current_period = ( pd.to_datetime(period_start) <= filtered['date'] ) & \
-                          ( filtered['date'] <= pd.to_datetime(period_start)+datetime.timedelta(days=30) ) 
-        
-        previous_period = ( pd.to_datetime(period_start)-datetime.timedelta(days=30) <= filtered['date'] ) & \
-                          ( filtered['date'] <= pd.to_datetime(period_start) ) 
-        
-        
+        period_start = pd.to_datetime(period_start)
+        current_period = (period_start,period_start+datetime.timedelta(days=30))
+        previous_period = (period_start -datetime.timedelta(days=30),period_start)
 
-        filtered_current = filtered[current_period].copy()
-        filtered_prev = filtered[previous_period].copy()
+        current_filters = GraphFilters(config= GraphFilterConfig(start_date=current_period[0],
+                                                     end_date=current_period[1],
+                                                     element_column=element_column,
+                                                     selected_elements=selected_elements,
+                                                     branch=branch,
+                                                     include_outliers=include_outliers))
+        
+        previous_filters = GraphFilters(config= GraphFilterConfig(start_date=previous_period[0],
+                                                     end_date=previous_period[1],
+                                                     element_column=element_column,
+                                                     selected_elements=selected_elements,
+                                                     branch=branch,
+                                                     include_outliers=include_outliers))
+
+        filtered_current = current_filters.apply(df)
+        filtered_prev = previous_filters.apply(df)
+        
 
         if filtered_current.empty:
                 st.warning("No hay datos para el elemento seleccionado en este periodo.")
@@ -560,7 +564,7 @@ def right_section(data:pd.DataFrame,
                                element_column:str,
                                period_start,
                                period_end,
-                               include_outliers:bool,
+                               include_outliers:bool|None,
                                branch:str,
                                analysis_lvl:str,
                                tab:str):  
@@ -678,7 +682,7 @@ def right_section(data:pd.DataFrame,
                     selected_element=main_element,
                     element_column=element_column,
                     period_start=period_start,
-                    include_outliers=include_outliers,
+                    include_outliers=None,
                     branch=branch,
                     tab=tab
                     )
@@ -687,7 +691,7 @@ def right_section(data:pd.DataFrame,
                     selected_element=main_element,
                     element_column=element_column,
                     period_start=period_start,
-                    include_outliers=include_outliers,
+                    include_outliers=None,
                     tab=tab
                     )
         priority_and_map_plots( global_data=None,

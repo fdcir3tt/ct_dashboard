@@ -8,6 +8,7 @@ import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
 
 
+from dataclasses import dataclass
 from dashboard.utils import time_period,month_dict,add_states_column
 from streamlit_folium import st_folium
 from matplotlib.ticker import MaxNLocator
@@ -15,6 +16,49 @@ from matplotlib.figure import Figure
 
 warnings.filterwarnings('ignore')
 
+@dataclass
+class GraphFilterConfig:
+    start_date: pd.Timestamp
+    end_date: pd.Timestamp
+    element_column: str | None = None
+    selected_elements: list | None = None
+    branch: str | None = None
+    include_outliers: bool | None= None
+    val: bool = False
+
+class GraphFilters:
+
+    def __init__(self, config: GraphFilterConfig):
+        self.cfg = config
+
+    def apply(self, data: pd.DataFrame):
+
+        mask = (
+            (data['date'] >= self.cfg.start_date) &
+            (data['date'] <= self.cfg.end_date) 
+        )
+        if self.cfg.element_column :
+            mask &= data[self.cfg.element_column].isin(self.cfg.selected_elements)
+
+        if self.cfg.include_outliers is False:
+            mask &= data["is_outlier"] == False
+
+        df = data[mask]
+
+        if self.cfg.branch:
+            df = df[df["branch"] == self.cfg.branch]
+
+        return df
+
+    def empty_plot(self, df):
+
+        if df.empty:
+            fig, ax = plt.subplots(figsize=(8, 4))
+            ax.text(0.5, 0.5, "No hay datos disponibles",
+                    ha="center", va="center", fontsize=14)
+            ax.axis("off")
+
+            return (fig, df) if self.cfg.val else fig
 
 def load_mexico_shp():
     mexico = gpd.read_file("data/raw/gadm41_MEX_shp/gadm41_MEX_1.shp")
@@ -40,23 +84,6 @@ def period_sales(data: pd.DataFrame,
     Grafica curva de ventas y regresa la figura.
     """
 
-    # --- Validaciones básicas ---
-    if data.empty:
-        
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return (fig, data) if val else fig
-
-    if "date" not in data or element_column not in data:
-        
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        #fig.savefig("plots/almacen_ventas.png")
-        return (fig, data) if val else fig
-    
-
     # --- Asegurar que las fechas SON datetime ---
     data["date"] = pd.to_datetime(data["date"], errors="coerce")
     data["month"] = data["date"].dt.month
@@ -66,39 +93,20 @@ def period_sales(data: pd.DataFrame,
     end_date   = pd.to_datetime(end_date)
 
     df = data.copy()
-    # Filtro por rango de fechas
-    in_period = (df['date'] >= start_date) & (df['date'] <= end_date)
-    # Filtro por productos o categorías
-    in_selected = df[element_column].isin(selected_elements)
-    
+    filters = GraphFilters(config= GraphFilterConfig(start_date=start_date,
+                                                     end_date=end_date,
+                                                     element_column=element_column,
+                                                     selected_elements=selected_elements,
+                                                     branch=branch,
+                                                     include_outliers=include_outliers,
+                                                     val=val))
 
-    mask = in_period & in_selected
-    if not include_outliers:
-        mask &= df["is_outlier"] == include_outliers
-
-    df = df[mask]
-
+    df = filters.apply(df)
     if df.empty:
-        
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return (fig, df) if val else fig
-    
-    # Filtro por sucursal 
-    if branch:
-        in_branch = df["branch"]==branch
-        df = df[in_branch]
-
-    if df.empty:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return (fig, df) if val else fig
+        return filters.empty_plot(df)
     
     month = month_dict[ df["month"].iloc[0] ]
     year = df["year"].iloc[0]
-    
     
     # Líneas interpoladas
     
@@ -176,23 +184,6 @@ def period_inventory(data: pd.DataFrame,
     Grafica curva de inventario y regresa la figura.
     """
     
-    # --- Validaciones básicas ---
-    if data.empty or (not branch_storage):
-        
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return (fig, data) if val else fig
-
-    if "date" not in data or element_column not in data:
-        
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No se encuentran datos de fecha o del producto", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        #fig.savefig("plots/almacen_ventas.png")
-        return (fig, data) if val else fig
-    
-
     # --- Asegurar que las fechas SON datetime ---
     data["date"] = pd.to_datetime(data["date"], errors="coerce")
 
@@ -200,16 +191,15 @@ def period_inventory(data: pd.DataFrame,
     end_date   = pd.to_datetime(end_date)
 
     df = data.copy().reset_index(drop=True)
-    mask = ((df['date'] >= start_date) & (df['date'] <= end_date) & 
-             df[element_column].isin(selected_elements))
+    filters = GraphFilters(config= GraphFilterConfig(start_date=start_date,
+                                                     end_date=end_date,
+                                                     element_column=element_column,
+                                                     selected_elements=selected_elements,
+                                                     val=val))
 
-    df = df[mask]
-
+    df = filters.apply(df)
     if df.empty:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "No hay datos disponibles", ha="center", va="center", fontsize=14)
-        ax.axis("off")
-        return (fig, df) if val else fig
+        return filters.empty_plot(df)
     
     df["month"] = df["date"].dt.month
     df["year"] = df["date"].dt.year
@@ -218,15 +208,15 @@ def period_inventory(data: pd.DataFrame,
     
     if branch:
         storages = branch_storage[branch]
-        mask &= df['storageId'].isin(storages)
+        mask = df['storageId'].isin(storages)
     else:
         storages = []
         for b in branch_storage.values():
             storages+=b
 
-        mask &= df['storageId'].isin(storages)
+        mask = df['storageId'].isin(storages)
 
-    df = df[mask] 
+    df=df[mask]
     df['total_stock']= df.groupby(['date','productId'])['stock'].transform('sum')
     
 
@@ -315,25 +305,20 @@ def sales_hist(data: pd.DataFrame,
 
     if data.empty or "date" not in data or element_column not in data:
         return empty_fig("No hay datos disponibles", data)
-
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
     df = data.copy()
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    filters = GraphFilters(config= GraphFilterConfig(start_date=start_date,
+                                                     end_date=end_date,
+                                                     element_column=element_column,
+                                                     selected_elements=[main_element],
+                                                     branch=branch,
+                                                     include_outliers=include_outliers,
+                                                     val=val))
 
-    mask = (
-        (df["date"] >= pd.to_datetime(start_date)) &
-        (df["date"] <= pd.to_datetime(end_date)) &
-        (df[element_column] == main_element)
-    )
-
-    if branch:
-        mask &= df["branch"] == branch
-    if not include_outliers:
-        mask &= df["is_outlier"] == include_outliers
-
-    df = df.loc[mask, ["quantity"]].dropna()
-
+    df = filters.apply(df)
     if df.empty:
-        return empty_fig("No hay datos disponibles", df)
+        return filters.empty_plot(df)
 
     
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -364,25 +349,21 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,
                                include_outliers:bool=None,
                                val:bool=False,**kwargs)->pd.DataFrame:
     
-    if data.empty or "date" not in data or element_column not in data:
-        return None
-
+    
     df = data.copy()
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
+    df = data.copy()
+    filters = GraphFilters(config= GraphFilterConfig(start_date=start_date,
+                                                     end_date=end_date,
+                                                     element_column=element_column,
+                                                     selected_elements=[main_element],
+                                                     include_outliers=include_outliers,
+                                                     val=val))
 
-    mask = (
-        (df["date"] >= pd.to_datetime(start_date)) &
-        (df["date"] <= pd.to_datetime(end_date)) &
-        (df[element_column] == main_element )
-    )
-
-    if not include_outliers:
-        mask &= df["is_outlier"] == include_outliers
-
-    df_filtered = df[mask]
-
+    df_filtered = filters.apply(df)
     if df_filtered.empty:
-        return None
+        return filters.empty_plot(df_filtered)
     
     mexico = load_mexico_shp()
     if tab=='ventas':
@@ -490,9 +471,6 @@ def abc_bar_chart(data:pd.DataFrame,
                   type:str="productos",
                   val:bool=False,**kwargs):
     
-    if data.empty:
-        print("Dataset vacío")
-        return None
     type_dict={"productos":"productId","categorias":"category"}
     def abc_class(x):
         if x <= 0.80:
@@ -510,15 +488,15 @@ def abc_bar_chart(data:pd.DataFrame,
 
     data["date"] = pd.to_datetime(data["date"], errors="coerce")
     df = data.copy()
+    filters = GraphFilters(config= GraphFilterConfig(start_date=start_date,
+                                                     end_date=end_date,
+                                                     branch=branch,
+                                                     include_outliers=include_outliers,
+                                                     val=val))
 
-    is_in_period = ( start_date <= df["date"] ) & ( df["date"] <= end_date )
-    in_branch = df["branch"] == branch
-
-    mask = is_in_period&in_branch
-    if not include_outliers:
-        mask &= df["is_outlier"] == include_outliers
-
-    df_filtered = df[mask]
+    df_filtered = filters.apply(df)
+    if df_filtered.empty:
+        return filters.empty_plot(df_filtered)
 
 
     df_summary = (
