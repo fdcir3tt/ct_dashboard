@@ -768,8 +768,12 @@ def main():
 # ===========================================================
 
     today = datetime.date.today() 
-    period_start = pd.to_datetime( datetime.date(today.year, today.month, 1) )
-    period_end = pd.to_datetime( today )
+    if today.day < 15:
+        period_start = pd.to_datetime( datetime.date(today.year, today.month -1 , 15) )
+        period_end = pd.to_datetime( today )
+    else:
+        period_start = pd.to_datetime( datetime.date(today.year, today.month, 1) )
+        period_end = pd.to_datetime( today )
 
 
 
