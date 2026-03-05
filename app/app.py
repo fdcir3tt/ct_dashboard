@@ -423,10 +423,11 @@ def right_section(data:pd.DataFrame,
     def inventory_kpis(data:pd.DataFrame)->tuple[int,int]:
         df = data.copy()
         latest_register=df['date']==df['date'].max()
-        current_stock = df[latest_register]['stock'].iloc[0]
-
-        df['difference'] = df['stock'].diff().fillna(0)
+        current_stock = int((df[latest_register]["stock"].sum()))
+        print(latest_register)
+        df['difference'] = (df.groupby("date")["stock"].sum().reset_index())['stock'].diff().fillna(0)
         positive_supply = df['difference']>0
+        print(df['difference'])
         supplied_stock = int(df[positive_supply]['difference'].sum())
         return current_stock,supplied_stock
     
@@ -446,14 +447,14 @@ def right_section(data:pd.DataFrame,
         current_filters = GraphFilters(config= GraphFilterConfig(start_date=current_period[0],
                                                      end_date=current_period[1],
                                                      element_column=element_column,
-                                                     selected_elements=selected_elements,
+                                                     selected_elements=[selected_element],
                                                      branch=branch,
                                                      include_outliers=include_outliers))
         
         previous_filters = GraphFilters(config= GraphFilterConfig(start_date=previous_period[0],
                                                      end_date=previous_period[1],
                                                      element_column=element_column,
-                                                     selected_elements=selected_elements,
+                                                     selected_elements=[selected_element],
                                                      branch=branch,
                                                      include_outliers=include_outliers))
 

@@ -716,7 +716,7 @@ def load_inventory()->pd.DataFrame:
 
         df = add_states_column(data=df)
         df['productId'] = df['productId'].dropna()
-        
+        df['stock'] = df['stock'].astype('int')
         return df
     else:
         return pd.DataFrame()
