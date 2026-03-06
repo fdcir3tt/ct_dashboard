@@ -367,7 +367,7 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,
 
     df_filtered = filters.apply(df)
     if df_filtered.empty:
-        return df_filtered
+        return None
     
     mexico = load_mexico_shp()
     if tab=='ventas':
@@ -400,14 +400,14 @@ def render_sales_heat_map( merged:pd.DataFrame,
                            main_element: str,
                            tab: str,
                            map_key: str = None,
-                                       map_height: int = 300):
+                           map_height: int = 300)->folium.Map | Figure :
     
     if merged is None:
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles",
                 ha="center", va="center", fontsize=14)
         ax.axis("off")
-        return fig, None
+        return fig
 
     variable = "quantity" if tab == "ventas" else "stock"
 
@@ -539,7 +539,7 @@ def abc_bar_chart(data:pd.DataFrame,
 
     df_summary = (
         df_filtered
-            .groupby([type_selected,"branch"],as_index=False)
+            .groupby([type_selected],as_index=False)
             .agg(
                 total_sales=("quantity", "sum"),
                 min_cost=("cost", "min")  

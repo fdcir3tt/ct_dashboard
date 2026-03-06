@@ -608,11 +608,14 @@ def right_section(data:pd.DataFrame,
                                                             tab= tab
                                                         )
                     map_obj = render_sales_heat_map(merged=merged, 
-                                                                    main_element=main_element,
-                                                                    tab=tab,
-                                                                    map_key=f"{tab} Mapa")
+                                                    main_element=main_element,
+                                                    tab=tab,
+                                                    map_key=f"{tab} Mapa")
+                    if isinstance(map_obj,Figure):
+                        st.pyplot(map_obj)
             
             with col2:
+                st.markdown(f"**Prioridades de {analysis_lvl}**")
                 if analysis_lvl=="Productos":
                     st.pyplot(product_priorities)
                 if analysis_lvl=="Categorías":
