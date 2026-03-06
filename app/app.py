@@ -732,6 +732,7 @@ def right_section(data:pd.DataFrame,
 def main():
     st.set_page_config(
         page_title="CT Dashboard",
+        page_icon="assets/logo.png",
         layout="wide",  
         initial_sidebar_state="collapsed" 
     )
