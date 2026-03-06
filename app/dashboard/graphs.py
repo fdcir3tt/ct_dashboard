@@ -367,7 +367,7 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,
 
     df_filtered = filters.apply(df)
     if df_filtered.empty:
-        return filters.empty_plot(df_filtered)
+        return df_filtered
     
     mexico = load_mexico_shp()
     if tab=='ventas':
@@ -396,10 +396,10 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,
 
 
 
-def render_sales_heat_map(merged,
-                                       main_element: str,
-                                       tab: str,
-                                       map_key: str = None,
+def render_sales_heat_map( merged:pd.DataFrame,
+                           main_element: str,
+                           tab: str,
+                           map_key: str = None,
                                        map_height: int = 300):
     
     if merged is None:

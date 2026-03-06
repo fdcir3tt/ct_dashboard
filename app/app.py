@@ -424,11 +424,19 @@ def right_section(data:pd.DataFrame,
         df = data.copy()
         latest_register=df['date']==df['date'].max()
         current_stock = int((df[latest_register]["stock"].sum()))
-        print(df[latest_register]['date'])
-        df['difference'] = (df.groupby("date")["stock"].sum())['stock'].diff().fillna(0)
-        positive_supply = df['difference']>0
-        print(df.head())
-        supplied_stock = int(df[positive_supply]['difference'].sum())
+        branches = list(df.branch.unique())
+        supplied_stock = 0
+        for b in branches:
+            df_filtered = df[df['branch']==b]
+            df_filtered['difference'] = (
+                                        df_filtered.groupby("date")["stock"]
+                                        .transform("sum")
+                                        .diff()
+                                        .fillna(0)
+                                    )
+            positive_supply = df_filtered['difference']>0
+            supplied_stock += int(df_filtered[positive_supply]['difference'].sum())
+       
         return current_stock,supplied_stock
     
     def kpi_display(data:pd.DataFrame,
@@ -541,7 +549,7 @@ def right_section(data:pd.DataFrame,
                         f'''
                         <div class="kpi-title">
                             <h3>Existencia {title}</h3>
-                            <h2>{current_stock}</h2>
+                            <h2>{current_stock:,}</h2>
                             <p style="color: {stock_color}; font-weight: 600;">
                             {stock_rate:+.1f}%</p>
                         </div>
@@ -554,7 +562,7 @@ def right_section(data:pd.DataFrame,
                         f'''
                         <div class="kpi-title">
                             <h3>Compras {title}</h3>
-                            <h2>{current_supplied}</h2>
+                            <h2>{current_supplied:,}</h2>
                             <p style="color: {supply_color}; font-weight: 600;">
                             {supply_rate:+.1f}% </p>
                         </div>
