@@ -707,8 +707,8 @@ def load_inventory()->pd.DataFrame:
         df = df.drop(columns=['cost'])
 
         # Columna de categorías
-        products = load_products(update=True)
-        categories = load_categories(update=True)
+        products = load_products()
+        categories = load_categories()
         products = products.merge(categories,
                                   how="left",on="idCategoria")
         products = products [["clave","nombre"]].rename(columns={"clave":"productId",
