@@ -424,10 +424,10 @@ def right_section(data:pd.DataFrame,
         df = data.copy()
         latest_register=df['date']==df['date'].max()
         current_stock = int((df[latest_register]["stock"].sum()))
-        print(latest_register)
-        df['difference'] = (df.groupby("date")["stock"].sum().reset_index())['stock'].diff().fillna(0)
+        print(df[latest_register]['date'])
+        df['difference'] = (df.groupby("date")["stock"].sum())['stock'].diff().fillna(0)
         positive_supply = df['difference']>0
-        print(df['difference'])
+        print(df.head())
         supplied_stock = int(df[positive_supply]['difference'].sum())
         return current_stock,supplied_stock
     

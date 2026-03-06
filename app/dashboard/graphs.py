@@ -221,7 +221,7 @@ def period_inventory(data: pd.DataFrame,
         mask = df['storageId'].isin(storages)
 
     df=df[mask]
-    df['total_stock']= df.groupby(['date','productId'])['stock'].transform('sum')
+    df['total_stock']= df.groupby(['date',element_column])['stock'].transform('sum')
     
 
     
@@ -572,7 +572,7 @@ def abc_bar_chart(data:pd.DataFrame,
     )
 
     ax.set_xlabel("Ventas Totales")
-    ax.set_title(f"Ventas Totales en Sucursal por {type[:-1].capitalize()} ")
+    ax.set_title(f"Ventas Totales en {branch.capitalize()} por {type[:-1].capitalize()} ")
 
     # Mostrar valores sobre las barras
     max_val = df_plot["total_sales"].max()

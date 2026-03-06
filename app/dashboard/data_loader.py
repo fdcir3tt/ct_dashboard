@@ -535,11 +535,11 @@ def load_product_codes():
 
     return df
 
-def load_categories():
+def load_categories(update:bool=False):
     file_path = DATA_PATH/'raw'/'categorias.parquet'
     
     categories_exist = os.path.exists(file_path)
-    if categories_exist:
+    if categories_exist and (update is False):
         df = pd.read_parquet(file_path)
         
     else:
@@ -557,10 +557,10 @@ def load_categories():
         
     return df
 
-def load_products():
+def load_products(update:bool=False):
     file_path = DATA_PATH/'raw'/'productos.parquet'
     products_exist = os.path.exists(file_path)
-    if products_exist:
+    if products_exist&(update is False):
         
         df = pd.read_parquet(file_path)
         
@@ -714,9 +714,20 @@ def load_inventory()->pd.DataFrame:
         df = df.merge(right=branches[['storageId','branch']],on='storageId')
         df = df.drop(columns=['cost'])
 
+        # Columna de categorías
+        products = load_products(update=True)
+        categories = load_categories(update=True)
+        products = products.merge(categories,
+                                  how="left",on="idCategoria")
+        products = products [["clave","nombre"]].rename(columns={"clave":"productId",
+                                                                 "nombre":"category"})
+        df = df.merge(products,
+                      how="left",on="productId")
+        
         df = add_states_column(data=df)
         df['productId'] = df['productId'].dropna()
         df['stock'] = df['stock'].astype('int')
+        df.dropna(inplace=True)
         return df
     else:
         return pd.DataFrame()
