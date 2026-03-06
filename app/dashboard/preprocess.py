@@ -3,6 +3,8 @@ import pandas as pd
 import json
 import datetime
 import numpy as np
+import logging
+
 from dashboard.utils import time_period
 from pathlib import Path
 
@@ -53,27 +55,66 @@ def get_existence(existences:str)->int:
 
 
 
-def process_exchange_rates(data:pd.DataFrame):
-    
-    df = data.copy()
-    
-    # Imputación 
-    rates = pd.read_parquet(DATA_PATH/'raw'/'usd_mxn_rates.parquet')
-    rates.index = rates.index.date.astype('datetime64[ns]')
-    rates.index.name = 'date'
+def process_exchange_rates(
+    data: pd.DataFrame,
+    raw_rates: pd.DataFrame,
+    start_date: datetime.datetime = datetime.datetime(2020,1,1),
+    logger: logging.Logger | None = None
+):
 
-    period = pd.DataFrame(data=time_period(start_date=datetime.datetime(2020,1,1) ),columns=["date"])
-    merged = period.merge(df,how="left",on="date")
-    merged = merged.merge(rates,how='left',on='date',suffixes=('', '_fill'))
-    merged['exchange_rate'] = merged['exchange_rate'].fillna(merged['exchange_rate_fill'])
-    merged = merged.drop(columns=['exchange_rate_fill'])
+    if logger:
+        logger.info("Actualizando conversiones...")
+        print("Actualizando conversiones...")
+    else:
+        print("Actualizando conversiones...")
+
+    df = data.copy()
+
+    # asegurar formato datetime
+    
+    df.index = pd.to_datetime(df.index)
+    raw_rates = raw_rates.copy()
+    raw_rates.index = pd.to_datetime(raw_rates.index)
+
+    # generar periodo completo
+    period = pd.DataFrame({
+        "date": pd.date_range(start=start_date, end=pd.Timestamp.today(), freq="D")
+    })
+
+    merged = (
+        period
+        .merge(df, how="left", on="date")
+        .merge(
+            raw_rates.reset_index(),
+            how="left",
+            on="date",
+            suffixes=("", "_fill")
+        )
+    )
+
+    merged["exchange_rate"] = merged["exchange_rate"].fillna(
+        merged["exchange_rate_fill"]
+    )
+
+    merged = merged.drop(columns=["exchange_rate_fill"])
 
     processed_rates = fill_exchange_rates(rates_dataframe=merged)
-    processed_rates = processed_rates.set_index("date") 
-    os.makedirs(DATA_PATH/'processed',exist_ok=True)
-    processed_rates.to_parquet(DATA_PATH/'processed'/'conversion_usd_mxn_tmp.parquet')
-    os.replace(DATA_PATH/'processed'/'conversion_usd_mxn_tmp.parquet',DATA_PATH/'processed'/'conversion_usd_mxn.parquet')
+    processed_rates = processed_rates.set_index("date")
 
+    os.makedirs(DATA_PATH / "processed", exist_ok=True)
+
+    tmp_path = DATA_PATH / "processed" / "conversion_usd_mxn_tmp.parquet"
+    final_path = DATA_PATH / "processed" / "conversion_usd_mxn.parquet"
+
+    processed_rates.to_parquet(tmp_path)
+    os.replace(tmp_path, final_path)
+
+    if logger:
+        logger.info("Actualización realizada correctamente!")
+    else:
+        print("Actualización realizada correctamente!")
+
+    
    
 def normalize_coins(df:pd.DataFrame)->pd.DataFrame:
 
@@ -109,10 +150,12 @@ def process_data(invoices:pd.DataFrame,
     """
     file_path = DATA_PATH/'processed'/'facturas_ventas.parquet'
     data_exists= os.path.exists(file_path)
+    
     if (data_exists)&(not update):
         df=pd.read_parquet(file_path)
         return df
     else:
+        
         df = invoices.merge(product_codes,
                             how="inner",on="productId")
         df = df.merge(exchange_rates,
@@ -144,4 +187,4 @@ def process_data(invoices:pd.DataFrame,
         df = df.drop_duplicates(subset=['folio','productId','date','clientId'])
         df.to_parquet(DATA_PATH/'processed'/'facturas_ventas_tmp.parquet',index=False)
         os.replace(DATA_PATH/'processed'/'facturas_ventas_tmp.parquet', file_path)
-    
+        

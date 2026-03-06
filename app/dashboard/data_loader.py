@@ -480,23 +480,15 @@ def update_table(table:str,
 
     os.remove(save_dir/f"{table}_update.parquet")
 
-def update_exchange_rates(logger,
-                          rates_dataframe:pd.DataFrame,
-                          rate:float=None)->pd.DataFrame:
+def update_exchange_rates(logger, rates_dataframe, rate=None):
     if rate is None:
         rate = get_usd_to_mxn(logger=logger)
-    new_rate =pd.DataFrame(
-            {"exchange_rate": [rate]   },
-            index=pd.DatetimeIndex( [TODAY], name="date")  )
-    
-    new_rate.index = new_rate.index.astype("datetime64[ns]")
-        
-    updated_rates = (
-            pd.concat([rates_dataframe, new_rate])
-              .sort_index()
-              .loc[~pd.concat([rates_dataframe, new_rate]).index.duplicated(keep="last")]
-        )
-    return updated_rates
+
+    today = pd.Timestamp.today().normalize()
+
+    rates_dataframe.loc[today, "exchange_rate"] = rate
+
+    return rates_dataframe.sort_index()
 
 # ===========================================================
 #                       CARGA

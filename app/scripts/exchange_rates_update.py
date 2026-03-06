@@ -67,65 +67,61 @@ def log_exchange_rate_update(status: bool,meta_data: dict,logger: logging.Logger
     else:
         logger.info(msg)
 
-
+def get_local_dataframe():
+    if os.path.exists("data/raw/usd_mxn_rates.parquet"):
+        return pd.read_parquet("data/raw/usd_mxn_rates.parquet")
+    return load_exchange_rates()
 
 def main():
-    if is_up_to_date():
-        print("Conversiones ya estan actualizadas !")
-        return None
-    
-    meta_data = {}
-    file_exists = os.path.exists("data/raw/usd_mxn_rates.parquet")
-    if file_exists:
-        df = pd.read_parquet("data/raw/usd_mxn_rates.parquet")
-        raw_df=load_raw_exchange_rates()
-        process_exchange_rates(data=raw_df)
-        previous_rate= df['exchange_rate'].iloc[-1]
-    else:
-        df = load_exchange_rates()
-        if df is not None:
-            meta_data["fallback_type"] = "estimated" 
-            meta_data["fallback_source_date"] = datetime.datetime.today()
-            previous_rate= df['exchange_rate'].iloc[-1]
-        else:
-            raw_df=load_raw_exchange_rates()
-            process_exchange_rates(data=raw_df)
-            df = load_exchange_rates()
 
-            meta_data["fallback_type"] = "estimated" 
-            meta_data["fallback_source_date"] = datetime.datetime.today()
-            previous_rate= df['exchange_rate'].iloc[-1]
+    df = get_local_dataframe()
 
-    # Llamada a API de conversiones
-    fetched_at = datetime.datetime.today()
-    
-    rate = get_usd_to_mxn(logger=logger)
+    if df is not None and is_up_to_date():
+        print("Conversiones ya están actualizadas!")
+        return
 
-    # Actualización 
+    previous_rate = df["exchange_rate"].iloc[-1]
+
+    try:
+        rate = get_usd_to_mxn(logger=logger)
+    except Exception as e:
+        logger.error(e)
+        rate = None
+
     if rate is None:
-        if file_exists:
-            df = pd.read_parquet("data/raw/usd_mxn_rates.parquet")
-        else:
-            df = load_exchange_rates()
-        rate = np.mean([ df["exchange_rate"].iloc[-1],df["exchange_rate"].iloc[-2] ])
-        meta_data["fallback_type"] = "estimated" 
-        meta_data["fallback_source_date"] = df["date"].iloc[-1]
-        updated = update_exchange_rates(logger=logger,rates_dataframe=df,rate=rate)
+        print("No se pudo extraer un valor de conversion")
+        rate = np.mean(df["exchange_rate"].tail(2))
+        fallback = True
+    else:
+        fallback = False
 
-    else:        
-        meta_data["fetched_at"]=fetched_at
-        if file_exists:
-            df = pd.read_parquet("data/raw/usd_mxn_rates.parquet")
-        else:
-             df = load_exchange_rates()
-        updated = update_exchange_rates(logger=logger,rates_dataframe=df)
+    updated = update_exchange_rates(
+        logger=logger,
+        rates_dataframe=df,
+        rate=rate
+    )
 
-    # Loggeo
     updated.to_parquet("data/raw/usd_mxn_rates.parquet")
-    meta_data["previous_rate"]=previous_rate
-    meta_data["status"]=True
+
+    meta_data = {
+        "previous_rate": previous_rate,
+        "fetched_at": datetime.datetime.today(),
+    }
+
+    if fallback:
+        meta_data["fallback_type"] = "estimated"
+
     log_exchange_rate_update(status=True,meta_data=meta_data)
 
+    raw_df = load_raw_exchange_rates()
+
+    rates_df = pd.read_parquet("data/raw/usd_mxn_rates.parquet")
+    
+    process_exchange_rates(
+        data=raw_df,
+        raw_rates=rates_df,
+        logger=logger
+    )
 
 
 
