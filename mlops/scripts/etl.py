@@ -81,14 +81,10 @@ def main():
             products = list(df_filtered.productId.unique())
             
             for p in products:
-                
-                for w in df_filtered.week.unique():
-                    file_path = (
-                        data_dir / 'processed' / b / c / p / f'week_{str(w)}'
-                        ).with_suffix('.parquet')
-
-                    mask = (df_filtered['week'] == w)
-                    load(transformed_data=df_filtered[mask], file_path=file_path)
+                file_path = (
+                    data_dir / 'processed' / b / p
+                    ).with_suffix('.parquet')
+                load(transformed_data=df_filtered, file_path=file_path)
                 
     return None
 
