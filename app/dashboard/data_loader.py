@@ -7,16 +7,16 @@ import mysql.connector
 import pandas as pd
 import pyarrow.parquet as pq
 import shutil
-import datetime
 import requests
 import time
 
 from pathlib import Path
+from typing import Callable
 from dotenv import load_dotenv
 from pymongo import MongoClient 
 from pymongo.database import Database
 from pymongo.errors import PyMongoError
-from dashboard.utils import add_states_column,time_period
+from dashboard.utils import add_states_column,time_period,Logger,Date,Documents
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
@@ -26,9 +26,7 @@ warnings.filterwarnings('ignore')
 #                           CONFIG
 # ===========================================================
 
-Date = datetime.date
-Document =  dict[str, any]
-Documents = list[Document]
+
 
 DATA_PATH= Path('data')
 TODAY= Date.today()
@@ -74,13 +72,16 @@ PRODUCT_CATEGORY_TABLE_NAME=os.getenv('PRODUCT_CATEGORY_TABLE_NAME')
 PRODUCT_CATALOGUE_TABLE_NAME=os.getenv('PRODUCT_CATALOGUE_TABLE_NAME')
 
 
-def connect_to_DB(conn_uri:str,
-                  db_name:str)-> Database|None:
+def connect_to_DB(conn_uri:str,db_name:str)-> Database|None:
     """
-    Docstring 
+    Conexión a una base de mongo
     
-    :return: Base de datos de mongoDB
-    :rtype: Any
+    Parametros:
+    - conn_uri: str, URI para establecer conexión
+    - db_name: str, Nombre de base
+
+    Regresa : 
+    - client[db_name]: pymongo.database.Database , Base de datos de mongoDB
     """
     try:
         client = MongoClient(conn_uri,
@@ -102,19 +103,22 @@ def get_mysql_connection():
     database=os.getenv('CDB_NAME')
 )
 
+
 # ===========================================================
 #                           QUERIES
 # ===========================================================
 
-def build_query(start_date:Date,
-                end_date:Date)->str:
+def build_query(start_date:Date, end_date:Date)->str:
     """
-    Recibe fecha de inicio y final de periodo y regresa un query
+    Recibe fecha de inicio y final de periodo y regresa un query de SQL
     utilizado para la extracción de la tabla de facturas de venta.
 
-    Args:
-    start_date := Se espera una fecha con el formato YYYY-MM-DD
-    end_date := Se espera una fecha con el formato YYYY-MM-DD
+    Parametros:
+    - start_date : Date , Fecha de inicio de periodo. Se espera una fecha con el formato YYYY-MM-DD
+    - end_date : Date ,Fecha de fin de periodo. Se espera una fecha con el formato YYYY-MM-DD
+    
+    Regresa:
+    - query : str , Query de SQL para extracción de tabla de facturas 
     """
     
     if start_date > end_date:
@@ -135,8 +139,17 @@ def build_query(start_date:Date,
             """
     return query
 
-def get_query(query:str,
-              connection_str:str=conn_str)->pd.DataFrame:    
+def get_query(query:str,connection_str:str=conn_str)->pd.DataFrame:
+    """
+    Extrae dataframe de pandas utilizando una query de SQL
+
+    Parametros:
+    - query: str, Query de consulta
+    - connection_str: str, Hilo de conexión a base de datos SQL
+
+    Regresa:
+    - df: pandas.DataFrame , Tabla extraída 
+    """    
     try:
         
         conn = pyodbc.connect(connection_str)
@@ -150,15 +163,19 @@ def get_query(query:str,
         print(f"Error al intentar conectarse a la base de datos: {e}")
 
 
-def get_documents(database:None,
-                  collection:str,
-                  filters:dict=None,
-                  projection:dict=None) -> Documents:
+def get_documents(database:Database|None,collection_name:str,filters:dict[str,dict]=None,projection:dict[str,str]=None) -> Documents:
     """
-    Función que regresa lista de documentos extraídos de la colección de existencia
+    Función que regresa lista de documentos extraídos de la colección 'existencia' de productos en base de mongo
     
-    :return: Conjunto de documentos extraídos de la colección de existencia e historial
-    :rtype: tuple
+    Parametros:
+    - database: pymongo.database.Database , Base de datos de mongo
+    - collection_name: str , Nombre de colección dentro de base
+    - filters: dict[str,dict] , Filtros de consulta a colección. Ver documentación de pymongo.database.Database.Collection.find() para más información
+    - projection: dict[str,str] , Especificación de campos que se quieren extraer de la consulta. Ver documentación de pymongo.database.Database.Collection.find() para más información
+    
+    Regresa:
+    - result_docs: Documents, Conjunto de documentos extraídos de la colección de existencia e historial
+    
     """
     if database is not None:
         db = database
@@ -168,7 +185,7 @@ def get_documents(database:None,
     if db is None:
         return []
     else:
-        collection = db[collection]
+        collection = db[collection_name]
         try:
             cursor = collection.find(filters, 
                                      projection=projection,
@@ -180,13 +197,16 @@ def get_documents(database:None,
             print(f"No se pudieron extraer los documentos correctamente:{e}")
             return []
         
-def get_product_cost_dict(query_fn=get_query)-> dict :
+def get_product_cost_dict(query_fn:Callable=get_query)-> dict[str,str] :
     """
-    Función que consulta el datawarehouse para conseguir los costos de productos y los regresa
+    Función que consulta el data warehouse para conseguir los costos de productos y los regresa
     como diccionario.
     
-    :return: Regresa un diccionario donde las llaves son el código del producto (productId) y los valores el costo correspondiente
-    :rtype: dict
+    Parametros:
+    - query_fn: Callable , Función de consulta de queries tipo SQL
+
+    Regresa:
+    - cost_dict: dict[str,str] , Diccionario donde las llaves son el código del producto (productId) y los valores el costo correspondiente
     """
     product_code_col= PRODUCT_COLUMNS.split(',')[2]
     product_cost_col= PRODUCT_COLUMNS.split(',')[2]
@@ -199,8 +219,8 @@ def get_product_cost_dict(query_fn=get_query)-> dict :
             "No se pudo obtener costos de productos. "
             "Revisa la conexión ODBC y variables de entorno."
         )    
-    
-    return dict(zip(df[product_code_col], df[product_cost_col]))
+    cost_dict = dict(zip(df[product_code_col], df[product_cost_col]))
+    return cost_dict
 
 
 
@@ -209,7 +229,18 @@ def get_product_cost_dict(query_fn=get_query)-> dict :
 # ===========================================================
 
 
-def format_columns(df:pd.DataFrame):
+def format_columns(df:pd.DataFrame)->pd.DataFrame:
+    """
+    Cambia el nombre de las columnas de la tabla de facturas y luego 
+    el formato con las que deben ser guardadas en base la especificación
+    dentro del entorno 
+
+    Parametros:
+    - df: pandas.DataFrame , Dataframe de las facturas 
+
+    Regresa:
+    - df: pandas.Dataframe , Dataframe con columnas transformadas 
+    """
 
     # Obtener diccionarios de entorno
     name_dict = json.loads(os.getenv("NAME_DICT"))
@@ -243,8 +274,14 @@ def format_columns(df:pd.DataFrame):
 
 def get_last_processed_offset(offset_file: str) -> int:
     """
-    Retrieve the last processed offset from a JSON file.
-    If no file exists, return 0 (start from the beginning).
+    Obtiene el último offset del proceso de extracción del archivo json correspondiente.
+    Regresa 0 si no existe archivo (empieza).
+
+    Parametros:
+    offset_file: str , Nombre de archivo offset
+
+    Regresa:
+    - last_offset: int , Número de filas extraídas durante el proceso de extracción 
     """
     if os.path.exists(offset_file):
         with open(offset_file, 'r') as f:
@@ -252,23 +289,41 @@ def get_last_processed_offset(offset_file: str) -> int:
         return last_offset
     return 0
 
-def save_last_processed_offset(offset_file: str,
-                               offset: int):
+def save_last_processed_offset(offset_file: str, offset: int):
     """
-    Save the last processed offset to a JSON file.
+    
+    Guarda el número offset en archivo JSON
+
+    Parametros:
+    - offset_file : str , Nombre de archivo
+    - offset : int , Número de filas extraídas (offset)
+    
+    Regresa:
+    - : None 
     """
+
     with open(offset_file, 'w') as f:
         json.dump({'last_offset': offset}, f)
 
 
 
-def fetch_and_write_chunk(query:str,
-                          chunk_index:int,
-                          offset:int,
-                          chunk_size:int,
-                          connection_str:str,
-                          order_column:str, 
-                          temp_dir:Path,**kwargs)->int:
+def fetch_and_write_chunk(query:str,chunk_index:int,offset:int,chunk_size:int,connection_str:str,order_column:str, temp_dir:Path,**kwargs)->int:
+    """
+    Extrae chunk de consulta, la guarda y regresa el indice del chunk que procesó
+
+    Parametros:
+    - query: str , Query de la consulta
+    - chunk_index: int , Indice del chunk que se extraera
+    - offset: int, Número de filas ya extraídas (offset)
+    - chunk_size: int, Número de filas que se requieren extraer for chunk
+    - connection_str: str, Hilo de conexión a base de SQL
+    - order_column: str , Nombre de columna con la cuál se basa el orden de extracción
+    - temp_dir: pathlib.Path , Directorio temporal en donde se realizarán la escritura de los chunks y archivos relevantes a la extracción
+    
+    Regresa:
+    - chunk_index: int , Indice del chunk que se extrajo
+
+    """
     
     conn = pyodbc.connect(connection_str)
 
@@ -285,16 +340,27 @@ def fetch_and_write_chunk(query:str,
         
     return chunk_index
 
-def extract_table_parallel(query:str,
-                           output_file: Path,
-                           connection_str: str,
-                           chunk_percent: float = 10,
-                           table_name: str = INVOICES_TABLE,
-                           schema: str = INVOICES_TABLE_SCHEMA,
-                           order_column: str = INVOICES_COLUMNS.split(',')[3],
-                           offset_file: str = 'last_offset.json',
-                           max_workers: int = 4,
-                           temp_dir:Path=Path('/tmp')):
+def extract_table_parallel(query:str,output_file: Path,connection_str: str,chunk_percent: float = 10,table_name: str = INVOICES_TABLE,schema: str = INVOICES_TABLE_SCHEMA,order_column: str = INVOICES_COLUMNS.split(',')[3],offset_file: str = 'last_offset.json',max_workers: int = 4,temp_dir:Path=Path('/tmp')):
+    """
+    Cálcula cuantos chunks se deben procesar para la extracción completa de datos. Luego, pone a correr 'max_workers' de
+    hilos para ejecutar 'fetch_and_write_chunk' en paralelo sin perder información. Una vez terminado el proceso de extracción de 
+    chunks, se une la información de cada chunk guardado en un solo archivo y se borra el directorio temporal.
+
+    Parametros:
+    - query: str, Query de la consulta
+    - output_file: pathlib.Path , Ruta de archivo parquet en cuales los datos extraídos se guardaran
+    - connection_str : str, 
+    - chunk_percent: float, Porcentaje de la cantidad de filas de tabla de extracción que abarcará cada chunk extraído
+    - table_name: str, Nombre de tabla de extracción
+    - schema: str, Esquema de tabla de extracción
+    - order_column: str, Nombre de columna con la cuál se basa el orden de extracción
+    - offset_file: str, Nombre de archivo offset
+    - max_workers: int, Cantidad de hilos que se utilizaran para extraer chunks
+    - temp_dir: pathlib.Path , Directorio temporal en donde se realizarán la escritura de los chunks y archivos relevantes a la extracción
+    
+    Regresa:
+    - : None
+    """
     try:
         print("Conectando para obtener número de filas...")
         n_rows = int(get_query(
@@ -393,7 +459,17 @@ def extract_table_parallel(query:str,
         print(f" Error crítico: {e}")
 
 
-def get_usd_to_mxn(logger)->float:
+def get_usd_to_mxn(logger)->float|None:
+    """
+    Se conecta a página de conversiones de moneda y extrae la conversión de USD a MXN 
+    más actual.
+
+    Parametros:
+    - logger: logging.Logger , Objeto de logeo para capturar información relevante al proceso
+
+    Regresa:
+    - rate: float, Conversión de moneda USD a MXN
+    """
     
     url = "https://api.fxratesapi.com/latest"
     params = {
@@ -422,7 +498,8 @@ def get_usd_to_mxn(logger)->float:
         return None
 
     try:
-        return data["rates"]["MXN"]
+        rate = data["rates"]["MXN"]
+        return rate
     except KeyError:
         logger.error(
             "MXN rate missing from API response",
@@ -443,20 +520,20 @@ def save_file_safe(data: pd.DataFrame, file_path: Path) -> None:
 
     os.replace(tmp_path, file_path)
 
-def update_table(table:str,
-                 latest_update:Date,
-                 save_dir:Path=DATA_PATH):
+def update_table(table:str,latest_update:Date,save_dir:Path=DATA_PATH):
     """ 
     Se especifica cual de las tablas de datos ocupa actualizarse y el último periodo
     que tiene registrado para no generar una consulta grande.
 
     ------------------------
-    Args:
+    Parametros:
 
-    table(str):
-    latest_update(str):
-    save_dir(str,optional):
+    -table: str , Nombre de tabla
+    -latest_update: Date, Fecha más actual del contenido de tabla
+    -save_dir: pathlib.Path , Directorio en donde se quiere guardar tabla actualizada
 
+    Regresa :
+    - : None ,
     """
     if latest_update==TODAY:
         return None
@@ -480,7 +557,18 @@ def update_table(table:str,
 
     os.remove(save_dir/f"{table}_update.parquet")
 
-def update_exchange_rates(logger, rates_dataframe, rate=None):
+def update_exchange_rates(logger:Logger, rates_dataframe:pd.DataFrame, rate:float|None=None)->pd.DataFrame:
+    """
+    Actualiza tabla de conversiones de moneda USD a MXN acorde el valor específicado de 'rate'.
+
+    Parametros:
+    - logger: Logger,
+    - rates_dataframe: pandas.Dataframe, Dataframe de conversiones de moneda USD a MXN
+    - rate: float, Valor de conversión a imputar a tabla de conversiones
+
+    Regresa:
+    - rates_dataframe: pandas.DataFrame , Dataframe de conversiones de moneda USD a MXN actualizada
+    """
     if rate is None:
         rate = get_usd_to_mxn(logger=logger)
 
@@ -641,7 +729,7 @@ def load_branches()->pd.DataFrame:
         return branches
         
 
-def load_storage()->dict:
+def load_storage()->dict[str,list[str]]:
     branches = load_branches()
 
     if not branches.empty :
@@ -649,12 +737,14 @@ def load_storage()->dict:
         branches = branches.set_index("storageId")["branch"].to_dict()
 
         branch_storage={}
-        for key,branch in branches.items():
+        for storageId,branch in branches.items():
+
+            # En caso de haber sucursales con más de un almacen
             if branch in branch_storage.keys():
-                branch_storage[branch].append(key)
+                branch_storage[branch].append(storageId)
                 continue
 
-            branch_storage[branch]=[key]
+            branch_storage[branch]=[storageId]
 
         return branch_storage
     else:
@@ -724,7 +814,7 @@ def load_inventory()->pd.DataFrame:
     else:
         return pd.DataFrame()
 
-def load_raw_exchange_rates()->pd.DataFrame:
+def load_raw_exchange_rates()->pd.DataFrame|None:
     dir_path=DATA_PATH/'raw'
     if os.path.exists(dir_path):
         for path in os.listdir(dir_path):
@@ -748,7 +838,7 @@ def load_raw_exchange_rates()->pd.DataFrame:
     
     return df
 
-def load_exchange_rates():
+def load_exchange_rates()->pd.DataFrame|None:
     file_path=DATA_PATH/'processed'/'conversion_usd_mxn.parquet'
     processed = os.path.exists(file_path)
     if processed:
@@ -758,7 +848,7 @@ def load_exchange_rates():
         return None
 
 
-def load_sales_invoices():
+def load_sales_invoices()->pd.DataFrame|None:
     file_path=DATA_PATH/'processed'/'facturas_ventas.parquet'
     processed = os.path.exists(file_path)
     if processed:

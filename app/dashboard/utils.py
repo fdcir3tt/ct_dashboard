@@ -3,7 +3,11 @@ import yaml
 import datetime
 import json
 
+from logging import Logger 
 
+Date = datetime.date
+Document =  dict[str, any]
+Documents = list[Document]
 
 month_dict={  1:"Enero",
                   2:"Febrero",
@@ -19,6 +23,16 @@ month_dict={  1:"Enero",
                   12:"Diciembre"}
 
 def add_states_column(data:pd.DataFrame)->pd.DataFrame:
+    """
+    Agrega columna de estado Méxicano a la tabla ingresada
+
+    Parametros:
+    - data: pandas.DataFrame, Datos de ingreso con columna de sucursal
+
+    Regresa:
+    - df: pandas.DataFrame, Datos con columna de estados Méxicanos agregada.
+    """
+
     df = data.copy()
     with open("states_dict.json", "r", encoding="utf-8") as f:
             states_dict = json.load(f)
@@ -26,14 +40,19 @@ def add_states_column(data:pd.DataFrame)->pd.DataFrame:
     df["state"] = df["branch"].map(states_dict).fillna("UNKNOWN")
     return df
 
-def top_n(data:pd.DataFrame,
-          element_column,
-          type:str="producto",
-          criteria:str="ventas_diarias",
-          n:int=5)->list[str]:
+def top_n(data:pd.DataFrame,element_column:str,type:str="producto",criteria:str="ventas_diarias",n:int=5)->pd.DataFrame:
     """
     Recibe el dataframe de datos del periodo especificado y regresa los mejores
     'n' productos o categorías en base el criterio específicado.
+
+    Parametros:
+    - data: pandas.DataFrame, Datos de facturas de venta
+    - element_column: str , Nombre de columna clasificadora de elementos. Es decir 'productId' para productos o 'category' para categoría de producto
+    - type: str, Tipo de elemento que se quiere extraer.
+    - criteria: str , Criterio en base cual se compararán los elementos. Ya sea ventas diarias, mensuales etc.
+    - n: int, Cantidad de elementos seleccionados de los mejores.
+    Regresa:
+    - top_n: pandas.DataFrame, Datos de los mejores 'n' elementos en base el criterio específicado.
     """
     type_dict= {"producto":"productId",
                 "categoria":"category",
@@ -44,85 +63,38 @@ def top_n(data:pd.DataFrame,
                    "ventas_mensuales":"sales_month",
                    "ganancia_total":"total_profit"}
     
-    data["sales_day"] = data.groupby([element_column, "date"])["quantity"].transform("sum")
+    data["sales_day"] = (data.groupby([element_column, "date"])["quantity"]
+                             .transform("sum") )
+    
+    columns=[ type_dict[type], criteria_dict[criteria]]
     if n==1:
-        top_n= data[[type_dict[type],criteria_dict[criteria]]].sort_values(by=criteria_dict[criteria],ascending=False)[type_dict[type]].iloc[0]
+        top_n= (data[columns].sort_values(by=criteria_dict[criteria],ascending=False)[type_dict[type]]
+                             .iloc[0])
         return top_n
+    
     if n<0 :
-        df= data[[type_dict[type],criteria_dict[criteria]]].sort_values(by=criteria_dict[criteria],ascending=True).drop_duplicates()[:abs(n)]
+        df= (data[columns].sort_values(by=criteria_dict[criteria],ascending=True)
+                          .drop_duplicates()[:abs(n)])
         return df
-    df= data[[type_dict[type],criteria_dict[criteria]]].sort_values(by=criteria_dict[criteria],ascending=False).drop_duplicates()[:n]
-
+    
+    df= (data[columns].sort_values(by=criteria_dict[criteria],ascending=False)
+                      .drop_duplicates()[:n])
     top_n= df
 
     return top_n
 
-def frequency(data:pd.DataFrame,
-              type:str="cliente")->pd.DataFrame:
+
+def time_period(start_date: Date, end_date: Date = Date.today()) -> list[Date]:
     """
-    Recibe el dataframe de datos del periodo especificado y regresa los ritmos de ventas promedio
-    en dicho periodo. 
+    Genera una lista de fechas en el periodo designado
+
+    Parametros:
+    - start_date: Date , Fecha inicio del periodo
+    - end_date: Date , Fecha fin del periodo
+    Regresa:
+    - dates:list[Date], Lista de fechas entre 'start_date' y 'end_date'
 
     """
-    if data.empty:
-        print("Dataset vacío")
-        return None
-    type_dict= {"producto":"productId",
-                "categoria":"category",
-                "branch":"branch",
-                "cliente":"client",
-                "dia":"weekday",
-                "mes":"month"}
-    
-    column = type_dict[type]
-    data["date"] = pd.to_datetime(data["date"])
-    start = data["date"].min().day
-    end = data["date"].max().day
-
-    period_length = end - start
-    df = data[[column,"date"]].value_counts().to_frame("count")
-    df["total"] = df.groupby(level=column)["count"].transform("sum") 
-    df["avg_rate"] = df["total"]/period_length
-    df = df.reset_index()
-    df = df[[column,"avg_rate"]].drop_duplicates().reset_index().drop(columns="index")
-    return df
-
-def frequent_clients(data:pd.DataFrame,
-                     level:str="producto",
-                     n:int=5)->list[str]:
-    level_dict={"producto":"productId"}
-    df = frequency(data)
-    df = df.sort_values(by="avg_rate",ascending=False)
-    frequent_clients = list( df[:n])
-    return frequent_clients
-
-def top_day(data:pd.DataFrame)->str:
-    weekday_dict={0:"Lunes",
-                  1:"Martes",
-                  2:"Miercoles",
-                  3:"Jueves",
-                  4:"Viernes",
-                  5:"Sábado",
-                  6:"Domingo"}
-    
-    data["date"] = pd.to_datetime(data["date"])
-    data["weekday"]=data["date"].dt.weekday
-    df = frequency(data,type="dia")
-    df = df.sort_values(by="avg_rate",ascending=False)
-    return weekday_dict[df["weekday"].iloc[0]]
-
-def top_month(data:pd.DataFrame)->str:
-
-    
-    data["date"] = pd.to_datetime(data["date"])
-    
-    df = frequency(data,type="mes")
-    df = df.sort_values(by="avg_rate",ascending=False)
-    return month_dict[df["month"].iloc[0]]
-
-
-def time_period(start_date: datetime.datetime,
-                end_date: datetime.datetime = datetime.datetime.today()) -> list:
     if start_date > end_date:
         raise ValueError("Fecha inicial debe tomar lugar antes que la fecha final de periodo")
 

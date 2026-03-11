@@ -581,19 +581,12 @@ def right_section(data:pd.DataFrame,
                                analysis_lvl:str,
                                tab:str):  
         if tab=='ventas':
-            product_priorities = abc_bar_chart(data=global_data,
-                                                    branch=branch,
-                                                    include_outliers=include_outliers,
-                                                    start_date=period_start,
-                                                    end_date=period_end,
-                                                    type="productos")
-
-            category_priorities = abc_bar_chart(data=global_data,
-                                                    branch=branch,
-                                                    include_outliers=include_outliers,
-                                                    start_date=period_start,
-                                                    end_date=period_end,
-                                                    type="categorias")
+            sales_priorities = abc_bar_chart(data=global_data,
+                                             element_column=element_column,
+                                             branch=branch,
+                                             include_outliers=include_outliers,
+                                             start_date=period_start,
+                                             end_date=period_end)
 
             col1, col2 = st.columns(2)
             with col1:
@@ -616,29 +609,26 @@ def right_section(data:pd.DataFrame,
             
             with col2:
                 st.markdown(f"**Prioridades de {analysis_lvl}**")
-                if analysis_lvl=="Productos":
-                    st.pyplot(product_priorities)
-                if analysis_lvl=="Categorías":
-                    st.pyplot(category_priorities)
+                st.pyplot(sales_priorities)
 
         if tab=='inventario':
             col1, col2 = st.columns(2)
             with col1:
                 st.markdown(f"**Mapa de {tab}**")
                 merged = cached_functions['prepare_sales_heatmap_data'](
-                                                                data=inventory,
-                                                                main_element=main_element,
-                                                                element_column=element_column,
-                                                                start_date=period_start,
-                                                                end_date=period_end,
-                                                                include_outliers = include_outliers,
-                                                                tab= tab
-                                                            )
+                                                                        data=inventory,
+                                                                        main_element=main_element,
+                                                                        element_column=element_column,
+                                                                        start_date=period_start,
+                                                                        end_date=period_end,
+                                                                        include_outliers = include_outliers,
+                                                                        tab= tab
+                                                                    )
         
                 map_obj= render_sales_heat_map(merged=merged, 
-                                                                main_element=main_element,
-                                                                tab=tab,
-                                                                map_key=f"{tab} Mapa")
+                                               main_element=main_element,
+                                               tab=tab,
+                                               map_key=f"{tab} Mapa")
 
     if tab=='ventas':
         sales_plots(data,
@@ -815,8 +805,6 @@ def main():
 
     if data.empty:
         print('Dataset vacío')
-
-
 
 
 # ===========================================================

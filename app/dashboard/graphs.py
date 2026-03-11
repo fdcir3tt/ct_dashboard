@@ -13,7 +13,7 @@ import base64
 
 
 from dataclasses import dataclass
-from dashboard.utils import time_period,month_dict,add_states_column
+from dashboard.utils import month_dict,Date
 from streamlit_folium import st_folium
 from matplotlib.ticker import MaxNLocator
 from matplotlib.figure import Figure
@@ -31,7 +31,6 @@ class GraphFilterConfig:
     val: bool = False
 
 class GraphFilters:
-
     def __init__(self, config: GraphFilterConfig):
         self.cfg = config
 
@@ -65,6 +64,9 @@ class GraphFilters:
             return (fig, df) if self.cfg.val else fig
 
 def load_mexico_shp():
+    """
+    Carga archivos 'shp' necesarios de México para mapa de calor
+    """
     mexico = gpd.read_file("data/raw/gadm41_MEX_shp/gadm41_MEX_1.shp")
     mexico["geometry"] = mexico["geometry"].simplify(
         tolerance=0.01, preserve_topology=True
@@ -77,15 +79,24 @@ def load_mexico_shp():
 # GRÄFICAS
 # -----------------------------------------------------------
 
-def period_sales(data: pd.DataFrame, 
-                 selected_elements: list[str] ,
-                 element_column:str ,
-                 start_date, end_date,
-                 include_outliers:bool=None,
-                 branch:str=None,
-                 val:bool=False,**kwargs)->Figure:
+def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_column:str ,start_date:Date, end_date:Date,include_outliers:bool|None=None,branch:str|None=None,val:bool=False)->Figure|tuple[Figure,pd.DataFrame]:
     """
-    Grafica curva de ventas y regresa la figura.
+    Grafica curva de ventas.
+
+    Parametros:
+    - data: pandas.DataFrame, Datos de facturas de venta 
+    - selected_elements: list[str] , Elementos seleccionados a visualizar en gráfica .(ej. Productos o Categorías de producto)
+    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'productId' para productos o 'category' para categoría de producto
+    - start_date: Date, Fecha inicio de periodo de análisis
+    - end_date: Date, Fecha fin de periodo de análisis
+    - include_outliers: bool, Booleano para afirmar la inclusión de ventas atípicas en el análisis
+    - branch: str, Nombre de sucursal en cual se quiere hacer análisis. Si es análisis global, no se incluye.
+    - val: bool, Paramétro para pruebas unitarias de función
+
+    Regresa:
+    - fig: matplotlib.figure.Figure , Figura de gráfico 
+    - plot_df: pandas.DataFrame, Datos usados para la visualización de ventas
+
     """
 
     # --- Asegurar que las fechas SON datetime ---
@@ -177,15 +188,24 @@ def period_sales(data: pd.DataFrame,
     
     return (fig, plot_df) if val else fig
 
-def period_inventory(data: pd.DataFrame,
-                     branch_storage:dict[str,list[str]], 
-                     selected_elements: list[str] ,
-                     element_column:str ,
-                     start_date, end_date,
-                     branch:str=None,
-                     val:bool=False,**kwargs)->Figure:
+def period_inventory(data: pd.DataFrame,branch_storage:dict[str,list[str]], selected_elements: list[str] ,element_column:str ,start_date:Date, end_date:Date,branch:str|None=None,val:bool=False)->Figure|tuple[Figure,pd.DataFrame]:
     """
-    Grafica curva de inventario y regresa la figura.
+    Grafica curva de inventario.
+
+    Parametros:
+    - data: pandas.DataFrame, Datos de facturas de venta 
+    - branch_storage: dict[str,list[str]], Diccionario que contiene los almacenes asociados a cada sucursal.
+    - selected_elements: list[str] , Elementos seleccionados a visualizar en gráfica .(ej. Productos o Categorías de producto)
+    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'productId' para productos o 'category' para categoría de producto
+    - start_date: Date, Fecha inicio de periodo de análisis
+    - end_date: Date, Fecha fin de periodo de análisis
+    - branch: str, Nombre de sucursal en cual se quiere hacer análisis. Si es análisis global, no se incluye.
+    - val: bool, Paramétro para pruebas unitarias de función
+
+    Regresa:
+    - fig: matplotlib.figure.Figure , Figura de gráfico 
+    - plot_df: pandas.DataFrame, Datos usados para la visualización de existencias
+
     """
     
     # --- Asegurar que las fechas SON datetime ---
@@ -290,16 +310,29 @@ def period_inventory(data: pd.DataFrame,
     return (fig, plot_df) if val else fig
 
 
-def sales_hist(data: pd.DataFrame,
-               main_element: str,
+def sales_hist(data: pd.DataFrame,main_element: str,
                element_column: str,
                start_date,end_date,
                include_outliers:bool,
                branch: str = None,
-               val: bool = False,):
+               val: bool = False,)->Figure|tuple[Figure,pd.DataFrame]:
     """
-    Función que recibe el dataframe de datos del periodo especificado y 
-    gráfica las curvas de existencia del producto y ventas.
+    Gráfica frecuencias de venta.
+
+    Parametros:
+    - data: pandas.DataFrame, Datos de facturas de venta     
+    - main_element: str , Elemento seleccionado a visualizar en gráfica .(ej. Producto o Categoría de producto)
+    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'productId' para productos o 'category' para categoría de producto
+    - start_date: Date, Fecha inicio de periodo de análisis
+    - end_date: Date, Fecha fin de periodo de análisis
+    - include_outliers: bool, Booleano para afirmar la inclusión de ventas atípicas en el análisis
+    - branch: str, Nombre de sucursal en cual se quiere hacer análisis. Si es análisis global, no se incluye.
+    - val: bool, Paramétro para pruebas unitarias de función
+
+    Regresa:
+    - fig: matplotlib.figure.Figure , Figura de gráfico 
+    - plot_df: pandas.DataFrame, Datos usados para la visualización de frecuencias
+
     """
     def empty_fig(msg, df):
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -320,15 +353,15 @@ def sales_hist(data: pd.DataFrame,
                                                      include_outliers=include_outliers,
                                                      val=val))
 
-    df = filters.apply(df)
-    if df.empty:
+    plot_df = filters.apply(df)
+    if plot_df.empty:
         return filters.empty_plot(df)
 
     
     fig, ax = plt.subplots(figsize=(10, 6))
 
     ax.hist(
-        df["quantity"],
+        plot_df["quantity"],
         bins=100,               
         color="steelblue",
         edgecolor="black"
@@ -342,19 +375,31 @@ def sales_hist(data: pd.DataFrame,
 
     fig.tight_layout()
 
-    return (fig, df) if val else fig
+    return (fig, plot_df) if val else fig
 
 
-def prepare_sales_heatmap_data(data: pd.DataFrame, 
-                               main_element: str,
-                               element_column: str,
-                               start_date,end_date,
-                               tab:str,
-                               include_outliers:bool=None,
-                               val:bool=False,**kwargs)->pd.DataFrame:
+def prepare_sales_heatmap_data(data: pd.DataFrame,main_element: str,element_column: str,start_date,end_date,tab:str,include_outliers:bool=None,val:bool=False)->pd.DataFrame|tuple[pd.DataFrame,pd.DataFrame]:
     
+    """
+    Prepara datos para gráfica mapa de calor uniendo datos geoespaciales de México y datos de ventas/inventario.
+
+    Parametros:
+    - data: pandas.DataFrame, Datos de facturas de venta o datos de inventario    
+    - main_element: str , Elemento seleccionado a visualizar en gráfica .(ej. Producto o Categoría de producto)
+    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'productId' para productos o 'category' para categoría de producto
+    - start_date: Date, Fecha inicio de periodo de análisis
+    - end_date: Date, Fecha fin de periodo de análisis
+    - tab: str, Indica si se trabajara con datos de inventario o de ventas
+    - include_outliers: bool, Booleano para afirmar la inclusión de ventas atípicas en el análisis
+    - branch: str, Nombre de sucursal en cual se quiere hacer análisis. Si es análisis global, no se incluye.
+    - val: bool, Paramétro para pruebas unitarias de función
+
+    Regresa:
+    - merged: pandas.DataFrame , Datos usados para la visualización de ventas/inventario en mapa de calor
+    - filtered_df: pandas.DataFrame, Datos filtrados antes de unirse con los datos geométricos de México
+
+    """
     
-    df = data.copy()
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
     df = data.copy()
@@ -399,9 +444,23 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,
 def render_sales_heat_map( merged:pd.DataFrame,
                            main_element: str,
                            tab: str,
-                           map_key: str = None,
+                           map_key: str|None = None,
                            map_height: int = 300)->folium.Map | Figure :
-    
+    """
+    Gráfica mapa de calor de ventas/inventario.
+
+    Parametros:
+    - merged: pandas.DataFrame, Datos preparados  
+    - main_element: str , Elemento seleccionado a visualizar en gráfica .(ej. Producto o Categoría de producto)
+    - tab: str, Indica si se trabajara con datos de inventario o de ventas
+    - map_key: str, Identificador de objeto mapa
+    - map_height: int, Paramétro para configurar altura de mapa en pixeles
+
+    Regresa:
+    - m: folium.Map , Mapa de calor a visualizar
+    - fig: matplotlib.figure.Figure, Figura en caso de que no hayan datos a visualizar
+
+    """
     if merged is None:
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles",
@@ -501,15 +560,27 @@ def render_sales_heat_map( merged:pd.DataFrame,
 
     return m
 
-def abc_bar_chart(data:pd.DataFrame,
-                  start_date:str,
-                  end_date:str,
-                  branch:str,
-                  include_outliers:bool,
-                  type:str="productos",
-                  val:bool=False,**kwargs):
+def abc_bar_chart(data:pd.DataFrame,element_column:str,start_date:Date,end_date:Date,branch:str,include_outliers:bool,val:bool=False)->Figure|tuple[Figure,pd.DataFrame]:
+    """
+    Gráfica prioridades de producto/categoría. Clasifica prioridad de producto/categoría en base 
+    porcentaje de aportación a valor adquirido en periodo especificado. El valor adquirido se cal-
+    cula con el costo total de las ventas realizadas. 
+
+    Parametros:
+    - data: pandas.DataFrame, Datos de facturas de venta     
+    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'productId' para productos o 'category' para categoría de producto
+    - start_date: Date, Fecha inicio de periodo de análisis
+    - end_date: Date, Fecha fin de periodo de análisis
+    - include_outliers: bool, Booleano para afirmar la inclusión de ventas atípicas en el análisis
+    - branch: str, Nombre de sucursal en cual se quiere hacer análisis. Si es análisis global, no se incluye.
+    - val: bool, Paramétro para pruebas unitarias de función
+
+    Regresa:
+    - fig: matplotlib.figure.Figure , Figura de gráfico 
+    - plot_df: pandas.DataFrame, Datos usados para la visualización de prioridades
+
+    """
     
-    type_dict={"productos":"productId","categorias":"category"}
     def abc_class(x):
         if x <= 0.80:
             return "Alta"
@@ -520,7 +591,7 @@ def abc_bar_chart(data:pd.DataFrame,
         
     # Filtros
 
-    type_selected = type_dict[type]
+    type_selected = element_column
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
 
@@ -551,32 +622,33 @@ def abc_bar_chart(data:pd.DataFrame,
     df_summary["cumulative_val"] = df_summary["annual_value"].cumsum() / df_summary["annual_value"].sum()
     df_summary["prioridad"] = df_summary["cumulative_val"].apply(abc_class)
 
-    
-    
-    
-    
+
 
     color_map = {"Alta":"red", "Media":"blue", "Baja":"gray"}
 
-    df_plot = df_summary.sort_values(by="total_sales",ascending=False)
-    df_plot = df_plot.reset_index()[:20]
+    plot_df = df_summary.sort_values(by="total_sales",ascending=False)
+    plot_df = plot_df.reset_index()[:20]
 
 
     fig, ax = plt.subplots(figsize=(10, 8))
 
     # Barras
     ax.barh(
-        df_plot[type_selected],
-        df_plot["total_sales"],
-        color=df_plot["prioridad"].map(color_map)
+        plot_df[type_selected],
+        plot_df["total_sales"],
+        color=plot_df["prioridad"].map(color_map)
     )
-
+    if element_column=='category':
+        element='Categoría'
+    else:
+        element='Producto'    
+        
     ax.set_xlabel("Ventas Totales")
-    ax.set_title(f"Ventas Totales en {branch.capitalize()} por {type[:-1].capitalize()} ")
+    ax.set_title(f"Ventas Totales en {branch.capitalize()} por {element} ")
 
     # Mostrar valores sobre las barras
-    max_val = df_plot["total_sales"].max()
-    for i, v in enumerate(df_plot["total_sales"]):
+    max_val = plot_df["total_sales"].max()
+    for i, v in enumerate(plot_df["total_sales"]):
         ax.text(v + max_val * 0.01, i, str(v), va='center')
 
     # Leyenda
@@ -587,8 +659,9 @@ def abc_bar_chart(data:pd.DataFrame,
     ax.invert_yaxis()
 
     fig.tight_layout()
+    
     if val:
-        return fig,df_summary
+        return fig,plot_df
     
     
     return fig
