@@ -7,3 +7,10 @@
 [Modelo ARIMA](https://www.probabilidadyestadistica.net/modelo-arima/)
 
 [What is LSTM - Long Short Term Memory?](https://www.geeksforgeeks.org/deep-learning/deep-learning-introduction-to-long-short-term-memory/)
+
+[MLOps best practices, challenges and maturity models: A systematic literature review](https://www.sciencedirect.com/science/article/pii/S0950584925000722)
+
+[10 MLOps best practices for 2025](https://www.goml.io/blog/mlops-best-practices)
+
+[12 Essential MLOps Best Practices & Tips
+](https://www.moontechnolabs.com/blog/mlops-best-practices/)
