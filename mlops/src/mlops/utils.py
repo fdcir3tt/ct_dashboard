@@ -3,6 +3,7 @@ import datetime
 import pandas as pd
 import yaml
 import numpy as np
+import matplotlib.pyplot as plt
 
 from pathlib import Path
 from typing import Any,Iterable
@@ -174,3 +175,49 @@ def get_experiment_config(file_path:Path=Path('config.yml'))->ExperimentConfig:
 
     return ExperimentConfig(**config)
 
+
+def make_time_series(data:pd.DataFrame,period:list[Date]|None=None,target_column:str="quantity")-> np.ndarray:
+    """
+    Convierte datos de ventas a serie temporal, llenando los huecos de fechas con venta '0'
+
+    Parametros:
+    - data: pandas.DataFrame, Datos de venta
+    - period: list[Date], Periodo de tiempo de interes
+    - target_column: str, Columna objetivo de serie
+    Regresa:
+    - time_series: numpy.ndarray, Serie de tiempo resultado de los datos de venta
+    """
+    if period is None:
+        period = time_period(start_date=Date(2020,1,1))
+    time_df = pd.DataFrame(data=period,columns=["date"])
+    time_df["date"]=pd.to_datetime(time_df["date"])
+    df = time_df.merge(right=data,
+                       how="left",
+                       on="date")
+    df[target_column]=df[target_column].fillna(value=0,inplace=False)
+
+    time_series=df[target_column].to_numpy()
+    return time_series
+
+
+def plot_series(series:np.ndarray,title:str="Ventas realizadas dentro del periodo",xlabel:str="Tiempo (días)", ylabel:str="Ventas"):
+    """
+    Gráfica de predicción de modelo y datos reales.
+            
+    Parametros:
+    - series: array-like, Valores de venta
+    - title: str, Título de gráfico
+    - xlabel: str, Etiqueta de eje horizontal
+    - ylabel: str,  Etiqueta de eje vertical
+
+    Regresa:
+    - fig: matplotlib Figure object, Gráfica de ventas 
+    """
+    fig, ax = plt.subplots(figsize=(10,5))
+    ax.plot(series, label="Ventas", marker='x')
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.legend()
+    ax.grid(True)
+    return fig

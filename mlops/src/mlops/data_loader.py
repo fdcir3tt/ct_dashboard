@@ -1,13 +1,11 @@
 import pandas as pd
 import os
-from utils import data_dir,Date,save_file_safe
+from mlops.utils import data_dir,Date,save_file_safe
 
 
 
 
-def get_dataset(branch:str,
-                productId:str,
-                time_period:list[Date]|None=None)->pd.Dataframe:
+def get_dataset(branch:str,productId:str,time_period:list[Date]|None=None)->pd.Dataframe:
     """
     Extrae dataset 
     """
@@ -21,10 +19,7 @@ def get_dataset(branch:str,
     return dataset
 
 
-def dataset_profiling(branch:str,
-                      productId:str,
-                      time_period:list[Date],
-                      description:str)->None:
+def dataset_profiling(branch:str,productId:str,time_period:list[Date],description:str)->None:
     """
     Función que guarda metadatos de un dataset en tabla correspondiente
     """
