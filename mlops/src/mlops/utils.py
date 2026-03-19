@@ -2,6 +2,7 @@ import os
 import datetime 
 import pandas as pd
 import yaml
+import numpy as np
 
 from pathlib import Path
 from typing import Any,Iterable
@@ -12,12 +13,109 @@ data_dir = Path('data')
 
 @dataclass
 class ExperimentConfig:
-    model : str
-    metrics : Iterable[str]
-    parameters : dict[str,Any] 
-    time_period : tuple[Date,Date]
-    time_unit : str='days'
+    datasets: dict[str,str]
+    metrics : dict[str,Iterable[str]]
+    parameters : dict[str,dict[str,Any]] 
+    training_data_start_dates: dict[str,Date]
+    training_data_end_dates: dict[str,Date]
+    model_types: list[str]
+    horizons:dict[str,int]
+    frequencies: dict[str,str]
+    training_windows:dict[str,int]
+    seeds:dict[str,int]
+    git_commit: str|None =None
+    feature_set: str|None =None
 
+@dataclass
+class DatasetFilterConfig:
+    start_date: Date
+    end_date: Date
+    frequency : str
+    horizon: int 
+    training_window: int
+
+class DatasetFilters:
+    def __init__(self, config: DatasetFilterConfig):
+        self.cfg = config
+
+    def apply_period_filter(self, data: pd.DataFrame)->pd.DataFrame:
+        """
+        Aplica filtro de periodo especificado a los datos
+        
+        Parametros:
+        - data: pandas.DataFrame, Datos que se quieren filtrar
+
+        Regresa:
+        - df: pandas.DataFrame, Datos filtrados
+        """
+        start_date = pd.to_datetime(self.cfg.start_date)
+        end_date = pd.to_datetime(self.cfg.end_date)
+        
+        mask = (
+            (data['date'] >= start_date) &
+            (data['date'] <= end_date) 
+        )
+
+        df = data[mask]
+        
+        if df.empty:
+            print("Dataset invalido: No hay datos en el periodo específicado")
+            return None
+        df = df.sort_values("date")
+        return df
+    
+    def apply_split(self, data: pd.DataFrame)->tuple[np.ndarray,np.ndarray,np.ndarray,np.ndarray]|None:
+        """
+        Divide datos en datos de entrenamiento y de prueba en base los parametros
+        de frecuencia, ventana de entrenamiento y ventana de horizonte.
+
+        Parametros:
+        - data: pandas.DataFrame, Datos filtrados que se quieren dividir
+
+        Regresa:
+        - x_train: numpy.ndarray, Datos de entrada de entrenamiento
+        - y_train: numpy.ndarray, Datos de objetivo de entrenamiento
+        - x_test: numpy.ndarray, Datos de entrada de prueba
+        - y_test: numpy.ndarray, Datos de objetivo de prueba
+        """
+        
+        df = self.apply_period_filter(data)
+        if df is None:
+            return None
+        
+        # Frecuencia
+        if self.cfg.frequency not in ["days","weeks","months"]:
+            print("Frecuencia invalida: El valor debe ser 'days','weeks' o 'months' ")
+            return None
+        if self.cfg.frequency == "days":
+            target_column = "quantity"
+        
+        if self.cfg.frequency == "weeks":
+            df["weekly_quantity"]=df.groupby(["year","week"])["quantity"].transform("sum")
+            target_column="weekly_quantity"
+
+        if self.cfg.frequency == "months": 
+            df["months_quantity"]=df.groupby(["year","month"])["quantity"].transform("sum")
+            target_column="months_quantity"
+        
+        # Ventanas de entrenamiento y horizonte
+        training_window = self.cfg.training_window
+        horizon = self.cfg.horizon
+        
+        if len(df)< horizon+training_window:
+            print(f"Dataset invalido: Insuficiente datos para configuración actual.\nNúmero de datos:{len(df)}\nNúmero Requerido:{horizon+training_window}")
+            return None
+        
+        x = df["date"].to_numpy()
+        y = df[target_column].to_numpy()
+
+        x_train = x[:training_window]
+        y_train = y[:training_window]
+
+        x_test = x[training_window:training_window+horizon]
+        y_test = y[training_window:training_window+horizon]
+
+        return x_train,y_train,x_test,y_test
 
 def time_period(start_date: Date,end_date: Date = Date.today()) -> list[Date]:
     """
@@ -26,9 +124,9 @@ def time_period(start_date: Date,end_date: Date = Date.today()) -> list[Date]:
     Parametros:
     - start_date: Date , Fecha inicio del periodo
     - end_date: Date , Fecha fin del periodo
+    
     Regresa:
     - dates:list[Date], Lista de fechas entre 'start_date' y 'end_date'
-
     """
     if start_date > end_date:
         raise ValueError("Fecha inicial debe tomar lugar antes que la fecha final de periodo")
@@ -50,6 +148,8 @@ def save_file_safe(data: pd.DataFrame, file_path: Path) -> None:
     - data: pandas.DataFrame , Datos que se quieren almacenar
     - file_path: pathlib.Path , Ubicación en donde se quieren almacenar los datos
 
+    Regresa:
+    -, :None
     """
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -64,9 +164,13 @@ def get_experiment_config(file_path:Path=Path('config.yml'))->ExperimentConfig:
 
     Parametros:
     - file_path: pathlib.Path , Ubicación de archivo de configuración. 
+    
+    Regresa:
+    - ExperimentConfig(**config): ExperimentConfig, Configuración de experimento
     """
     if file_path.suffix=='.yml' or file_path.suffix=='.yaml':
         with open(file_path, mode='r') as f:
             config = yaml.safe_load(f)
 
     return ExperimentConfig(**config)
+

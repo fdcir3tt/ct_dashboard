@@ -1,9 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Iterable
+from typing import Iterable,Any
 from matplotlib.figure import Figure
 from dataclasses import dataclass
 from abc import ABC,abstractmethod
+
 
 @dataclass
 class Metrics:
@@ -18,10 +19,32 @@ class LossHistory:
     test_loss:Iterable|None=None
         
 class ForecastModel(ABC):
-    def __init__(self,parameters:dict[str,float],test_metrics:list[str]=['mae','mse']):
+    _registry: dict[str, type["ForecastModel"]] = {}
+
+    def __init__(self,parameters:dict[str,Any],test_metrics:list[str]=['mae','mse']):
         self.parameters= parameters
         self.test_metrics = test_metrics # Metricas que se quieren evaluar
 
+
+    @classmethod
+    def register(cls, name: str):
+        """ Decorador para registrar modelos de esta clase automáticamente """
+        def decorator(model_cls: type["ForecastModel"]):
+            cls._registry[name] = model_cls
+            return model_cls
+        return decorator
+    
+    @classmethod
+    def from_name(cls,model_name: str,parameters: dict[str, float],test_metrics: list[str] = ['mae','mse']) -> "ForecastModel":
+        """ Método para cargar modelo de esta clase por su nombre """
+        model_cls = cls._registry.get(model_name.lower())
+        if model_cls is None:
+            raise ValueError(
+                f"Modelo desconocido '{model_name}'. Modelos disponibles: {list(cls._registry)}"
+            )
+
+        return model_cls(parameters, test_metrics)
+    
     @abstractmethod
     def fit(self,x_train:np.ndarray,y_train:np.ndarray):
         """
@@ -51,13 +74,14 @@ class ForecastModel(ABC):
         pass
 
     @abstractmethod
-    def predict(self,x_test:np.ndarray )->np.ndarray:
+    def predict(self,x_test:np.ndarray,y_test:np.ndarray )->np.ndarray:
         """
         Predicciones del modelo 
         Requiere ser implementado por subclases.
 
         Parametros:
         - x_test: array-like, Datos de entrada en cual se quieren realizar predicciones.
+        - y_test: array-like, Datos de entrada, valores reales .
 
         Regresa:
         - y_pred: array-like , Predicciones del modelo 
@@ -172,6 +196,8 @@ class ForecastModel(ABC):
         test_fig = self.plot_prediction(y_pred,y_true)
         return test_fig,metrics 
 
+
+@ForecastModel.register("heuristic")
 class HeuristicModel(ForecastModel):
     def fit(self, x_train: np.ndarray, y_train: np.ndarray):
         """ No se tiene método de ajuste para este modelo actualmente"""
@@ -196,3 +222,6 @@ class HeuristicModel(ForecastModel):
         else: 
             print(f"Error: Datos no cumplen con longitud mínima. Esperado: 30 , Ingreso:{len(x_test)}")
             return None
+        
+
+
