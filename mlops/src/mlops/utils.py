@@ -107,8 +107,11 @@ class DatasetFilters:
             print(f"Dataset invalido: Insuficiente datos para configuración actual.\nNúmero de datos:{len(df)}\nNúmero Requerido:{horizon+training_window}")
             return None
         
-        x = df["date"].to_numpy()
-        y = df[target_column].to_numpy()
+        start_date = pd.to_datetime(self.cfg.start_date)
+        end_date = pd.to_datetime(self.cfg.end_date)
+        period = time_period(start_date=start_date,end_date=end_date)
+
+        x,y = make_time_series(df,period,target_column)
 
         x_train = x[:training_window]
         y_train = y[:training_window]
@@ -176,7 +179,7 @@ def get_experiment_config(file_path:Path=Path('config.yml'))->ExperimentConfig:
     return ExperimentConfig(**config)
 
 
-def make_time_series(data:pd.DataFrame,period:list[Date]|None=None,target_column:str="quantity")-> np.ndarray:
+def make_time_series(data:pd.DataFrame,period:list[Date]|None=None,target_column:str="quantity",frequency:str="days")-> np.ndarray:
     """
     Convierte datos de ventas a serie temporal, llenando los huecos de fechas con venta '0'
 
@@ -184,8 +187,10 @@ def make_time_series(data:pd.DataFrame,period:list[Date]|None=None,target_column
     - data: pandas.DataFrame, Datos de venta
     - period: list[Date], Periodo de tiempo de interes
     - target_column: str, Columna objetivo de serie
+    - frequency: str, Frecuencia de serie. Ej. 'days','weeks','months' 
     Regresa:
     - time_series: numpy.ndarray, Serie de tiempo resultado de los datos de venta
+    - time_axis: numpy.ndarray, Fechas de serie de tiempo
     """
     if period is None:
         period = time_period(start_date=Date(2020,1,1))
@@ -194,10 +199,23 @@ def make_time_series(data:pd.DataFrame,period:list[Date]|None=None,target_column
     df = time_df.merge(right=data,
                        how="left",
                        on="date")
+    
     df[target_column]=df[target_column].fillna(value=0,inplace=False)
+    df = df.sort_values(by="date")
 
+    if frequency=="days":
+        frequency_col = "day"
+        df["day"]=df["date"].dt.dayofyear
+
+    if frequency=="weeks":
+        frequency_col = "week"
+
+    if frequency=="months":
+        frequency_col = "month"
+
+    time_axis = df[frequency_col].to_numpy()
     time_series=df[target_column].to_numpy()
-    return time_series
+    return time_axis,time_series
 
 
 def plot_series(series:np.ndarray,title:str="Ventas realizadas dentro del periodo",xlabel:str="Tiempo (días)", ylabel:str="Ventas"):
