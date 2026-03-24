@@ -273,7 +273,7 @@ class HeuristicModel(ForecastModel):
 
         self.get_sales_flow_index(df)
 
-        #self.get_client_sales(df)
+        self.get_client_sales(df)
         
         #self.get_remaining_days(df)
     
