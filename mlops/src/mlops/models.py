@@ -1,5 +1,8 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
+
+from mlops.utils import get_client_list,ExperimentConfig,DatasetFilterConfig,DatasetFilters
 from typing import Iterable,Any
 from matplotlib.figure import Figure
 from dataclasses import dataclass
@@ -45,20 +48,9 @@ class ForecastModel(ABC):
 
         return model_cls(parameters, test_metrics)
     
-    @abstractmethod
-    def fit(self,x_train:np.ndarray,y_train:np.ndarray):
-        """
-        Ajusta modelo a datos de entrenamiento.
-        Requiere ser implementado por subclases.
-        Parametros:
-        - x_train: array-like, Datos de entrada en cual se quieren realizar el entrenamiento del modelo.
-        - y_train: array-like, Datos de entrada en cual se quieren realizar el entrenamiento del modelo.
-        
-        """
-        pass
 
     @abstractmethod
-    def train(self,x_train:np.ndarray,y_train:np.ndarray)->tuple[LossHistory,Figure]:
+    def train(self,x_train:np.ndarray,y_train:np.ndarray)->tuple[LossHistory,Figure]|None:
         """
         Entrena modelo y regresa el historial de la función de perdida y su figura correspondiente
         Requiere ser implementado por subclases.
@@ -199,15 +191,99 @@ class ForecastModel(ABC):
 
 @ForecastModel.register("heuristic")
 class HeuristicModel(ForecastModel):
-    def fit(self, x_train: np.ndarray, y_train: np.ndarray):
-        """ No se tiene método de ajuste para este modelo actualmente"""
+
+    def get_sales_flow_index(self,dataset:pd.DataFrame)->None:
+        def index(difference:int)->str:
+            if difference<0:
+                return "B"
+            if difference==0:
+                return "E"
+            if difference>0:
+                return "S"
+        df = dataset.copy()
+        max_date = df["date"].max()
+        
+        self.current_quatrimester = pd.date_range(end=max_date, periods=4, freq="MS").month.tolist()
+        df = df[ df["month"].isin(self.current_quatrimester) ]
+        df = df.sort_values("date")
+        df = df[["year","month","monthly_sales"]].drop_duplicates().reset_index()
+        df.loc[df.index[-1], "monthly_sales"] = self.month_estimate
+        df["difference"] = df["monthly_sales"].diff().dropna().astype("int")
+        df = df.dropna()
+        df["index"] = df["difference"].apply(index)
+        indeces = df["index"].to_list()
+
+        self.sales_idx = ""
+        for i in indeces:
+            self.sales_idx += i 
+
+    def get_client_sales(self,dataset:pd.DataFrame)->None:
+        clients = get_client_list()
+        client_sales = dataset.merge(clients,how="inner",on="clientId")
+        if not client_sales.empty:
+            client_sales["client_sales"]= client_sales.groupby(["year","month"])["quantity"].transform("sum")
+            self.client_sales = client_sales[["year","month","client_sales"]].drop_duplicates()
+        else: 
+            self.client_sales= self.sales_period[["year","month"]]
+            self.client_sales["client_sales"]=[0] * len(self.client_sales)
+
+
+    def get_remaining_days(self)->None:
+        self.current_day = self.sales_period["date"].max().day
+        max_date = self.sales_period["date"].max()
+        
+        
         pass
 
-    def train(self, x_train: np.ndarray, y_train: np.ndarray):
+    def fit(self,dataset:pd.DataFrame,config:ExperimentConfig|None=None)->None:
+        """ 
+        Cálcula las variables fundamentales para realizar predicciones de la venta mensual
+        
+        Parametros:
+        - dataset: pandas.DataFrame , Datos con información relacionada a cada venta realizada dentro del periodo
+
+        Regresa:
+        - sales_period: pandas.DataFrame, Tabla con registro de ventas por periodo
+        - sales_idx: str, Indice clasificador del flujo de ventas. Ejemplo: B-B-S
+        - client_sales: pandas.DataFrame, Tabla con registro de ventas por periodo realizadas por clientes
+        - current_day: int , Día más actual del periodo de entrenamiento
+        - remaining_days: int , Número de días que hacen falta para terminar més de ventas
+
+        """
+        
+        if config is not None:
+            model_name="heuristic"
+            dataset_config = DatasetFilterConfig(start_date=(config.get("training_data_start_dates")).get(model_name),
+                                            end_date=(config.get("training_data_end_dates")).get(model_name),
+                                            frequency=(config.get("frequencies")).get(model_name),
+                                            horizon=(config.get("horizons")).get(model_name),
+                                            training_window=(config.get("training_windows")).get(model_name))
+        
+            df = DatasetFilters(dataset_config).apply_period_filter(dataset)
+        
+        else :
+            df = dataset.copy()
+
+        max_date = df["date"].max()
+        df["monthly_sales"] = df.groupby(["year","month"])["quantity"].transform("sum")
+        self.sales_period = df[["year","month","monthly_sales"]].drop_duplicates()
+
+        l = self.parameters['l']
+        self.month_estimate =int( l*df[df["date"]==max_date]["monthly_sales"].iloc[0])
+
+        self.get_sales_flow_index(df)
+
+        #self.get_client_sales(df)
+        
+        #self.get_remaining_days(df)
+    
+        return None
+    
+    def train(self, x_train: np.ndarray, y_train: np.ndarray)->None:
         """ No se tiene método de entrenamiento para este modelo actualmente"""
         history = LossHistory(train_loss=[], test_loss=[])
         fig = self.plot_loss(history)
-        return history, fig
+        return None
     
     def predict(self,x_test:np.ndarray,y_test:np.ndarray)->np.ndarray|None:
         """
@@ -215,13 +291,8 @@ class HeuristicModel(ForecastModel):
         Toma los datos de ventas del mes y predice la venta mensual partiendo de las ventas a mitad del periodo
         """
         l = self.parameters['l']
-        if len(y_test)==30:
-            x = y_test[14]
-            prediction = np.full(15, round(l*x, 0))
-            return np.concatenate((y_test[:14],prediction))
-        else: 
-            print(f"Error: Datos no cumplen con longitud mínima. Esperado: 30 , Ingreso:{len(x_test)}")
-            return None
+        pass 
         
-
-
+@ForecastModel.register("arima")
+class ARIMAModel(ForecastModel):
+    pass
