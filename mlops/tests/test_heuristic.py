@@ -117,11 +117,13 @@ def test_index_sum():
 
 def test_predict_next_month_sale():
     mask = dataset["productId"]=="product1"
-    result = model.predict_next_month_sale(dataset[mask])
+    model.fit(dataset[mask])
+    result = model.predict_next_month_sale()
 
     assert result == 6
 
     mask = dataset["productId"]=="product2"
-    result = model.predict_next_month_sale(dataset[mask])
+    model.fit(dataset[mask])
+    result = model.predict_next_month_sale()
 
     assert result == 29

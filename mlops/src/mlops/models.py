@@ -989,12 +989,12 @@ class HeuristicModel(ForecastModel):
         fig = self.plot_loss(history)
         return None
     
-    def predict_next_month_sale(self,dataset:pd.DataFrame)->int|None:
+    def predict_next_month_sale(self)->int|None:
         """
         Predicciones del modelo.
         Toma los datos de ventas del mes y predice la venta mensual partiendo de las ventas a mitad del periodo
         """
-        self.fit(dataset)
+        
 
         l = self.parameters['l']
         
@@ -1034,7 +1034,7 @@ class HeuristicModel(ForecastModel):
         pass
 
 
-    
+
 @ForecastModel.register("arima")
 class ARIMAModel(ForecastModel):
     pass
