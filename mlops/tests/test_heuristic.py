@@ -34,6 +34,10 @@ rows = [["product1",datetime.datetime(2025,2,5),1,"ACA0001"],
 dataset = pd.DataFrame(columns=columns,data=rows)
 dataset["year"]= dataset["date"].dt.year
 dataset["month"]= dataset["date"].dt.month
+
+max_date = dataset["date"].max()
+dataset["monthly_sales"] = dataset.groupby(["year","month","productId"])["quantity"].transform("sum")
+
 model = HeuristicModel(parameters={"l":8.4})
 
 def test_sales_period():
@@ -61,7 +65,7 @@ def test_sales_period():
 
 def test_remaining_days():
     mask = dataset["productId"]=="product1"
-    model.fit(dataset[mask])
+    model.get_remaining_days(max_date)
     
     assert model.current_day==5
     assert model.current_month==2
@@ -70,16 +74,16 @@ def test_remaining_days():
 
 def test_get_sales_flow_index():
     mask = dataset["productId"]=="product1"
-    model.fit(dataset[mask])
+    model.get_sales_flow_index(dataset[mask])
     assert model.sales_idx =="SBS" 
 
     mask = dataset["productId"]=="product2"
-    model.fit(dataset[mask])
+    model.get_sales_flow_index(dataset[mask])
     assert model.sales_idx =="SSS" 
 
 def test_get_client_sales():
     mask = dataset["productId"]=="product1"
-    model.fit(dataset[mask])
+    model.get_client_sales(dataset[mask])
     
     results = model.client_sales
 
@@ -88,7 +92,7 @@ def test_get_client_sales():
     assert results[results["month"]==2]["client_sales"].iloc[0]==1
 
     mask = dataset["productId"]=="product2"
-    model.fit(dataset[mask])
+    model.get_client_sales(dataset[mask])
     
     results = model.client_sales
 
@@ -97,3 +101,15 @@ def test_get_client_sales():
     assert results[results["month"]==2]["client_sales"].iloc[0]==4
 
 
+def test_index_sum():
+    mask = dataset["productId"]=="product1"
+    model.fit(dataset[mask])
+    
+    assert model.s_n == [0.0, 0.0, 0.0, 8.0, 0.0]
+    assert model.idx_sum == 8.0
+
+    mask = dataset["productId"]=="product2"
+    model.fit(dataset[mask])
+    
+    assert model.s_n == [0.0, 0.0, 0.0, 0.0, 38.0]
+    assert model.idx_sum == 38.0

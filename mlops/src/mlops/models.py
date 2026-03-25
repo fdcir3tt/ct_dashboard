@@ -194,6 +194,18 @@ class ForecastModel(ABC):
 class HeuristicModel(ForecastModel):
 
     def get_sales_flow_index(self,dataset:pd.DataFrame)->None:
+        """
+        Recibe el dataset del producto de analisis ( al menos 6 meses) y obtiene 
+        el índice del flujo de ventas.
+
+        Parametros:
+        - dataset: pandas.DataFrame, Dataset del producto conteniendo la información de ventas en al menos 6 meses
+
+        Regresa:
+        - current_quatrimester: list[int], Lista de los últimos 4 meses del dataset analizado
+        - sales_idx: str, Indice del flujo de ventas,consiste en tres siglas que describen el cambio del flujo de ventas.
+                          S = Subió, E= Empató, B = Bajó
+        """
         def index(difference:int)->str:
             if difference<0:
                 return "B"
@@ -219,6 +231,15 @@ class HeuristicModel(ForecastModel):
             self.sales_idx += i 
 
     def get_client_sales(self,dataset:pd.DataFrame)->None:
+        """
+        Recibe los datos de ventas del producto y regresa la cantidad de ventas realizadas por clientes.
+
+        Parametros:
+        - dataset: pandas.DataFrame, Tabla de ventas de producto en periodo de al menos 6 meses.
+
+        Regresa:
+        - client_sales: pandas.DataFrame , Tabla de la cantidad de unidades vendidas a clientes.
+        """
         clients = get_client_list()
         client_sales = dataset.merge(clients,how="inner",on="clientId")
         if not client_sales.empty:
@@ -230,6 +251,20 @@ class HeuristicModel(ForecastModel):
 
 
     def get_remaining_days(self,latest_date:pd.Timestamp)->None:
+        """
+        Cálcula los días restantes del último mes del periodo y los guarda cómo propiedades 
+        del modelo.
+
+        Parametros:
+        - latest_date: pandas.Timestamp, Fecha del día más actual del periodo analizado
+
+        Regresa:
+        - current_day: int, Día del periodo analizado
+        - current_month: int, Mes del periodo analizado
+        - current_year: int, Año del periodo analizado
+        - remaining_days: int, Cantidad de días restantes del último mes
+        """
+
         self.current_day = latest_date.day
         self.current_month = latest_date.month
         self.current_year = latest_date.year
@@ -237,6 +272,669 @@ class HeuristicModel(ForecastModel):
         days_in_month = calendar.monthrange(self.current_year, self.current_month)[1]
         
         self.remaining_days = days_in_month - self.current_day
+    
+    def get_index_sum(self)->None:
+        """
+        Cálcula los valores de estimado ('s1','s2','s3','s4','s5') en base el índice de flujo de ventas y 
+        regresa la suma total.
+
+        Parametros:
+        - : None,
+
+        Regresa:
+        - s_n: list[float], Lista de valores de ('s1','s2','s3','s4','s5')
+        - idx_sum:float, Suma total de ('s1','s2','s3','s4','s5')
+        """
+        def s1():
+            sales_period = self.sales_period
+            sales_idx = self.sales_idx
+            current_day = self.current_day
+            month_estimate = self.month_estimate
+            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_sales"].iloc[0]) for i in range(4) ]
+
+
+            if sales_idx == "BES":
+                if current_day <= 8:
+                    if month_estimate <= current_quatrimester[0]:
+                        if current_quatrimester[3] <= current_quatrimester[2]:
+                            return current_quatrimester[2]
+                        else:
+                            return current_quatrimester[3]
+                    else:
+                        if current_quatrimester[3] <= current_quatrimester[2]:
+                            return current_quatrimester[2]
+                        else:
+                            return current_quatrimester[3]
+
+                elif current_day <= 15:
+                    if month_estimate <= current_quatrimester[0]:
+                        return month_estimate
+                    else:
+                        if current_quatrimester[3] == 1:
+                            return 1
+                        else:
+                            return (month_estimate + current_quatrimester[0]) / 2
+
+                elif current_day <= 21:
+                    if month_estimate <= current_quatrimester[0]:
+                        return month_estimate
+                    else:
+                        if current_quatrimester[0] <= current_quatrimester[3]:
+                            return (current_quatrimester[3] + month_estimate) / 2
+                        else:
+                            return current_quatrimester[0]
+
+                else:
+                    if (current_quatrimester[0] + month_estimate) / 2 >= month_estimate:
+                        return current_quatrimester[3]
+                    else:
+                        if (current_quatrimester[0] + month_estimate) / 2 >= current_quatrimester[0]:
+                            return current_quatrimester[3]
+                        else:
+                            return (current_quatrimester[0] + month_estimate) / 2
+
+            elif sales_idx == "BSS":
+                if current_day <= 8:
+                    if (current_quatrimester[2] + month_estimate) / 2 >= current_quatrimester[0]:
+                        if current_quatrimester[2] >= current_quatrimester[0]:
+                            return current_quatrimester[2]
+                        else:
+                            return current_quatrimester[0]
+                    else:
+                        if current_quatrimester[0] <= month_estimate:
+                            return current_quatrimester[0]
+                        else:
+                            return (current_quatrimester[2] + month_estimate) / 2
+
+                elif current_day <= 15:
+                    max_lmn = max(current_quatrimester[0],
+                                current_quatrimester[1],
+                                current_quatrimester[2])
+
+                    if month_estimate <= max_lmn:
+                        return month_estimate
+                    else:
+                        if (current_quatrimester[0] +
+                            current_quatrimester[1] +
+                            month_estimate) / 3 >= month_estimate:
+                            return month_estimate
+                        else:
+                            if (current_quatrimester[2] + month_estimate) / 2 >= current_quatrimester[3]:
+                                if (current_quatrimester[2] + month_estimate) / 2 <= max_lmn:
+                                    return max_lmn
+                                else:
+                                    return (current_quatrimester[2] + month_estimate) / 2
+                            else:
+                                return current_quatrimester[3]
+
+                elif current_day <= 21:
+                    return ((current_quatrimester[2] + month_estimate) / 2 + month_estimate) / 2
+
+                else:
+                    max_lmn = max(current_quatrimester[0],
+                                current_quatrimester[1],
+                                current_quatrimester[2])
+
+                    if (current_quatrimester[2] + month_estimate) / 2 >= current_quatrimester[3]:
+                        return (current_quatrimester[2] + month_estimate) / 2
+                    else:
+                        if current_quatrimester[3] <= max_lmn:
+                            return current_quatrimester[3]
+                        else:
+                            if current_quatrimester[3] <= (2 * max_lmn):
+                                return current_quatrimester[3]
+                            else:
+                                return (current_quatrimester[2] + month_estimate) / 2
+
+            elif sales_idx == "EBB":
+                if current_day <= 15:
+                    if current_quatrimester[2] == 1:
+                        return 1
+                    else:
+                        return (current_quatrimester[2] + month_estimate) / 2
+
+                elif current_day <= 21:
+                    if month_estimate <= (current_quatrimester[2] + month_estimate) / 2:
+                        return (current_quatrimester[2] + month_estimate) / 2
+                    else:
+                        return month_estimate
+
+                else:
+                    return month_estimate
+
+            elif sales_idx == "EBE":
+                return current_quatrimester[2]
+
+            else:
+                return 0.0
+
+        def s2():
+            sales_period = self.sales_period
+            sales_idx = self.sales_idx
+            current_day = self.current_day
+            month_estimate = self.month_estimate
+            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_sales"].iloc[0]) for i in range(4) ]
+
+            def count_non_zero_mn():
+                return sum(1 for v in current_quatrimester[1:3] if v != 0)
+
+            if sales_idx in ["BEE", "BBE", "BBB", "BEB"]:
+                if current_day <= 8:
+                    return current_quatrimester[2]
+
+                elif current_day <= 15:
+                    if month_estimate == 0:
+                        if current_quatrimester[2] == 1:
+                            return current_quatrimester[2]
+                        else:
+                            return (current_quatrimester[2] + month_estimate) / 2
+                    else:
+                        return (current_quatrimester[2] + month_estimate) / 2
+
+                else:
+                    if month_estimate == 0:
+                        if count_non_zero_mn() == 2:
+                            return month_estimate
+                        else:
+                            return month_estimate
+                    else:
+                        if current_day <= 21:
+                            if (current_quatrimester[2] + current_quatrimester[3]) / 2 >= month_estimate:
+                                return (current_quatrimester[2] + current_quatrimester[3]) / 2
+                            else:
+                                return month_estimate
+                        else:
+                            if sales_idx == "BEE":
+                                return month_estimate
+                            else:
+                                if (current_quatrimester[2] + current_quatrimester[3]) / 2 <= month_estimate:
+                                    return current_quatrimester[3]
+                                else:
+                                    return month_estimate
+
+            elif sales_idx == "BBS":
+                if current_day <= 8:
+                    if current_quatrimester[3] >= current_quatrimester[1]:
+                        if current_quatrimester[3] >= current_quatrimester[2]:
+                            return current_quatrimester[0]
+                        else:
+                            return current_quatrimester[3]
+                    else:
+                        if current_quatrimester[2] < 0:
+                            return 0
+                        else:
+                            if current_quatrimester[2] <= current_quatrimester[3]:
+                                return current_quatrimester[3]
+                            else:
+                                return current_quatrimester[2]
+
+                elif current_day <= 15:
+                    max_lmn = max(current_quatrimester[0],
+                                current_quatrimester[1],
+                                current_quatrimester[2])
+
+                    if month_estimate <= max_lmn:
+                        if (month_estimate + current_quatrimester[2]) / 2 >= current_quatrimester[1]:
+                            if current_quatrimester[1] <= current_quatrimester[3]:
+                                return (month_estimate + current_quatrimester[2]) / 2
+                            else:
+                                return current_quatrimester[1]
+                        else:
+                            return (current_quatrimester[2] + month_estimate) / 2
+                    else:
+                        if current_quatrimester[0] == current_quatrimester[3]:
+                            return (current_quatrimester[3] + month_estimate) / 2
+                        else:
+                            return max_lmn
+
+                elif current_day <= 21:
+                    max_lmn = max(current_quatrimester[0],
+                                current_quatrimester[1],
+                                current_quatrimester[2])
+
+                    if month_estimate <= max_lmn:
+                        return month_estimate
+                    else:
+                        if max_lmn <= current_quatrimester[3]:
+                            return (current_quatrimester[3] + month_estimate) / 2
+                        else:
+                            return max_lmn
+
+                else:
+                    if month_estimate == 0:
+                        if count_non_zero_mn() == 2:
+                            if current_quatrimester[2] < 0:
+                                return 0
+                            else:
+                                return current_quatrimester[2] / 2
+                        else:
+                            return month_estimate
+                    else:
+                        if current_quatrimester[3] >= current_quatrimester[0]:
+                            if (current_quatrimester[0] + month_estimate) / 2 >= current_quatrimester[3]:
+                                return (current_quatrimester[0] + month_estimate) / 2
+                            else:
+                                return current_quatrimester[3]
+                        else:
+                            return month_estimate
+
+            elif sales_idx == "BSB":
+                if current_day <= 8:
+                    if month_estimate == 0:
+                        if (current_quatrimester[2] + month_estimate) / 2 >= current_quatrimester[0]:
+                            return (current_quatrimester[2] + month_estimate) / 2
+                        else:
+                            if current_quatrimester[0] >= current_quatrimester[2]:
+                                return current_quatrimester[2]
+                            else:
+                                return current_quatrimester[0]
+                    else:
+                        if (current_quatrimester[2] + month_estimate) / 2 >= current_quatrimester[1]:
+                            return (current_quatrimester[2] + month_estimate) / 2
+                        else:
+                            return current_quatrimester[1]
+
+                elif current_day <= 15:
+                    if month_estimate <= current_quatrimester[1]:
+                        if month_estimate == 0:
+                            if current_quatrimester[2] == current_quatrimester[0]:
+                                return (current_quatrimester[0] + current_quatrimester[2]) / 2
+                            else:
+                                if (current_quatrimester[2] / 30) * current_day >= current_quatrimester[1]:
+                                    return current_quatrimester[1]
+                                else:
+                                    return (current_quatrimester[2] / 30) * current_day
+                        else:
+                            return month_estimate
+                    else:
+                        return month_estimate
+
+                elif current_day <= 21:
+                    if month_estimate <= current_quatrimester[1]:
+                        if current_quatrimester[3] == 0:
+                            return month_estimate
+                        else:
+                            if current_quatrimester[1] >= current_quatrimester[3] * 2:
+                                return current_quatrimester[3] * 2
+                            else:
+                                return current_quatrimester[1]
+                    else:
+                        return month_estimate
+
+                else:
+                    avg_val = (current_quatrimester[1] +
+                            current_quatrimester[2] +
+                            month_estimate) / 3
+
+                    if avg_val >= month_estimate:
+                        return month_estimate
+                    else:
+                        if month_estimate >= avg_val:
+                            return month_estimate
+                        else:
+                            return avg_val
+
+            elif sales_idx == "BSE":
+                return current_quatrimester[2]
+
+            else:
+                return 0.0
+        
+        def s3():
+            sales_period = self.sales_period
+            sales_idx = self.sales_idx
+            current_day = self.current_day
+            month_estimate = self.month_estimate
+            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_sales"].iloc[0]) for i in range(4) ]
+
+            if sales_idx == "EBS":
+                if current_day <= 8:
+                    if (current_quatrimester[2] + month_estimate) / 2 >= current_quatrimester[1]:
+                        return current_quatrimester[1]
+                    else:
+                        return (current_quatrimester[2] + month_estimate) / 2
+
+                elif current_day <= 15:
+                    if month_estimate <= current_quatrimester[1]:
+                        return month_estimate
+                    else:
+                        if current_quatrimester[3] >= current_quatrimester[1]:
+                            return current_quatrimester[3]
+                        else:
+                            return current_quatrimester[1]
+
+                elif current_day <= 21:
+                    if month_estimate <= current_quatrimester[1]:
+                        return month_estimate
+                    else:
+                        if current_quatrimester[3] >= current_quatrimester[1]:
+                            if current_quatrimester[3] <= (current_quatrimester[1] * 2):
+                                return current_quatrimester[3]
+                            else:
+                                return (current_quatrimester[3] + current_quatrimester[1]) / 2
+                        else:
+                            return current_quatrimester[1]
+
+                else:
+                    if month_estimate <= current_quatrimester[1]:
+                        return month_estimate
+                    else:
+                        return (current_quatrimester[1] + month_estimate) / 2
+
+            elif sales_idx == "EEB":
+                if current_day <= 8:
+                    return current_quatrimester[0]
+
+                elif current_day <= 15:
+                    if current_quatrimester[0] == 1:
+                        return 1
+                    else:
+                        return (current_quatrimester[0] + current_quatrimester[2]) / 2
+
+                else:
+                    if current_quatrimester[0] <= 2:
+                        return 1
+                    else:
+                        return current_quatrimester[2]
+
+            elif sales_idx == "EEE":
+                return current_quatrimester[2]
+
+            elif sales_idx == "EES":
+                if current_day <= 8:
+                    if current_quatrimester[3] >= current_quatrimester[2]:
+                        if (current_quatrimester[0] +
+                            current_quatrimester[1] +
+                            current_quatrimester[2]) <= 0:
+                            if current_quatrimester[3] == 1:
+                                return 1
+                            else:
+                                return current_quatrimester[3] / 2
+                        else:
+                            return current_quatrimester[3]
+                    else:
+                        return current_quatrimester[2]
+
+                elif current_day <= 15:
+                    if (current_quatrimester[1] + current_quatrimester[2]) == 0:
+                        return current_quatrimester[3]
+                    else:
+                        if current_quatrimester[3] >= current_quatrimester[2]:
+                            return current_quatrimester[3]
+                        else:
+                            return current_quatrimester[2]
+
+                elif current_day <= 21:
+                    if current_quatrimester[2] == 0:
+                        if current_quatrimester[3] <= 3:
+                            return current_quatrimester[3]
+                        else:
+                            return current_quatrimester[3] / 2
+                    else:
+                        if (current_quatrimester[2] * month_estimate) / 2 <= current_quatrimester[3]:
+                            return current_quatrimester[3]
+                        else:
+                            return (current_quatrimester[2] + month_estimate) / 2
+
+                else:
+                    if (current_quatrimester[1] + current_quatrimester[2]) == 0:
+                        if current_quatrimester[3] <= 2:
+                            return current_quatrimester[3]
+                        else:
+                            return (current_quatrimester[3] / 3) * 2
+                    else:
+                        return current_quatrimester[3]
+
+            elif sales_idx in ["ESB", "SEE"]:
+                if (current_quatrimester[0] + current_quatrimester[1]) <= 0:
+                    if month_estimate == 0:
+                        return 0
+                    else:
+                        if month_estimate <= (current_quatrimester[2] + month_estimate) / 2:
+                            return month_estimate
+                        else:
+                            return (current_quatrimester[2] + month_estimate) / 2
+
+                elif current_day <= 8:
+                    if (current_quatrimester[0] + current_quatrimester[1]) <= 0:
+                        if month_estimate == 0:
+                            return 0
+                        else:
+                            if month_estimate <= (current_quatrimester[2] + month_estimate) / 2:
+                                return month_estimate
+                            else:
+                                return (current_quatrimester[2] + month_estimate) / 2
+                    else:
+                        if month_estimate == 0:
+                            return current_quatrimester[1]
+                        else:
+                            if month_estimate <= current_quatrimester[1]:
+                                return month_estimate
+                            else:
+                                return current_quatrimester[1]
+
+                elif current_day <= 15:
+                    if month_estimate == 0:
+                        return current_quatrimester[1]
+                    else:
+                        return month_estimate
+
+                elif current_day <= 21:
+                    return month_estimate
+
+                else:
+                    if month_estimate <= current_quatrimester[1]:
+                        return month_estimate
+                    else:
+                        return current_quatrimester[3]
+
+            elif sales_idx in ["ESE", "SBE"]:
+                return month_estimate
+
+            elif sales_idx == "SSE":
+                return month_estimate
+
+            else:
+                return 0.0
+        
+        def s4():
+            sales_period = self.sales_period
+            sales_idx = self.sales_idx
+            current_day = self.current_day
+            month_estimate = self.month_estimate
+            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_sales"].iloc[0]) for i in range(4) ]
+            
+
+            if sales_idx == "ESS":
+                if current_day <= 8:
+                    return max(current_quatrimester[2], current_quatrimester[3])
+
+                elif current_day <= 15:
+                    if current_quatrimester[3] >= current_quatrimester[2]:
+                        return (current_quatrimester[2] + month_estimate) / 2
+                    else:
+                        return current_quatrimester[2]
+
+                elif current_day <= 21:
+                    if (current_quatrimester[2] + month_estimate) / 2 >= current_quatrimester[3]:
+                        return (current_quatrimester[2] + month_estimate) / 2
+                    else:
+                        return current_quatrimester[3]
+
+                else:
+                    if (month_estimate + current_quatrimester[2]) / 2 >= current_quatrimester[3]:
+                        return current_quatrimester[3]
+                    else:
+                        if month_estimate > (current_quatrimester[2] * 2):
+                            if current_quatrimester[2] == 1:
+                                if current_quatrimester[3] > 2:
+                                    return month_estimate / 2
+                                else:
+                                    return month_estimate
+                            else:
+                                return current_quatrimester[3]
+                        else:
+                            return current_quatrimester[3]
+
+            elif sales_idx == "SBB":
+                if current_day < 8:
+                    if current_quatrimester[3] == 0:
+                        if current_quatrimester[0] <= 0:
+                            return current_quatrimester[2]
+                        else:
+                            if current_quatrimester[2] >= min(current_quatrimester[0],
+                                                            current_quatrimester[1],
+                                                            current_quatrimester[2]):
+                                if current_day >= 6:
+                                    if current_quatrimester[0] >= current_quatrimester[2]:
+                                        return current_quatrimester[2]
+                                    else:
+                                        return current_quatrimester[2] * 0.75
+                                else:
+                                    return (current_quatrimester[2] + current_quatrimester[0]) / 2
+                            else:
+                                return min(current_quatrimester[0],
+                                        current_quatrimester[1],
+                                        current_quatrimester[2])
+                    else:
+                        return (current_quatrimester[2] + month_estimate) / 2
+
+                elif current_day <= 15:
+                    if current_quatrimester[2] == 1:
+                        return 1
+                    else:
+                        return (current_quatrimester[2] + month_estimate) / 2
+
+                else:
+                    return month_estimate
+
+            elif sales_idx == "SBS":
+                max_val = max(current_quatrimester[0],
+                            current_quatrimester[1],
+                            current_quatrimester[2])
+
+                if current_day <= 8:
+                    if max_val <= month_estimate:
+                        if max_val <= current_quatrimester[3]:
+                            return current_quatrimester[3]
+                        else:
+                            return max_val
+                    else:
+                        return month_estimate
+
+                elif current_day <= 15:
+                    if month_estimate <= current_quatrimester[1]:
+                        return month_estimate
+                    else:
+                        if current_quatrimester[3] >= current_quatrimester[1]:
+                            return current_quatrimester[3]
+                        else:
+                            return current_quatrimester[1]
+
+                else:
+                    if month_estimate <= current_quatrimester[1]:
+                        return month_estimate
+                    else:
+                        if current_quatrimester[3] >= (2 * current_quatrimester[1]):
+                            return (current_quatrimester[1] + month_estimate) / 2
+                        else:
+                            return current_quatrimester[3]
+
+            elif sales_idx == "SEB":
+                if current_day <= 8:
+                    return current_quatrimester[2]
+
+                elif current_day <= 15:
+                    if current_quatrimester[2] == 1:
+                        return 1
+                    else:
+                        return (current_quatrimester[2] + month_estimate) / 2
+
+                elif current_day <= 21:
+                    return month_estimate
+
+                else:
+                    if current_quatrimester[2] == 1:
+                        return 1
+                    else:
+                        return month_estimate
+
+            else:
+                return 0.0
+        
+        def s5():
+            sales_period = self.sales_period
+            sales_idx = self.sales_idx
+            current_day = self.current_day
+            month_estimate = self.month_estimate
+            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_sales"].iloc[0]) for i in range(4) ]
+            
+
+            if sales_idx == "SES":
+                if current_day <= 8:
+                    if current_quatrimester[3] >= current_quatrimester[2]:
+                        return current_quatrimester[3]
+                    else:
+                        return current_quatrimester[2]
+
+                elif current_day <= 15:
+                    if (current_quatrimester[1] + current_quatrimester[2]) == 0:
+                        return current_quatrimester[3] / 2
+                    else:
+                        if current_quatrimester[3] >= current_quatrimester[2]:
+                            if current_quatrimester[3] == current_quatrimester[2]:
+                                return (current_quatrimester[3] + month_estimate) / 2
+                            else:
+                                return current_quatrimester[3]
+                        else:
+                            return current_quatrimester[2]
+
+                else:
+                    if (current_quatrimester[1] + current_quatrimester[2]) == 0:
+                        return current_quatrimester[3] / 2
+                    else:
+                        if (current_quatrimester[2] + month_estimate) / 2 >= current_quatrimester[3]:
+                            return (current_quatrimester[2] + month_estimate) / 2
+                        else:
+                            if current_quatrimester[3] >= current_quatrimester[2]:
+                                return current_quatrimester[3]
+                            else:
+                                return current_quatrimester[2]
+
+            elif sales_idx == "SSB":
+                if current_day <= 8:
+                    if (current_quatrimester[2] + month_estimate) / 2 >= current_quatrimester[3]:
+                        return (current_quatrimester[2] + month_estimate) / 2
+                    else:
+                        return current_quatrimester[3]
+                else:
+                    return month_estimate
+
+            elif sales_idx == "SSS":
+                if current_day <= 8:
+                    return max(current_quatrimester[0],
+                            current_quatrimester[1],
+                            current_quatrimester[2],
+                            current_quatrimester[3])
+
+                elif current_day <= 15:
+                    return (current_quatrimester[2] + month_estimate) / 2
+
+                elif current_day <= 21:
+                    if current_quatrimester[3] >= current_quatrimester[2]:
+                        return (current_quatrimester[3] + month_estimate) / 2
+                    else:
+                        return current_quatrimester[2]
+
+                else:
+                    return current_quatrimester[3]
+
+            else:
+                return 0.0
+
+
+        self.s_n = [s1(),s2(),s3(),s4(),s5()]
+        self.idx_sum = s1()+s2()+s3()+s4()+s5()
 
     def fit(self,dataset:pd.DataFrame,config:ExperimentConfig|None=None)->None:
         """ 
@@ -247,6 +945,7 @@ class HeuristicModel(ForecastModel):
 
         Regresa:
         - sales_period: pandas.DataFrame, Tabla con registro de ventas por periodo
+        - month_estimate: int, Estimación burda de ventas del final del més.
         - sales_idx: str, Indice clasificador del flujo de ventas. Ejemplo: B-B-S
         - client_sales: pandas.DataFrame, Tabla con registro de ventas por periodo realizadas por clientes
         - current_day: int , Día más actual del periodo de entrenamiento
@@ -280,7 +979,7 @@ class HeuristicModel(ForecastModel):
         
         self.get_remaining_days(max_date)
 
-        #self.get_index_sum(df)
+        self.get_index_sum()
     
         return None
     
