@@ -989,14 +989,52 @@ class HeuristicModel(ForecastModel):
         fig = self.plot_loss(history)
         return None
     
-    def predict(self,x_test:np.ndarray,y_test:np.ndarray)->np.ndarray|None:
+    def predict_next_month_sale(self,dataset:pd.DataFrame)->int|None:
         """
         Predicciones del modelo.
         Toma los datos de ventas del mes y predice la venta mensual partiendo de las ventas a mitad del periodo
         """
+        self.fit(dataset)
+
         l = self.parameters['l']
-        pass 
         
+        # Estimación ideal
+        sales_condition = sum(1 for s in self.sales_period["monthly_sales"].to_list() if s >= 1) > 2
+        client_sales_condition = sum(1 for c in self.client_sales["client_sales"].to_list() if c >= 2) >= 1 
+        if sales_condition or client_sales_condition:
+            first_estimate = self.idx_sum
+        else:
+            first_estimate = 0
+
+        # Estimación ajustada
+        if self.remaining_days == 0:
+            adjusted_estimate = 0
+        else:
+            if self.remaining_days < 30:
+                if first_estimate < 6:
+                    adjusted_estimate = first_estimate
+                else:
+                    adjusted_estimate = int(first_estimate * (self.remaining_days / 30))
+            else:
+                adjusted_estimate = int(first_estimate * (self.remaining_days / 30))
+
+        # Estimación definitiva
+        if adjusted_estimate == 0:
+            final_estimate = 0
+        elif adjusted_estimate < 0:
+            final_estimate = 0
+        elif adjusted_estimate < 0.5:
+            final_estimate = first_estimate
+        else:
+            final_estimate = adjusted_estimate
+
+        return final_estimate
+        
+    def predict():
+        pass
+
+
+    
 @ForecastModel.register("arima")
 class ARIMAModel(ForecastModel):
     pass

@@ -113,3 +113,15 @@ def test_index_sum():
     
     assert model.s_n == [0.0, 0.0, 0.0, 0.0, 38.0]
     assert model.idx_sum == 38.0
+
+
+def test_predict_next_month_sale():
+    mask = dataset["productId"]=="product1"
+    result = model.predict_next_month_sale(dataset[mask])
+
+    assert result == 6
+
+    mask = dataset["productId"]=="product2"
+    result = model.predict_next_month_sale(dataset[mask])
+
+    assert result == 29
