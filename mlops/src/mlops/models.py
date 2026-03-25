@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import calendar
 
 from mlops.utils import get_client_list,ExperimentConfig,DatasetFilterConfig,DatasetFilters
 from typing import Iterable,Any
@@ -228,12 +229,14 @@ class HeuristicModel(ForecastModel):
             self.client_sales["client_sales"]=[0] * len(self.client_sales)
 
 
-    def get_remaining_days(self)->None:
-        self.current_day = self.sales_period["date"].max().day
-        max_date = self.sales_period["date"].max()
+    def get_remaining_days(self,latest_date:pd.Timestamp)->None:
+        self.current_day = latest_date.day
+        self.current_month = latest_date.month
+        self.current_year = latest_date.year
+
+        days_in_month = calendar.monthrange(self.current_year, self.current_month)[1]
         
-        
-        pass
+        self.remaining_days = days_in_month - self.current_day
 
     def fit(self,dataset:pd.DataFrame,config:ExperimentConfig|None=None)->None:
         """ 
@@ -275,7 +278,9 @@ class HeuristicModel(ForecastModel):
 
         self.get_client_sales(df)
         
-        #self.get_remaining_days(df)
+        self.get_remaining_days(max_date)
+
+        #self.get_index_sum(df)
     
         return None
     

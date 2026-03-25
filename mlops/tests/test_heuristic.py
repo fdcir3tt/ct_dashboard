@@ -59,6 +59,15 @@ def test_sales_period():
     assert results[results["month"]==1]["monthly_sales"].iloc[0] == 38
     assert results[results["month"]==2]["monthly_sales"].iloc[0] == 9
 
+def test_remaining_days():
+    mask = dataset["productId"]=="product1"
+    model.fit(dataset[mask])
+    
+    assert model.current_day==5
+    assert model.current_month==2
+    assert model.current_year==2025
+    assert model.remaining_days==23
+
 def test_get_sales_flow_index():
     mask = dataset["productId"]=="product1"
     model.fit(dataset[mask])
