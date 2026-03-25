@@ -19,7 +19,7 @@ rows = [["product1",datetime.datetime(2025,2,5),1,"ACA0001"],
         ["product1",datetime.datetime(2024,9,1),14,"unknown"],
 
     ]+[ ["product2",datetime.datetime(2025,2,5),4,"ACA0002"],
-        ["product2",datetime.datetime(2025,2,5),9,"unknown"],
+        ["product2",datetime.datetime(2025,2,5),5,"unknown"],
         ["product2",datetime.datetime(2025,1,2),13,"ACA0001"],
         ["product2",datetime.datetime(2025,1,2),25,"unknown"],
         ["product2",datetime.datetime(2024,12,1),6,"ACA0003"],
@@ -36,6 +36,28 @@ dataset["year"]= dataset["date"].dt.year
 dataset["month"]= dataset["date"].dt.month
 model = HeuristicModel(parameters={"l":8.4})
 
+def test_sales_period():
+    mask = dataset["productId"]=="product1"
+    model.fit(dataset[mask])
+    results = model.sales_period
+
+    assert results[results["month"]==9]["monthly_sales"].iloc[0] == 14
+    assert results[results["month"]==10]["monthly_sales"].iloc[0] == 1
+    assert results[results["month"]==11]["monthly_sales"].iloc[0] == 4
+    assert results[results["month"]==12]["monthly_sales"].iloc[0] == 10
+    assert results[results["month"]==1]["monthly_sales"].iloc[0] == 2
+    assert results[results["month"]==2]["monthly_sales"].iloc[0] == 1
+
+    mask = dataset["productId"]=="product2"
+    model.fit(dataset[mask])
+    results = model.sales_period
+
+    assert results[results["month"]==9]["monthly_sales"].iloc[0] == 37
+    assert results[results["month"]==10]["monthly_sales"].iloc[0] == 49
+    assert results[results["month"]==11]["monthly_sales"].iloc[0] == 29
+    assert results[results["month"]==12]["monthly_sales"].iloc[0] == 37
+    assert results[results["month"]==1]["monthly_sales"].iloc[0] == 38
+    assert results[results["month"]==2]["monthly_sales"].iloc[0] == 9
 
 def test_get_sales_flow_index():
     mask = dataset["productId"]=="product1"
