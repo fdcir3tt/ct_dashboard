@@ -56,4 +56,13 @@ def test_get_client_sales():
     assert results[results["month"]==1]["client_sales"].iloc[0]==2
     assert results[results["month"]==2]["client_sales"].iloc[0]==1
 
+    mask = dataset["productId"]=="product2"
+    model.fit(dataset[mask])
+    
+    results = model.client_sales
+
+    assert results[results["month"]==12]["client_sales"].iloc[0]==18
+    assert results[results["month"]==1]["client_sales"].iloc[0]==13
+    assert results[results["month"]==2]["client_sales"].iloc[0]==4
+
 

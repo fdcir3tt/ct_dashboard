@@ -4,7 +4,9 @@ import pandas as pd
 import yaml
 import numpy as np
 import matplotlib.pyplot as plt
+import pyodbc
 
+from dotenv import load_dotenv
 from pathlib import Path
 from typing import Any,Iterable
 from dataclasses import dataclass
@@ -178,6 +180,40 @@ def get_experiment_config(file_path:Path=Path('config.yml'))->ExperimentConfig:
 
     return ExperimentConfig(**config)
 
+def get_client_list()->pd.DataFrame:
+    """
+    Extrae claves de clientes registrados en el Data Ware House. 
+
+    Parametros:
+    - :None,
+    Regresa:
+    - df: pandas.Dataframe, Columna que contiene las claves de cliente
+    """
+    load_dotenv()
+    
+    connection_str = (
+        f'DRIVER={{{os.getenv("DATA_WAREHOUSE_DRIVER")}}};'
+        f'SERVER={os.getenv ("DATA_WAREHOUSE_IP") };'  
+        f'DATABASE={os.getenv("DATA_WAREHOUSE_DB_NAME")};'  
+        f'UID={os.getenv("DATA_WAREHOUSE_USER_ID")};'  
+        f'PWD={os.getenv("DATA_WAREHOUSE_USER_PWD")}'   
+    )
+    query = f""" SELECT {os.getenv("ID_COLUMN")} FROM {os.getenv("CLIENTS_TABLE_NAME")}"""
+
+    try:
+        
+        conn = pyodbc.connect(connection_str)
+        print("Conexión exitosa a la base de datos!")
+        
+        df = pd.read_sql(query,conn)
+        conn.close()
+        df = df.rename(columns={os.getenv("ID_COLUMN"):"clientId"})
+
+        return df
+
+    except pyodbc.Error as e:
+        print(f"Error al intentar conectarse a la base de datos: {e}")
+    
 
 def make_time_series(data:pd.DataFrame,period:list[Date]|None=None,target_column:str="quantity",frequency:str="days")-> np.ndarray:
     """
