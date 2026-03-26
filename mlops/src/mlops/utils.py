@@ -228,16 +228,14 @@ def make_time_series(data:pd.DataFrame,period:list[Date]|None=None,target_column
     - time_series: numpy.ndarray, Serie de tiempo resultado de los datos de venta
     - time_axis: numpy.ndarray, Fechas de serie de tiempo
     """
+    df = data.copy()
     if period is None:
         period = time_period(start_date=Date(2020,1,1))
     time_df = pd.DataFrame(data=period,columns=["date"])
     time_df["date"]=pd.to_datetime(time_df["date"])
-    df = time_df.merge(right=data,
-                       how="left",
-                       on="date")
-    
-    df[target_column]=df[target_column].fillna(value=0,inplace=False)
-    df = df.sort_values(by="date")
+
+    if "year" not in time_df.columns:
+        df["year"] = df["date"].dt.year
 
     if frequency=="days":
         frequency_col = "day"
@@ -249,8 +247,20 @@ def make_time_series(data:pd.DataFrame,period:list[Date]|None=None,target_column
     if frequency=="months":
         frequency_col = "month"
 
-    time_axis = df[frequency_col].to_numpy()
-    time_series=df[target_column].to_numpy()
+    df["quantity"]= df.groupby(["year",frequency_col])["quantity"].transform("sum")
+    df = df.drop_duplicates(subset=["year",frequency_col,"quantity"])
+
+    df = time_df.merge(right=df,
+                       how="left",
+                       on="date")
+    
+    df[target_column]=df[target_column].fillna(value=0,inplace=False)
+    df = df.sort_values(by="date")
+
+    
+
+    time_axis = df["date"].to_numpy()
+    time_series= df[target_column].to_numpy()
     return time_axis,time_series
 
 
