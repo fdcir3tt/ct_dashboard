@@ -14,8 +14,20 @@ from abc import ABC,abstractmethod
 class Metrics:
     mae: float |None = None
     mfe : float|None = None
-    mse : float |None = None
+    rmse : float |None = None
     da:float|None = None
+    def __post_init__(self):
+        if self.rmse <= 0:
+            raise ValueError("Raíz del error cuadrado promedio debe ser positivo")
+        
+        if self.mae <= 0:
+            raise ValueError("Error absoluto promedio debe ser positivo")
+        
+        if self.da <= 0:
+            raise ValueError("Error direccional debe ser positivo")
+
+       
+
 
 @dataclass
 class LossHistory:
@@ -25,7 +37,7 @@ class LossHistory:
 class ForecastModel(ABC):
     _registry: dict[str, type["ForecastModel"]] = {}
 
-    def __init__(self,parameters:dict[str,Any],test_metrics:list[str]=['mae','mse']):
+    def __init__(self,parameters:dict[str,Any],test_metrics:list[str]=['mae','mfe','rmse','da']):
         self.parameters= parameters
         self.test_metrics = test_metrics # Metricas que se quieren evaluar
 
@@ -105,13 +117,13 @@ class ForecastModel(ABC):
         result_metrics = {} 
         for m in self.test_metrics:
             if m=='mae': # Mean Absolute Error
-                result_metrics['mae'] = abs(y_true-y_pred).mean()
+                result_metrics['mae'] = np.mean(abs(y_true-y_pred))
 
             if m=='mfe':# Mean Forecast Error
-                result_metrics['mfe'] = (y_true-y_pred).mean()
+                result_metrics['mfe'] = np.mean(y_pred-y_true)
 
-            if m=='mse':# Mean Square Error
-                result_metrics['mse'] = ((y_true-y_pred)**2).mean()
+            if m=='rmse':# Root Mean Square Error
+                result_metrics['rmse'] = np.sqrt( np.mean( (y_true-y_pred)**2 ) )
 
             if m=='da':# Directional Accuracy
                 result_metrics['da'] = directional_accuracy(y_pred,y_true)

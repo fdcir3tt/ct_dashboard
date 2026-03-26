@@ -1,8 +1,13 @@
 import pytest
 import datetime
 import pandas as pd
+import numpy as np
 
-from mlops.models import HeuristicModel
+from mlops.models import ForecastModel,HeuristicModel,Metrics
+
+# ==================================================================== #
+#                       DATOS SINTÉTICOS
+# ==================================================================== #
 
 columns = ["productId","date","quantity","clientId"]
 
@@ -38,7 +43,40 @@ dataset["month"]= dataset["date"].dt.month
 max_date = dataset["date"].max()
 dataset["monthly_sales"] = dataset.groupby(["year","month","productId"])["quantity"].transform("sum")
 
-model = HeuristicModel(parameters={"l":8.4})
+
+
+
+# ==================================================================== #
+#                       MODELO ABSTRACTO FORECAST
+# ==================================================================== #
+
+def test_from_name():
+    model= ForecastModel.from_name(model_name="heuristic",
+                                    parameters={"l":8.4})
+    
+    assert type(model) == type(HeuristicModel(parameters={'l':2}))
+
+def test_calculate_metrics():
+    y_pred = np.array([0,1,2,3,4,6,6,6,6,8])
+    y_true = np.array([21,23,4,5,17,5,5,3,5,7])
+    residuals = np.array([21,22,2,2,13,-1,-1,-3,-1,-1]) # y_true-y_pred
+
+    expected_metrics = Metrics(mae= 6.70,
+                               mfe= -5.30,
+                               rmse= np.sqrt(111.50),
+                               da= 5/9)
+    
+    result_metrics = HeuristicModel(parameters={}).calculate_metrics(y_pred,y_true)
+    assert result_metrics.mae == expected_metrics.mae
+    assert result_metrics.mfe == expected_metrics.mfe
+    assert result_metrics.rmse == expected_metrics.rmse
+    assert result_metrics.da == expected_metrics.da
+
+# ==================================================================== #
+#                       MODELO HEURISTICO
+# ==================================================================== #
+model = ForecastModel.from_name(model_name="heuristic",
+                                    parameters={"l":8.4})
 
 def test_sales_period():
     mask = dataset["productId"]=="product1"
