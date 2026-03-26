@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from mlops.utils import make_time_series,time_period,DatasetFilterConfig,DatasetFilters,Date
 
@@ -28,7 +29,53 @@ def test_make_time_series():
     # Meses
 
 
-#def test_DatasetFilterConfig():
+def test_DatasetFilterConfig():
+    config = DatasetFilterConfig(start_date=Date(2000,1,1),
+                                 end_date=Date(2000,4,1),
+                                 frequency="daily",
+                                 horizon=30,
+                                 training_window=90)
+    
+    assert config.start_date == Date(2000,1,1)
+    assert config.end_date == Date(2000,4,1)
+    assert config.frequency == "daily"
+    assert config.horizon == 30
+    assert config.training_window == 90
 
-
+    config = DatasetFilterConfig(start_date=Date(2000,1,1),
+                                 end_date=Date(2000,4,1),
+                                 frequency="daily",
+                                 horizon=30,
+                                 training_window=90)
+    
+def test_invalid_dates():
+    with pytest.raises(ValueError):
+        DatasetFilterConfig(
+                start_date=Date(2025, 1, 10),
+                end_date=Date(2025, 1, 1),
+                frequency="daily",
+                horizon=10,
+                training_window=20,
+            )
+    
+def test_invalid_horizon():
+    with pytest.raises(ValueError):
+        DatasetFilterConfig(
+                start_date=Date(2025, 1, 1),
+                end_date=Date(2025, 1, 10),
+                frequency="daily",
+                horizon=-10,
+                training_window=20,
+            )
+        
+def test_invalid_training_window():
+    with pytest.raises(ValueError):
+        DatasetFilterConfig(
+                start_date=Date(2025, 1, 1),
+                end_date=Date(2025, 1, 10),
+                frequency="daily",
+                horizon=10,
+                training_window=-20,
+            )
+        
 #def test_DatasetFilters():

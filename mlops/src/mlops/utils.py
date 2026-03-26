@@ -36,6 +36,18 @@ class DatasetFilterConfig:
     frequency : str
     horizon: int 
     training_window: int
+    def __post_init__(self):
+        if self.start_date > self.end_date:
+            raise ValueError("'start_date' debe ser una fecha antes de 'end_date'")
+
+        if self.horizon <= 0:
+            raise ValueError("'horizon' debe ser positivo")
+
+        if self.training_window <= 0:
+            raise ValueError("'training_window' must be positive")
+
+        if self.frequency not in {"daily", "weekly", "monthly"}:
+            raise ValueError("'frequency' debe ser uno de los siguientes valores: daily, weekly, monthly")
 
 class DatasetFilters:
     def __init__(self, config: DatasetFilterConfig):
@@ -87,17 +99,14 @@ class DatasetFilters:
             return None
         
         # Frecuencia
-        if self.cfg.frequency not in ["days","weeks","months"]:
-            print("Frecuencia invalida: El valor debe ser 'days','weeks' o 'months' ")
-            return None
-        if self.cfg.frequency == "days":
+        if self.cfg.frequency == "daily":
             target_column = "quantity"
         
-        if self.cfg.frequency == "weeks":
+        if self.cfg.frequency == "weekly":
             df["weekly_quantity"]=df.groupby(["year","week"])["quantity"].transform("sum")
             target_column="weekly_quantity"
 
-        if self.cfg.frequency == "months": 
+        if self.cfg.frequency == "monthly": 
             df["months_quantity"]=df.groupby(["year","month"])["quantity"].transform("sum")
             target_column="months_quantity"
         
@@ -215,7 +224,7 @@ def get_client_list()->pd.DataFrame:
         print(f"Error al intentar conectarse a la base de datos: {e}")
     
 
-def make_time_series(data:pd.DataFrame,period:list[Date]|None=None,target_column:str="quantity",frequency:str="days")-> np.ndarray:
+def make_time_series(data:pd.DataFrame,period:list[Date]|None=None,target_column:str="quantity",frequency:str="daily")-> np.ndarray:
     """
     Convierte datos de ventas a serie temporal, llenando los huecos de fechas con venta '0'
 
@@ -237,14 +246,14 @@ def make_time_series(data:pd.DataFrame,period:list[Date]|None=None,target_column
     if "year" not in time_df.columns:
         df["year"] = df["date"].dt.year
 
-    if frequency=="days":
+    if frequency=="daily":
         frequency_col = "day"
         df["day"]=df["date"].dt.dayofyear
 
-    if frequency=="weeks":
+    if frequency=="weekly":
         frequency_col = "week"
 
-    if frequency=="months":
+    if frequency=="monthly":
         frequency_col = "month"
 
     df["quantity"]= df.groupby(["year",frequency_col])["quantity"].transform("sum")
