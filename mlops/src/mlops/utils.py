@@ -107,16 +107,14 @@ class DatasetFilters:
             target_column="weekly_quantity"
 
         if self.cfg.frequency == "monthly": 
-            df["months_quantity"]=df.groupby(["year","month"])["quantity"].transform("sum")
-            target_column="months_quantity"
+            df["monthly_quantity"]=df.groupby(["year","month"])["quantity"].transform("sum")
+            target_column="monthly_quantity"
         
         # Ventanas de entrenamiento y horizonte
         training_window = self.cfg.training_window
         horizon = self.cfg.horizon
         
-        if len(df)< horizon+training_window:
-            print(f"Dataset invalido: Insuficiente datos para configuración actual.\nNúmero de datos:{len(df)}\nNúmero Requerido:{horizon+training_window}")
-            return None
+        
         
         start_date = pd.to_datetime(self.cfg.start_date)
         end_date = pd.to_datetime(self.cfg.end_date)
@@ -124,6 +122,10 @@ class DatasetFilters:
 
         x,y = make_time_series(df,period,target_column)
 
+        if len(y)< horizon+training_window:
+            print(f"Dataset invalido: Insuficiente datos para configuración actual.\nNúmero de datos:{len(y)}\nNúmero Requerido:{horizon+training_window}")
+            return None
+        
         x_train = x[:training_window]
         y_train = y[:training_window]
 

@@ -8,10 +8,10 @@ def test_make_time_series():
 
     period = time_period(Date(2000,1,1),Date(2000,4,1))
     df = pd.DataFrame(data=[[Date(2000,1,4),10],
-                            [Date(2000,1,4),3], # 4
-                            [Date(2000,2,20),42], # 51
-                            [Date(2000,3,14),69], # 74
-                            [Date(2000,3,21),1337]] , # 81
+                            [Date(2000,1,4),3], # día 4 del año
+                            [Date(2000,2,20),42], # día 51 del año
+                            [Date(2000,3,14),69], # día 74 del año
+                            [Date(2000,3,21),1337]] , # día 81 del año
                       columns=["date","quantity"] )
     df["date"]=pd.to_datetime(df["date"])
 
@@ -78,4 +78,37 @@ def test_invalid_training_window():
                 training_window=-20,
             )
         
-#def test_DatasetFilters():
+def test_DatasetFilters():
+    df = pd.DataFrame(data=[[Date(2000,1,4),10],
+                            [Date(2000,1,4),3], 
+                            [Date(2000,2,20),42], # día 51 del año
+                            [Date(2000,3,14),69], 
+                            [Date(2000,3,21),1337],
+                            [Date(2000,4,21),314],
+                            [Date(2000,6,2),34],] , 
+                      columns=["date","quantity"] )
+    df["date"]=pd.to_datetime(df["date"])
+    config = DatasetFilterConfig(start_date=Date(2000,1,1),
+                                 end_date=Date(2000,4,14), # día 106
+                                 frequency="daily",
+                                 horizon=30,
+                                 training_window=60)
+    
+    x_train,y_train,x_test,y_test = DatasetFilters(config).apply_split(df)
+
+    assert type(x_train) == type(np.array([]))
+    assert type(y_train) == type(np.array([]))
+    assert type(x_test) == type(np.array([]))
+    assert type(y_test) == type(np.array([]))
+
+    assert x_train.shape == (60,),f"Unexpected shape: {x_train.shape}"
+    assert y_train.shape == (60,),f"Unexpected shape: {x_train.shape}"
+    assert x_test.shape == (30,),f"Unexpected shape: {x_train.shape}"
+    assert y_test.shape == (30,),f"Unexpected shape: {x_train.shape}"
+
+    assert y_train.sum() == 55, f"Unexpected y_train sum: {y_train.sum()}"
+    assert x_train.max() == pd.Timestamp(Date(2000, 2, 29)), f"Unexpected x_train max: {x_train.max()}"
+
+    assert y_test.sum() == 1406, f"Unexpected y_test sum: {y_test.sum()}"
+    assert x_test.max() == pd.Timestamp(Date(2000, 3, 30)), f"Unexpected x_test max: {x_test.max()}"
+
