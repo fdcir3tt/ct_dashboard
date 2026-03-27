@@ -41,7 +41,7 @@ dataset["year"]= dataset["date"].dt.year
 dataset["month"]= dataset["date"].dt.month
 
 max_date = dataset["date"].max()
-dataset["monthly_sales"] = dataset.groupby(["year","month","productId"])["quantity"].transform("sum")
+dataset["monthly_quantity"] = dataset.groupby(["year","month","productId"])["quantity"].transform("sum")
 
 
 
@@ -83,23 +83,23 @@ def test_sales_period():
     model.fit(dataset[mask])
     results = model.sales_period
 
-    assert results[results["month"]==9]["monthly_sales"].iloc[0] == 14
-    assert results[results["month"]==10]["monthly_sales"].iloc[0] == 1
-    assert results[results["month"]==11]["monthly_sales"].iloc[0] == 4
-    assert results[results["month"]==12]["monthly_sales"].iloc[0] == 10
-    assert results[results["month"]==1]["monthly_sales"].iloc[0] == 2
-    assert results[results["month"]==2]["monthly_sales"].iloc[0] == 1
+    assert results[results["month"]==9]["monthly_quantity"].iloc[0] == 14
+    assert results[results["month"]==10]["monthly_quantity"].iloc[0] == 1
+    assert results[results["month"]==11]["monthly_quantity"].iloc[0] == 4
+    assert results[results["month"]==12]["monthly_quantity"].iloc[0] == 10
+    assert results[results["month"]==1]["monthly_quantity"].iloc[0] == 2
+    assert results[results["month"]==2]["monthly_quantity"].iloc[0] == 1
 
     mask = dataset["productId"]=="product2"
     model.fit(dataset[mask])
     results = model.sales_period
 
-    assert results[results["month"]==9]["monthly_sales"].iloc[0] == 37
-    assert results[results["month"]==10]["monthly_sales"].iloc[0] == 49
-    assert results[results["month"]==11]["monthly_sales"].iloc[0] == 29
-    assert results[results["month"]==12]["monthly_sales"].iloc[0] == 37
-    assert results[results["month"]==1]["monthly_sales"].iloc[0] == 38
-    assert results[results["month"]==2]["monthly_sales"].iloc[0] == 9
+    assert results[results["month"]==9]["monthly_quantity"].iloc[0] == 37
+    assert results[results["month"]==10]["monthly_quantity"].iloc[0] == 49
+    assert results[results["month"]==11]["monthly_quantity"].iloc[0] == 29
+    assert results[results["month"]==12]["monthly_quantity"].iloc[0] == 37
+    assert results[results["month"]==1]["monthly_quantity"].iloc[0] == 38
+    assert results[results["month"]==2]["monthly_quantity"].iloc[0] == 9
 
 def test_remaining_days():
     mask = dataset["productId"]=="product1"
@@ -165,3 +165,4 @@ def test_predict_next_month_sale():
     result = model.predict_next_month_sale()
 
     assert result == 29
+

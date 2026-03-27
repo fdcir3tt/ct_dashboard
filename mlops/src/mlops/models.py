@@ -2,8 +2,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import calendar
+import random
 
-from mlops.utils import get_client_list,ExperimentConfig,DatasetFilterConfig,DatasetFilters
+from scipy.stats import gaussian_kde
+from mlops.utils import get_client_list,time_period,ExperimentConfig,DatasetFilterConfig,DatasetFilters,Date
 from typing import Iterable,Any
 from matplotlib.figure import Figure
 from dataclasses import dataclass
@@ -37,10 +39,10 @@ class LossHistory:
 class ForecastModel(ABC):
     _registry: dict[str, type["ForecastModel"]] = {}
 
-    def __init__(self,parameters:dict[str,Any],test_metrics:list[str]=['mae','mfe','rmse','da']):
+    def __init__(self,parameters:dict[str,Any],test_metrics:list[str]=['mae','mfe','rmse','da'],seed:int|None=None):
         self.parameters= parameters
         self.test_metrics = test_metrics # Metricas que se quieren evaluar
-
+        self.seed = seed
 
     @classmethod
     def register(cls, name: str):
@@ -204,7 +206,14 @@ class ForecastModel(ABC):
 
 @ForecastModel.register("heuristic")
 class HeuristicModel(ForecastModel):
-
+    
+    def index(self,difference:int)->str:
+            if difference<0:
+                return "B"
+            if difference==0:
+                return "E"
+            if difference>0:
+                return "S"
     def get_sales_flow_index(self,dataset:pd.DataFrame)->None:
         """
         Recibe el dataset del producto de analisis ( al menos 6 meses) y obtiene 
@@ -218,24 +227,17 @@ class HeuristicModel(ForecastModel):
         - sales_idx: str, Indice del flujo de ventas,consiste en tres siglas que describen el cambio del flujo de ventas.
                           S = Subió, E= Empató, B = Bajó
         """
-        def index(difference:int)->str:
-            if difference<0:
-                return "B"
-            if difference==0:
-                return "E"
-            if difference>0:
-                return "S"
         df = dataset.copy()
         max_date = df["date"].max()
         
         self.current_quatrimester = pd.date_range(end=max_date, periods=4, freq="MS").month.tolist()
         df = df[ df["month"].isin(self.current_quatrimester) ]
         df = df.sort_values("date")
-        df = df[["year","month","monthly_sales"]].drop_duplicates().reset_index()
-        df.loc[df.index[-1], "monthly_sales"] = self.month_estimate
-        df["difference"] = df["monthly_sales"].diff().dropna().astype("int")
+        df = df[["year","month","monthly_quantity"]].drop_duplicates().reset_index()
+        df.loc[df.index[-1], "monthly_quantity"] = self.month_estimate
+        df["difference"] = df["monthly_quantity"].diff().dropna().astype("int")
         df = df.dropna()
-        df["index"] = df["difference"].apply(index)
+        df["index"] = df["difference"].apply(self.index)
         indeces = df["index"].to_list()
 
         self.sales_idx = ""
@@ -254,13 +256,17 @@ class HeuristicModel(ForecastModel):
         """
         clients = get_client_list()
         client_sales = dataset.merge(clients,how="inner",on="clientId")
+        
         if not client_sales.empty:
+            self.avg_n_month_client_sales = client_sales.groupby(["year","month"]).size().mean()
+            self.client_sales_distribution = gaussian_kde(client_sales["quantity"])
             client_sales["client_sales"]= client_sales.groupby(["year","month"])["quantity"].transform("sum")
             self.client_sales = client_sales[["year","month","client_sales"]].drop_duplicates()
         else: 
             self.client_sales= self.sales_period[["year","month"]]
             self.client_sales["client_sales"]=[0] * len(self.client_sales)
-
+            self.avg_n_month_client_sales = client_sales.groupby(["year","month"]).size().mean()
+            self.client_sales_distribution = gaussian_kde(client_sales["quantity"])
 
     def get_remaining_days(self,latest_date:pd.Timestamp)->None:
         """
@@ -302,7 +308,7 @@ class HeuristicModel(ForecastModel):
             sales_idx = self.sales_idx
             current_day = self.current_day
             month_estimate = self.month_estimate
-            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_sales"].iloc[0]) for i in range(4) ]
+            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_quantity"].iloc[0]) for i in range(4) ]
 
 
             if sales_idx == "BES":
@@ -425,7 +431,7 @@ class HeuristicModel(ForecastModel):
             sales_idx = self.sales_idx
             current_day = self.current_day
             month_estimate = self.month_estimate
-            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_sales"].iloc[0]) for i in range(4) ]
+            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_quantity"].iloc[0]) for i in range(4) ]
 
             def count_non_zero_mn():
                 return sum(1 for v in current_quatrimester[1:3] if v != 0)
@@ -597,7 +603,7 @@ class HeuristicModel(ForecastModel):
             sales_idx = self.sales_idx
             current_day = self.current_day
             month_estimate = self.month_estimate
-            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_sales"].iloc[0]) for i in range(4) ]
+            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_quantity"].iloc[0]) for i in range(4) ]
 
             if sales_idx == "EBS":
                 if current_day <= 8:
@@ -754,7 +760,7 @@ class HeuristicModel(ForecastModel):
             sales_idx = self.sales_idx
             current_day = self.current_day
             month_estimate = self.month_estimate
-            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_sales"].iloc[0]) for i in range(4) ]
+            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_quantity"].iloc[0]) for i in range(4) ]
             
 
             if sales_idx == "ESS":
@@ -879,7 +885,7 @@ class HeuristicModel(ForecastModel):
             sales_idx = self.sales_idx
             current_day = self.current_day
             month_estimate = self.month_estimate
-            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_sales"].iloc[0]) for i in range(4) ]
+            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_quantity"].iloc[0]) for i in range(4) ]
             
 
             if sales_idx == "SES":
@@ -966,29 +972,32 @@ class HeuristicModel(ForecastModel):
         """
         
         if config is not None:
-            model_name="heuristic"
-            dataset_config = DatasetFilterConfig(start_date=(config.get("training_data_start_dates")).get(model_name),
-                                            end_date=(config.get("training_data_end_dates")).get(model_name),
-                                            frequency=(config.get("frequencies")).get(model_name),
-                                            horizon=(config.get("horizons")).get(model_name),
-                                            training_window=(config.get("training_windows")).get(model_name))
+            dataset_config = DatasetFilterConfig(start_date=(config.get("training_data_start_date")),
+                                            end_date=(config.get("training_data_end_date")),
+                                            frequency=(config.get("frequency")),
+                                            horizon=(config.get("horizon")),
+                                            training_window=(config.get("training_window")))
         
             df = DatasetFilters(dataset_config).apply_period_filter(dataset)
         
         else :
             df = dataset.copy()
 
+        
         max_date = df["date"].max()
-        df["monthly_sales"] = df.groupby(["year","month"])["quantity"].transform("sum")
-        self.sales_period = df[["year","month","monthly_sales"]].drop_duplicates()
-
+        df["monthly_quantity"] = df.groupby(["year","month"])["quantity"].transform("sum")
+        
+        self.distribution = gaussian_kde(df["quantity"])
+        self.avg_n_month_sales = df.groupby(["year","month"]).size().mean()
+        self.sales_period = df[["year","month","monthly_quantity"]].drop_duplicates()
+    
         l = self.parameters['l']
-        self.month_estimate =int( l*df[df["date"]==max_date]["monthly_sales"].iloc[0])
+        self.month_estimate =int( l*df[df["date"]==max_date]["monthly_quantity"].iloc[0])
 
         self.get_sales_flow_index(df)
 
         self.get_client_sales(df)
-        
+
         self.get_remaining_days(max_date)
 
         self.get_index_sum()
@@ -1011,7 +1020,7 @@ class HeuristicModel(ForecastModel):
         l = self.parameters['l']
         
         # Estimación ideal
-        sales_condition = sum(1 for s in self.sales_period["monthly_sales"].to_list() if s >= 1) > 2
+        sales_condition = sum(1 for s in self.sales_period["monthly_quantity"].to_list() if s >= 1) > 2
         client_sales_condition = sum(1 for c in self.client_sales["client_sales"].to_list() if c >= 2) >= 1 
         if sales_condition or client_sales_condition:
             first_estimate = self.idx_sum
@@ -1040,10 +1049,107 @@ class HeuristicModel(ForecastModel):
         else:
             final_estimate = adjusted_estimate
 
-        return final_estimate
+        return final_estimate   
+    
+    def generate_sales_data(self,n_samples:int,start_date:Date,end_date:Date,client_sales:bool=False)->pd.DataFrame:
+        if self.seed is not None:
+            random.seed(self.seed)
+        if client_sales:
+            new_data = self.client_sales_distribution.resample(size=n_samples)[0]
+        else:
+            new_data = self.distribution.resample(size=n_samples)[0]
+
+        period = time_period(start_date,end_date)
+
+        random_dates = [random.choice(period) for _ in range(n_samples)]
+        df = pd.DataFrame({
+                            "date": random_dates,
+                            "quantity": new_data
+                        })
+        df["date"] = pd.to_datetime(df["date"])
+        df["month"] = df["date"].dt.month
+        df["year"] = df["date"].dt.year
+
+        df["monthly_quantity"] = df.groupby(["year","month"])["quantity"].transform("sum")
         
-    def predict():
-        pass
+        return  df
+    
+
+        
+    def predict(self,x_input:np.ndarray)->np.ndarray:
+        
+        df = self.sales_period.copy()
+        max_date = df["date"].max()
+        
+
+        max_date = df["date"].max()
+        max_input_date = pd.to_datetime(x_input.max())       
+        min_input_date = pd.to_datetime(x_input.min())        
+        n_of_months = (
+                max_input_date.to_period("M") - min_input_date.to_period("M")
+            ).n
+        months_to_estimate = pd.date_range(end=max_input_date, periods=n_of_months, freq="MS").month.tolist()
+
+        if max_date >= max_input_date:
+
+            mask = df["month"].isin(months_to_estimate)
+            return df[mask]["monthly_quantity"].to_numpy()
+
+        # Generar datos de ventas hasta última fecha de predicción
+        synthetic_sales = self.generate_sales_data(n_samples=self.avg_n_month_sales,
+                                                   start_date=Date(max_date),
+                                                   end_date=x_input.max())
+        
+        synthetic_client_sales = self.generate_sales_data(n_samples=self.avg_n_month_client_sales,
+                                                   start_date=Date(max_date),
+                                                   end_date=x_input.max())
+        
+        
+        l = self.parameters['l']
+
+        for m in months_to_estimate:
+            tmp_sales = synthetic_sales[synthetic_sales["month"]==m]
+            tmp_client_sales = synthetic_client_sales[synthetic_client_sales["month"]==m]
+            tmp_df = pd.concat([df,
+                                tmp_sales,
+                                tmp_client_sales])
+            
+            tmp_df["monthly_quantity"] = tmp_df.groupby(["year","month"])["monthly_quantity"].transform("sum")
+            tmp_max_date = tmp_df["date"].max()
+
+            self.month_estimate =int( l*tmp_df["monthly_quantity"].iloc[0])
+            self.current_quatrimester = pd.date_range(end=tmp_max_date, periods=4, freq="MS").month.tolist()
+            
+            # Índice de flujo
+            tmp_df = tmp_df[["year","month","monthly_quantity"]].drop_duplicates().reset_index()
+            tmp_df.loc[tmp_df.index[-1], "monthly_quantity"] = self.month_estimate
+            tmp_df["difference"] = tmp_df["monthly_quantity"].diff().dropna().astype("int")
+            tmp_df = tmp_df.dropna()
+            tmp_df["index"] = tmp_df["difference"].apply(self.index)
+            indeces = tmp_df["index"].to_list()
+
+            self.sales_idx = ""
+            for i in indeces:
+                self.sales_idx += i 
+            
+            # Ventas de Cliente
+            tmp_client_sales["client_sales"]= tmp_client_sales.groupby(["year","month"])["quantity"].transform("sum")
+            self.client_sales = tmp_client_sales[["year","month","client_sales"]].drop_duplicates()
+        
+            self.get_remaining_days(tmp_max_date)
+
+            self.get_index_sum()
+
+            prediction = self.predict_next_month_sale()
+
+            next_month = (m)%12+1
+            next_year = self.current_year+1 if next_month==1 else self.current_year 
+            new_row = {"year":next_year,"month":next_month,"monthly_quantity":prediction}
+
+            self.sales_period = pd.concat([self.sales_period,pd.DataFrame(new_row)])
+
+            df = self.sales_period.copy()
+
 
 
 
