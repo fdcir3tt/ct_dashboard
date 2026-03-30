@@ -1,0 +1,19 @@
+model_type: arima
+dataset: HERMOSILLO, SON_MEMSTY050
+metrics:
+  - mae
+  - mfe
+  - mse
+  - da
+parameters:
+  p: 20
+  d: 1
+  q: 4
+training_data_start_date: "2025-01-01"
+training_data_end_date: "2026-03-15"
+frequency: "daily"
+horizon: 30
+training_window: 60
+seed: 42
+git_commit: null
+feature_set: raw
