@@ -2,7 +2,19 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from mlops.utils import make_time_series,time_period,DatasetFilterConfig,DatasetFilters,Date
+from mlops.utils import make_time_series,time_period,get_experiment_config,DatasetFilterConfig,DatasetFilters,Date,Path
+
+def test_get_experiment_config():
+    file_path = Path("test_config.yml")
+    config = get_experiment_config(file_path)
+
+    assert config.model_type=="arima"
+    assert config.dataset=="HERMOSILLO, SON_MEMSTY050"
+    assert config.metrics==["mae","mfe","mse","da"]
+    assert config.parameters=={"p":20,"d":1,"q":4}
+    assert config.training_data_start_date==Date(2025,1,1)
+    assert config.training_data_end_date==Date(2026,3,15)
+
 
 def test_make_time_series():
 

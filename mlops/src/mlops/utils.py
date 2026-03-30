@@ -16,18 +16,20 @@ data_dir = Path('data')
 
 @dataclass
 class ExperimentConfig:
-    datasets: dict[str,str]
-    metrics : dict[str,Iterable[str]]
-    parameters : dict[str,dict[str,Any]] 
-    training_data_start_dates: dict[str,Date]
-    training_data_end_dates: dict[str,Date]
-    model_types: list[str]
-    horizons:dict[str,int]
-    frequencies: dict[str,str]
-    training_windows:dict[str,int]
-    seeds:dict[str,int]
+    dataset: str
+    parameters : dict[str,Any]
+    training_data_start_date: Date
+    training_data_end_date: Date
+    model_type: str
+    horizon:int
+    frequency: str
+    training_window:int
+    seed:int
+    metrics : list[str]|None=None
     git_commit: str|None =None
     feature_set: str|None =None
+
+
 
 @dataclass
 class DatasetFilterConfig:
@@ -188,7 +190,8 @@ def get_experiment_config(file_path:Path=Path('config.yml'))->ExperimentConfig:
     if file_path.suffix=='.yml' or file_path.suffix=='.yaml':
         with open(file_path, mode='r') as f:
             config = yaml.safe_load(f)
-
+        config["training_data_start_date"] = Date.fromisoformat(config["training_data_start_date"])
+        config["training_data_end_date"]  = Date.fromisoformat(config["training_data_end_date"])
     return ExperimentConfig(**config)
 
 def get_client_list()->pd.DataFrame:
