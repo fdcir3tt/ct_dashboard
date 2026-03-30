@@ -1052,6 +1052,19 @@ class HeuristicModel(ForecastModel):
         return final_estimate   
     
     def generate_sales_data(self,n_samples:int,start_date:Date,end_date:Date,client_sales:bool=False)->pd.DataFrame:
+        """
+        Genera datos sintéticos en base a distribución observada por datos de ventas
+
+        Parametros:
+        - n_samples: int, Cantidad de valores que se quieren generar
+        - start_date: Date, Fecha inicio de periodo de registros
+        - end_date: Date, Fecha fin de periodo registros
+        - client_sales: bool, Determina si se quieren generar ventas normales o ventas de cliente
+
+        Regresa: 
+        - df: pandas.DataFrame, Datos generados 
+
+        """
         if self.seed is not None:
             random.seed(self.seed)
         if client_sales:
@@ -1102,7 +1115,8 @@ class HeuristicModel(ForecastModel):
         
         synthetic_client_sales = self.generate_sales_data(n_samples=self.avg_n_month_client_sales,
                                                    start_date=Date(max_date),
-                                                   end_date=x_input.max())
+                                                   end_date=x_input.max(),
+                                                   client_sales=True)
         
         
         l = self.parameters['l']
@@ -1133,7 +1147,7 @@ class HeuristicModel(ForecastModel):
                 self.sales_idx += i 
             
             # Ventas de Cliente
-            tmp_client_sales["client_sales"]= tmp_client_sales.groupby(["year","month"])["quantity"].transform("sum")
+            tmp_client_sales["client_sales"]= tmp_client_sales.groupby(["year","month"])["monthly_quantity"].transform("sum")
             self.client_sales = tmp_client_sales[["year","month","client_sales"]].drop_duplicates()
         
             self.get_remaining_days(tmp_max_date)
@@ -1142,6 +1156,7 @@ class HeuristicModel(ForecastModel):
 
             prediction = self.predict_next_month_sale()
 
+            # Actualización
             next_month = (m)%12+1
             next_year = self.current_year+1 if next_month==1 else self.current_year 
             new_row = {"year":next_year,"month":next_month,"monthly_quantity":prediction}
@@ -1149,6 +1164,8 @@ class HeuristicModel(ForecastModel):
             self.sales_period = pd.concat([self.sales_period,pd.DataFrame(new_row)])
 
             df = self.sales_period.copy()
+
+        return df[df["month"].isin(months_to_estimate)]["monthly_quantity"].to_numpy() 
 
 
 
