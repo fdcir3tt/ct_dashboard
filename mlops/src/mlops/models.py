@@ -5,11 +5,13 @@ import calendar
 import random
 
 from scipy.stats import gaussian_kde
-from mlops.utils import get_client_list,time_period,ExperimentConfig,DatasetFilterConfig,DatasetFilters,Date
+from mlops.utils import get_client_list,time_period,make_time_series,ExperimentConfig,DatasetFilterConfig,DatasetFilters,Date
 from typing import Iterable,Any
 from matplotlib.figure import Figure
 from dataclasses import dataclass
 from abc import ABC,abstractmethod
+from statsmodels.tsa.arima.model import ARIMA
+
 
 
 @dataclass
@@ -229,7 +231,8 @@ class HeuristicModel(ForecastModel):
         """
         df = dataset.copy()
         max_date = df["date"].max()
-        
+        l = self.parameters['l']
+        self.month_estimate =int( l*df[df["date"]==max_date]["monthly_quantity"].iloc[0])
         self.current_quatrimester = pd.date_range(end=max_date, periods=4, freq="MS").month.tolist()
         df = df[ df["month"].isin(self.current_quatrimester) ]
         df = df.sort_values("date")
@@ -991,8 +994,7 @@ class HeuristicModel(ForecastModel):
         self.avg_n_month_sales = df.groupby(["year","month"]).size().mean()
         self.sales_period = df[["year","month","monthly_quantity"]].drop_duplicates()
     
-        l = self.parameters['l']
-        self.month_estimate =int( l*df[df["date"]==max_date]["monthly_quantity"].iloc[0])
+        
 
         self.get_sales_flow_index(df)
 
@@ -1172,4 +1174,74 @@ class HeuristicModel(ForecastModel):
 
 @ForecastModel.register("arima")
 class ARIMAModel(ForecastModel):
-    pass
+
+    def fit(self,dataset:pd.DataFrame,config:ExperimentConfig|None=None)->None:
+        p = self.parameters.get('p')
+        d = self.parameters.get('d')
+        q = self.parameters.get('q')
+
+        df = dataset.copy()
+        if config is None:
+            target_column = "quantity"
+            training_window = 100
+            horizon = 30
+            start_date = pd.to_datetime(Date(2024,9,1))
+            end_date = pd.to_datetime(Date(2025,2,5))
+            period = time_period(start_date=start_date,end_date=end_date)
+
+        # Frecuencía
+        else:
+            if config.frequency == "daily":
+                target_column = "quantity"
+
+            if config.frequency == "weekly":
+                df["weekly_quantity"]=df.groupby(["year","week"])["quantity"].transform("sum")
+                target_column="weekly_quantity"
+
+            if config.frequency == "monthly": 
+                df["monthly_quantity"]=df.groupby(["year","month"])["quantity"].transform("sum")
+                target_column="monthly_quantity"
+
+            # 
+            training_window = config.training_window
+            horizon = config.horizon
+        
+    
+            start_date = pd.to_datetime(config.training_data_start_date)
+            end_date = pd.to_datetime(config.training_data_end_date)
+            period = time_period(start_date=start_date,end_date=end_date)
+
+        x,y = make_time_series(df,period,target_column)
+
+        if len(y)< horizon+training_window:
+            print(f"Dataset invalido: Insuficiente datos para configuración actual.\nNúmero de datos:{len(y)}\nNúmero Requerido:{horizon+training_window}")
+            return None
+        
+        x_train = x[:training_window]
+        y_train = y[:training_window]
+        
+        
+        self.known_data = pd.Series(y_train,index=x_train)
+        
+        model = ARIMA(y_train,
+              order=(p, d, q), # p,d,q
+              enforce_stationarity=True,
+              enforce_invertibility=True)
+        
+        self.fitted_model = model.fit(method_kwargs={"maxiter": 1000})
+
+    def predict(self,x_input:np.ndarray)->np.ndarray:
+        known_data = self.known_data 
+        known_outputs = known_data[known_data.index.isin(x_input)].to_numpy()
+
+        n_steps = len(x_input)-len(known_outputs)
+        if n_steps >0:
+            forecast = self.fitted_model.get_forecast(steps=n_steps).predicted_mean
+            y_pred = np.concatenate((known_outputs, forecast), axis=0)
+        else:
+            y_pred=known_outputs
+        return y_pred 
+
+
+    def train(self,x_train:np.ndarray,y_train:np.ndarray):
+        return None
