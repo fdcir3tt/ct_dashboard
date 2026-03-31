@@ -8,11 +8,17 @@ __pycache__/
 .pytest_cache/
 data
 log
+mlruns/
+plots/
+
 # Archivos
 .env
 config.yml
+mlflow.db 
 
 # Excepciones
 !app/data/raw/historical_data_usd_mxn_2008-12-31_to_2026-01-20.csv
 
 Revisión de lógica de distribución actual-20250206_101230-Grabación de la reunión.mp4
+
+
