@@ -60,7 +60,7 @@ class ForecastModel(ABC):
     @classmethod
     def from_name(cls,model_name: str,parameters: dict[str, float],test_metrics: list[str] = ['mae','rmse']) -> "ForecastModel":
         """ Método para cargar modelo de esta clase por su nombre """
-        model_cls = cls._registry.get(model_name.lower())
+        model_cls = cls._registry.get(model_name)
         if model_cls is None:
             raise ValueError(
                 f"Modelo desconocido '{model_name}'. Modelos disponibles: {list(cls._registry)}"
@@ -164,7 +164,7 @@ class ForecastModel(ABC):
         return fig
 
         
-    def plot_prediction(self,y_pred:np.ndarray,y_true:np.ndarray, title:str="Prediction vs True", xlabel:str="Tiempo (días)", ylabel:str="Ventas")->Figure:
+    def plot_prediction(self,y_pred:np.ndarray,y_true:np.ndarray, title:str="Predicción vs Real", xlabel:str="Tiempo (días)", ylabel:str="Ventas")->Figure:
         """
         Gráfica de predicción de modelo y datos reales.
             
@@ -180,8 +180,9 @@ class ForecastModel(ABC):
 
         """
         fig, ax = plt.subplots(figsize=(10,5))
-        ax.plot(y_true, label="True", marker='o')
-        ax.plot(y_pred, label="Predicted", marker='x')
+        ax.plot(y_true, label="Real", marker='o')
+        ax.plot(y_pred, label="Predicción", marker='x')
+        ax.set_ylim(0)
         ax.set_title(title)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
@@ -204,12 +205,16 @@ class ForecastModel(ABC):
         """
         y_pred = self.predict(x_test)
         y_true = y_test   
+        start_date = x_test.min().astype('datetime64[D]').astype(Date)
+        end_date = x_test.max().astype('datetime64[D]').astype(Date)
+        
+        title= f"Periodo : {start_date}  /   {end_date}"
         metrics = self.calculate_metrics(y_pred,y_true)
-        test_fig = self.plot_prediction(y_pred,y_true)
+        test_fig = self.plot_prediction(y_pred,y_true,title)
         return test_fig,metrics 
 
 
-@ForecastModel.register("heuristic")
+@ForecastModel.register("Heuristic")
 class HeuristicModel(ForecastModel):
     
     def index(self,difference:int)->str:
@@ -1175,7 +1180,7 @@ class HeuristicModel(ForecastModel):
 
 
 
-@ForecastModel.register("arima")
+@ForecastModel.register("ARIMA")
 class ARIMAModel(ForecastModel):
 
     def fit(self,dataset:pd.DataFrame,config:ExperimentConfig|None=None)->None:

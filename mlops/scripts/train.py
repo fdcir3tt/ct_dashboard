@@ -106,11 +106,12 @@ def logging(model_name:str,config:ExperimentConfig,metrics:Metrics,figures:dict[
     feature_set = (config.feature_set)
 
     # Parametros
-    run_name = f"{model_name}_{feature_set}_{training_window}_{seed}"
+    start_date = config.training_data_start_date
     parameters = (config.parameters)
 
     
     mlflow.log_params(params=parameters)
+    mlflow.log_param(key="training_starting_date",value=start_date)
 
     # Metricas
     for metric,value in metrics.__dict__.items():
@@ -132,6 +133,7 @@ def logging(model_name:str,config:ExperimentConfig,metrics:Metrics,figures:dict[
 def main():
     experiment_config = get_experiment_config()
     model_name = experiment_config.model_type
+    
     dataset_name = experiment_config.dataset
     frequency = (experiment_config.frequency)
     horizon = (experiment_config.horizon)
@@ -142,30 +144,33 @@ def main():
     dataset,x_train,y_train,x_test,y_test = load_dataset(model_name,dataset_name,experiment_config)
     model = load_model(model_name,experiment_config)
 
-    
-    experiment_id = f"{dataset_name.replace(" ","")}_{frequency}_{horizon}"
-    run_name = f"{model_name}_{feature_set}_{training_window}_{seed}"
+    branch = dataset_name.split("_")[0]
+    productId = dataset_name.split("_")[1]
+
+    experiment_id = f"{branch}"
+    parent_run_name = f"{productId}_{model_name}"
+    child_run_name =f"{feature_set}_{seed}_<{frequency},{training_window},{horizon}>"
     
     print(f"Experimento '{experiment_id}'")
-    print(f"Empezando intento: {run_name}")
+    print(f"Empezando intento: {parent_run_name}")
 
     
     mlflow.set_experiment(experiment_name=experiment_id)
-    with mlflow.start_run(run_name=run_name):
-
-        if hasattr(model,"fit") and callable(getattr(model, "fit")):
-            model.fit(dataset,experiment_config)
+    with mlflow.start_run(run_name=parent_run_name):
+        with mlflow.start_run(run_name=child_run_name,nested=True):
+            if hasattr(model,"fit") and callable(getattr(model, "fit")):
+                model.fit(dataset,experiment_config)
+                
+            train_results = model.train(x_train,y_train)
+            test_fig,metrics = model.test(x_test,y_test)
             
-        train_results = model.train(x_train,y_train)
-        test_fig,metrics = model.test(x_test,y_test)
-        
-        if train_results is None :
-            figures={"test_plot":test_fig}
-        else:
-            loss_history,loss_fig = train_results 
-            figures={"loss_plot":loss_fig,"test_plot":test_fig}
-            
-        logging(model_name,experiment_config,metrics,figures)
+            if train_results is None :
+                figures={"test_plot":test_fig}
+            else:
+                loss_history,loss_fig = train_results 
+                figures={"loss_plot":loss_fig,"test_plot":test_fig}
+                
+            logging(model_name,experiment_config,metrics,figures)
 
 
 if __name__=="__main__":
