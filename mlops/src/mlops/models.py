@@ -20,17 +20,20 @@ class Metrics:
     mfe : float|None = None
     rmse : float |None = None
     da:float|None = None
-    def __post_init__(self):
-        if self.rmse <= 0:
-            raise ValueError("Raíz del error cuadrado promedio debe ser positivo")
-        
-        if self.mae <= 0:
-            raise ValueError("Error absoluto promedio debe ser positivo")
-        
-        if self.da <= 0:
-            raise ValueError("Error direccional debe ser positivo")
 
-       
+    def __post_init__(self):
+        if self.rmse:
+            if self.rmse <= 0:
+                raise ValueError("Raíz del error cuadrado promedio debe ser positivo")
+        if self.mae:  
+            if self.mae <= 0:
+                raise ValueError("Error absoluto promedio debe ser positivo")
+            
+        if self.da:
+            if self.da <= 0:
+                raise ValueError("Error direccional debe ser positivo")
+            
+        
 
 
 @dataclass
@@ -55,7 +58,7 @@ class ForecastModel(ABC):
         return decorator
     
     @classmethod
-    def from_name(cls,model_name: str,parameters: dict[str, float],test_metrics: list[str] = ['mae','mse']) -> "ForecastModel":
+    def from_name(cls,model_name: str,parameters: dict[str, float],test_metrics: list[str] = ['mae','rmse']) -> "ForecastModel":
         """ Método para cargar modelo de esta clase por su nombre """
         model_cls = cls._registry.get(model_name.lower())
         if model_cls is None:
@@ -125,7 +128,7 @@ class ForecastModel(ABC):
 
             if m=='mfe':# Mean Forecast Error
                 result_metrics['mfe'] = np.mean(y_pred-y_true)
-
+                
             if m=='rmse':# Root Mean Square Error
                 result_metrics['rmse'] = np.sqrt( np.mean( (y_true-y_pred)**2 ) )
 

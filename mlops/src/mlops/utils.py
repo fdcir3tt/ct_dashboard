@@ -81,7 +81,7 @@ class DatasetFilters:
         df = df.sort_values("date")
         return df
     
-    def apply_split(self, data: pd.DataFrame)->tuple[np.ndarray,np.ndarray,np.ndarray,np.ndarray]|None:
+    def apply_split(self, data: pd.DataFrame)->tuple[np.ndarray[Date],np.ndarray[int],np.ndarray[Date],np.ndarray[int]]|None:
         """
         Divide datos en datos de entrenamiento y de prueba en base los parametros
         de frecuencia, ventana de entrenamiento y ventana de horizonte.
