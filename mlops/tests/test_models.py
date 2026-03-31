@@ -51,7 +51,7 @@ dataset["monthly_quantity"] = dataset.groupby(["year","month","productId"])["qua
 # ==================================================================== #
 
 def test_from_name():
-    model= ForecastModel.from_name(model_name="heuristic",
+    model= ForecastModel.from_name(model_name="Heuristic",
                                     parameters={"l":8.4})
     
     assert type(model) == type(HeuristicModel(parameters={'l':2}))
@@ -78,7 +78,7 @@ def test_calculate_metrics():
 
 
 def test_sales_period():
-    model = ForecastModel.from_name(model_name="heuristic",
+    model = ForecastModel.from_name(model_name="Heuristic",
                                     parameters={"l":8.4})
     
     mask = dataset["productId"]=="product1"
@@ -104,7 +104,7 @@ def test_sales_period():
     assert results[results["month"]==2]["monthly_quantity"].iloc[0] == 9
 
 def test_remaining_days():
-    model = ForecastModel.from_name(model_name="heuristic",
+    model = ForecastModel.from_name(model_name="Heuristic",
                                     parameters={"l":8.4})
     
     mask = dataset["productId"]=="product1"
@@ -116,7 +116,7 @@ def test_remaining_days():
     assert model.remaining_days==23
 
 def test_get_sales_flow_index():
-    model = ForecastModel.from_name(model_name="heuristic",
+    model = ForecastModel.from_name(model_name="Heuristic",
                                     parameters={"l":8.4})
     mask = dataset["productId"]=="product1"
     model.get_sales_flow_index(dataset[mask])
@@ -127,7 +127,7 @@ def test_get_sales_flow_index():
     assert model.sales_idx =="SSS" 
 
 def test_get_client_sales():
-    model = ForecastModel.from_name(model_name="heuristic",
+    model = ForecastModel.from_name(model_name="Heuristic",
                                     parameters={"l":8.4})
     mask = dataset["productId"]=="product1"
     model.get_client_sales(dataset[mask])
@@ -149,7 +149,7 @@ def test_get_client_sales():
 
 
 def test_index_sum():
-    model = ForecastModel.from_name(model_name="heuristic",
+    model = ForecastModel.from_name(model_name="Heuristic",
                                     parameters={"l":8.4})
     mask = dataset["productId"]=="product1"
     model.fit(dataset[mask])
@@ -165,7 +165,7 @@ def test_index_sum():
 
 
 def test_predict_next_month_sale():
-    model = ForecastModel.from_name(model_name="heuristic",
+    model = ForecastModel.from_name(model_name="Heuristic",
                                     parameters={"l":8.4})
     mask = dataset["productId"]=="product1"
     model.fit(dataset[mask])
@@ -186,7 +186,7 @@ def test_predict_next_month_sale():
 
 
 def test_predict():
-    model = ForecastModel.from_name(model_name="arima",
+    model = ForecastModel.from_name(model_name="ARIMA",
                                 parameters={"p":1,"d":1,"q":2})
     model.seed = 42
 

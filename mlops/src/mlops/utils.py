@@ -299,3 +299,35 @@ def plot_series(series:np.ndarray,title:str="Ventas realizadas dentro del period
     ax.legend()
     ax.grid(True)
     return fig
+
+def load_dataset(model_name:str,dataset:str,config:ExperimentConfig|dict[str,Any]):
+    """
+    Carga datos que se utilizaran para el experimento de entrenamiento de un modelo
+
+    Parametros:
+    - model_name: str, Nombre del tipo de modelo siendo utilizado
+    - dataset: str, Nombre de los datos que se quieren utilizar
+    - config: ExperimentConfig, Configuración del experimento
+
+    Regresa:
+    - df: pandas.DataFrame, Datos con filtro de periodo
+    - x_train: numpy.ndarray, Datos de entrada de entrenamiento
+    - y_train: numpy.ndarray, Datos de objetivo de entrenamiento
+    - x_test: numpy.ndarray, Datos de entrada de prueba
+    - y_test: numpy.ndarray, Datos de objetivo de prueba
+    """
+    branch, productId = dataset.split('_', 1)
+    file_path = data_dir/'processed'/ branch / f'{productId}.parquet'
+    
+    data = pd.read_parquet(file_path)
+    dataset_config = DatasetFilterConfig(start_date= config.training_data_start_date,
+                                         end_date= config.training_data_end_date,
+                                         frequency= config.frequency,
+                                         horizon= config.horizon,
+                                         training_window=config.training_window)
+    df = DatasetFilters(dataset_config).apply_period_filter(data)
+    
+    x_train,y_train,x_test,y_test = DatasetFilters(dataset_config).apply_split(data)
+    return df,x_train,y_train,x_test,y_test
+
+

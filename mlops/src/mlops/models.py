@@ -214,6 +214,25 @@ class ForecastModel(ABC):
         return test_fig,metrics 
 
 
+def load_model(model_name:str,config:ExperimentConfig|dict[str,Any])->ForecastModel:
+    """
+    Carga el modelo específicado
+
+    Parametros:
+    - model_name: str, Nombre del tipo de modelo siendo utilizado
+    - config: ExperimentConfig , Configuración del experimento
+    
+    Regresa:
+    - model: ForecastModel, Modelo de regresión temporal
+    """
+    parameters = (config.parameters)
+    metrics = (config.metrics)
+    model = ForecastModel.from_name(model_name=model_name,
+                                    parameters=parameters,
+                                    test_metrics=metrics)
+    return model
+
+
 @ForecastModel.register("Heuristic")
 class HeuristicModel(ForecastModel):
     

@@ -1,62 +1,8 @@
-import mlflow 
-import pandas as pd 
-import numpy as np
-import inspect
 import os
+import mlflow 
 
-from typing import get_type_hints
-from mlops.models import ForecastModel,Metrics,Figure
-from mlops.utils import data_dir,get_experiment_config,ExperimentConfig,DatasetFilters,DatasetFilterConfig
-
-def load_dataset(model_name:str,dataset:str,config:ExperimentConfig):
-    """
-    Carga datos que se utilizaran para el experimento de entrenamiento de un modelo
-
-    Parametros:
-    - model_name: str, Nombre del tipo de modelo siendo utilizado
-    - dataset: str, Nombre de los datos que se quieren utilizar
-    - config: ExperimentConfig, Configuración del experimento
-
-    Regresa:
-    - df: pandas.DataFrame, Datos con filtro de periodo
-    - x_train: numpy.ndarray, Datos de entrada de entrenamiento
-    - y_train: numpy.ndarray, Datos de objetivo de entrenamiento
-    - x_test: numpy.ndarray, Datos de entrada de prueba
-    - y_test: numpy.ndarray, Datos de objetivo de prueba
-    """
-    branch, productId = dataset.split('_', 1)
-    file_path = data_dir/'processed'/ branch / f'{productId}.parquet'
-    
-    data = pd.read_parquet(file_path)
-    dataset_config = DatasetFilterConfig(start_date= config.training_data_start_date,
-                                         end_date= config.training_data_end_date,
-                                         frequency= config.frequency,
-                                         horizon= config.horizon,
-                                         training_window=config.training_window)
-    df = DatasetFilters(dataset_config).apply_period_filter(data)
-    
-    x_train,y_train,x_test,y_test = DatasetFilters(dataset_config).apply_split(data)
-    return df,x_train,y_train,x_test,y_test
-
-
-
-def load_model(model_name:str,config:ExperimentConfig)->ForecastModel:
-    """
-    Carga el modelo específicado
-
-    Parametros:
-    - model_name: str, Nombre del tipo de modelo siendo utilizado
-    - config: ExperimentConfig , Configuración del experimento
-    
-    Regresa:
-    - model: ForecastModel, Modelo de regresión temporal
-    """
-    parameters = (config.parameters)
-    metrics = (config.metrics)
-    model = ForecastModel.from_name(model_name=model_name,
-                                    parameters=parameters,
-                                    test_metrics=metrics)
-    return model
+from mlops.models import Metrics,Figure,load_model
+from mlops.utils import get_experiment_config,ExperimentConfig,load_dataset
 
 
 def start_experiment(model_name:str,config:ExperimentConfig):
@@ -101,9 +47,7 @@ def logging(model_name:str,config:ExperimentConfig,metrics:Metrics,figures:dict[
     Regresa:
     - : None,
     """
-    training_window = (config.training_window)
-    seed = (config.seed)
-    feature_set = (config.feature_set)
+
 
     # Parametros
     start_date = config.training_data_start_date

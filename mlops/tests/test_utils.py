@@ -8,7 +8,7 @@ def test_get_experiment_config():
     file_path = Path("test_config.yml")
     config = get_experiment_config(file_path)
 
-    assert config.model_type=="arima"
+    assert config.model_type=="ARIMA"
     assert config.dataset=="HERMOSILLO, SON_MEMSTY050"
     assert config.metrics==["mae","mfe","mse","da"]
     assert config.parameters=={"p":20,"d":1,"q":4}
