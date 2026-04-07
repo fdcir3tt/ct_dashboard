@@ -84,8 +84,7 @@ def main():
     training_window = (experiment_config.training_window)
     seed = (experiment_config.seed)
     feature_set = (experiment_config.feature_set)
-
-    dataset,x_train,y_train,x_test,y_test = load_dataset(model_name,dataset_name,experiment_config)
+    dataset,x_train,y_train,x_test,y_test = load_dataset(dataset_name,experiment_config)
     model = load_model(model_name,experiment_config)
 
     branch = dataset_name.split("_")[0]
