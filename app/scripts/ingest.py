@@ -4,10 +4,8 @@ import datetime
 import warnings
 
 from dashboard.data_loader import connect_to_DB,get_documents,get_product_cost_dict
+from dashboard.utils import Database,Collection,Date,Document,Callable,Logger,Dict
 from dotenv import load_dotenv
-
-
-
 
 # -----------------------------------------------------------
 # SETUP 
@@ -33,22 +31,16 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-today = datetime.datetime.today()
-
+today = Date.today()
 id_fields = ["_id","existenciaId","codigo"]
-
-Date = datetime.datetime
-Document =  dict[str, any]
-Documents = list[Document]
-
 
 # -----------------------------------------------------------
 # INGESTA
 # -----------------------------------------------------------
-from typing import Dict, Any
 
 
-def check_database_up_to_date(collection, date_field: str = 'createdAt') -> Dict[str, Any]:
+
+def check_database_up_to_date(collection:Collection, date_field: str = 'createdAt') -> Dict[str, bool|int|Date ]:
     """
     Revisa si la base contiene documentos del día de hoy
     
@@ -64,8 +56,8 @@ def check_database_up_to_date(collection, date_field: str = 'createdAt') -> Dict
     """
     try:
         
-        today_start = datetime.datetime.combine(today, datetime.time.min)
-        today_end = datetime.datetime.combine(today, datetime.time.max)
+        today_start = Date.combine(today, datetime.time.min)
+        today_end = Date.combine(today, datetime.time.max)
         
         # Query for documents created today
         today_count = collection.count_documents({
@@ -84,7 +76,7 @@ def check_database_up_to_date(collection, date_field: str = 'createdAt') -> Dict
         raise Exception(f"Error checking database status: {str(e)}")
 
 
-def make_observation(raw_doc:Document,cost_dictionary:dict,now:datetime.datetime)->Document :
+def make_observation(raw_doc:Document,cost_dictionary:dict[str,float],now:Date)->Document :
     """
     Función que recibe información de existencia y se queda con solo la información relevante al final
     """
@@ -116,7 +108,7 @@ def make_observation(raw_doc:Document,cost_dictionary:dict,now:datetime.datetime
 # -----------------------------------------------------------
 
 
-def log_collection_size(db, collection_name, logger=logging.info, num_inserted_docs=None):
+def log_collection_size(db:Database, collection_name:str, logger:Logger=logging.info, num_inserted_docs:int|None=None):
     stats = db.command("collStats", collection_name)
 
     msg = (
@@ -139,7 +131,7 @@ def log_collection_size(db, collection_name, logger=logging.info, num_inserted_d
 # MAIN PIPELINE
 # -----------------------------------------------------------
 
-def main(extract_database=None,insert_database=None,now=datetime.datetime.now(),get_docs_fn=get_documents,get_costs_fn=get_product_cost_dict,make_obs_fn=make_observation,log_fn=log_collection_size):
+def main(extract_database:Database|None=None,insert_database:Database|None=None,now:Date=Date.now(),get_docs_fn:Callable=get_documents,get_costs_fn:Callable=get_product_cost_dict,make_obs_fn:Callable=make_observation,log_fn:Callable=log_collection_size):
 
      
     if extract_database is not None:
