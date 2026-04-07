@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 from mlops.utils import load_dataset,time_period,DatasetFilters, DatasetFilterConfig
 from mlops.models import ForecastModel
@@ -8,12 +9,12 @@ from mlops.models import ForecastModel
 # Configuración
 MODEL_TYPE = "ARIMA"
 MODEL_PARAMS= {"p":20,"d":1,"q":4}
-DATASET_NAME = "HERMOSILLO, SON_MEMSTY050" 
+DATASET_NAME = "HERMOSILLO, SON_CAMDAH5500" # MEMSTY050 ,CARHPP4170 ,CAMDAH5500 , 
 EVAL_CONFIG = { "training_data_start_date":"oldest",
               "training_data_end_date":"latest",
               "frequency":"daily",
               "horizon":30,
-              "training_window":30*6}
+              "training_window":180}
 
 datasets_config = DatasetFilterConfig(frequency=EVAL_CONFIG["frequency"],
                                       horizon=EVAL_CONFIG["horizon"],
@@ -23,11 +24,13 @@ filters = DatasetFilters(datasets_config)
 
 # Carga de modelos
 base_model = ForecastModel.from_name(model_name="Heuristic",
-                                     parameters={"l":8.4})
+                                     parameters={"l":8.4},
+                                     test_metrics=['mae','rmse','mfe'])
 print(f"Modelo {base_model.type} cargado correctamente!")
 
 model = ForecastModel.from_name(model_name=MODEL_TYPE,
-                                parameters=MODEL_PARAMS)
+                                parameters=MODEL_PARAMS,
+                                test_metrics=['mae','rmse','mfe'])
 
 # Carga de datos 
 dataset = load_dataset(DATASET_NAME,EVAL_CONFIG,train_split=False)
@@ -56,6 +59,11 @@ for i in range(number_of_periods):
     current_date += pd.DateOffset(months=1)
 
 
+
+# Cálculo de métricas
+base_model_metrics = {}
+new_model_metrics = {}
+period = 1
 for period_data in eval_periods:
     df,x_train,y_train,x_test,y_test = period_data 
     start_date = pd.Timestamp(x_train.min()).date()
@@ -100,9 +108,40 @@ for period_data in eval_periods:
     print(f"Métricas de modelo Base: { base_metrics}")
     print(f"Métricas de modelo nuevo: {model_metrics}")
 
+    key = f"period_{period}"
+    base_model_metrics [key]={"y_pred":base_pred,"y_true":y_true,"metrics":base_metrics,"start_date":start_date,"end_date":end_date}
+    new_model_metrics [key]={"y_pred":y_pred,"y_true":y_true,"metrics":model_metrics,"start_date":start_date,"end_date":end_date}
+    period+=1
 
-# Cálculo de métricas
 
 # Ponderación 
 
 # Gráficas 
+
+base_model_predictions = []
+for period,data in base_model_metrics.items(): 
+    base_model_predictions.append(data["y_pred"])
+
+new_model_predictions = []
+true_values = []
+for period,data in new_model_metrics.items(): 
+    new_model_predictions.append(data["y_pred"])
+    true_values.append(data["y_true"])
+
+
+title="Sales"
+xlabel= "Period"
+ylabel= "Value"
+
+fig, ax = plt.subplots(figsize=(10,5))
+ax.plot(true_values, label="Real", marker='o')
+ax.plot(base_model_predictions, label="Base", marker='o')
+ax.plot(new_model_predictions, label="ARIMA", marker='x')
+ax.set_ylim(0)
+ax.set_title(title)
+ax.set_xlabel(xlabel)
+ax.set_ylabel(ylabel)
+ax.legend()
+ax.grid(True)
+plt.show()
+
