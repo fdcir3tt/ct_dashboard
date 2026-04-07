@@ -33,14 +33,16 @@ class ExperimentConfig:
 
 @dataclass
 class DatasetFilterConfig:
-    start_date: Date
-    end_date: Date
     frequency : str
     horizon: int 
     training_window: int
+    start_date: Date|str="oldest"
+    end_date: Date|str="latest"
+    
     def __post_init__(self):
-        if self.start_date > self.end_date:
-            raise ValueError("'start_date' debe ser una fecha antes de 'end_date'")
+        if (self.start_date!="oldest") and (self.end_date!="latest") :
+            if self.start_date > self.end_date:
+                raise ValueError("'start_date' debe ser una fecha antes de 'end_date'")
 
         if self.horizon <= 0:
             raise ValueError("'horizon' debe ser positivo")
@@ -50,6 +52,7 @@ class DatasetFilterConfig:
 
         if self.frequency not in {"daily", "weekly", "monthly"}:
             raise ValueError("'frequency' debe ser uno de los siguientes valores: daily, weekly, monthly")
+    
 
 class DatasetFilters:
     def __init__(self, config: DatasetFilterConfig):
@@ -65,21 +68,77 @@ class DatasetFilters:
         Regresa:
         - df: pandas.DataFrame, Datos filtrados
         """
-        start_date = pd.to_datetime(self.cfg.start_date)
-        end_date = pd.to_datetime(self.cfg.end_date)
+        
+        if self.cfg.start_date=="oldest":
+            start_date = pd.to_datetime( data['date'].min())
+        else:
+            start_date = pd.to_datetime(self.cfg.start_date)
+        
+
+        if self.cfg.end_date=="latest":
+            end_date = pd.to_datetime( data['date'].max() )
+        else:    
+            end_date = pd.to_datetime(self.cfg.end_date)
         
         mask = (
             (data['date'] >= start_date) &
             (data['date'] <= end_date) 
         )
-
+        
         df = data[mask]
         
         if df.empty:
             print("Dataset invalido: No hay datos en el periodo específicado")
-            return None
+            return pd.DataFrame()
         df = df.sort_values("date")
         return df
+    
+    def prepare_series(self,data:pd.DataFrame)->tuple[np.ndarray[Date],np.ndarray[int]]:
+        """
+        Agarra un dataset de pandas y lo convierte en un par de series, uno de los valores
+        del periodo y otro con las fechas del periodo. 
+
+        Parametros: 
+        - data:pandas.DataFrame, Datos que se quieren convertir a serie de tiempo  
+
+        Regresa:
+        - x: numpy.ndarray, Serie que contiene fechas del periodo
+        - y: numpy.ndarray, Series que contiene los valores del periodo
+        """
+        df = self.apply_period_filter(data)
+        
+        
+        # Frecuencia
+        if self.cfg.frequency == "daily":
+            target_column = "quantity"
+        
+        if self.cfg.frequency == "weekly":
+            df["weekly_quantity"]=df.groupby(["year","week"])["quantity"].transform("sum")
+            target_column="weekly_quantity"
+
+        if self.cfg.frequency == "monthly": 
+            df["monthly_quantity"]=df.groupby(["year","month"])["quantity"].transform("sum")
+            target_column="monthly_quantity"
+        
+        
+        
+        if self.cfg.start_date=="oldest":
+            start_date = pd.to_datetime( data['date'].min())
+        else:
+            start_date = pd.to_datetime(self.cfg.start_date)
+        
+
+        if self.cfg.end_date=="latest":
+            end_date = pd.to_datetime( data['date'].max() )
+        else:    
+            end_date = pd.to_datetime(self.cfg.end_date)
+
+        period = time_period(start_date=start_date,end_date=end_date)
+        if df.empty:
+            x,y = make_time_series(pd.DataFrame(data=[[start_date,0]],columns=["date","quantity"]),period,target_column)
+        else:
+            x,y = make_time_series(df,period,target_column)
+        return x,y
     
     def apply_split(self, data: pd.DataFrame)->tuple[np.ndarray[Date],np.ndarray[int],np.ndarray[Date],np.ndarray[int]]|None:
         """
@@ -95,34 +154,12 @@ class DatasetFilters:
         - x_test: numpy.ndarray, Datos de entrada de prueba
         - y_test: numpy.ndarray, Datos de objetivo de prueba
         """
-        
-        df = self.apply_period_filter(data)
-        if df is None:
-            return None
-        
-        # Frecuencia
-        if self.cfg.frequency == "daily":
-            target_column = "quantity"
-        
-        if self.cfg.frequency == "weekly":
-            df["weekly_quantity"]=df.groupby(["year","week"])["quantity"].transform("sum")
-            target_column="weekly_quantity"
 
-        if self.cfg.frequency == "monthly": 
-            df["monthly_quantity"]=df.groupby(["year","month"])["quantity"].transform("sum")
-            target_column="monthly_quantity"
-        
+        x,y = self.prepare_series(data)
+
         # Ventanas de entrenamiento y horizonte
         training_window = self.cfg.training_window
         horizon = self.cfg.horizon
-        
-        
-        
-        start_date = pd.to_datetime(self.cfg.start_date)
-        end_date = pd.to_datetime(self.cfg.end_date)
-        period = time_period(start_date=start_date,end_date=end_date)
-
-        x,y = make_time_series(df,period,target_column)
 
         if len(y)< horizon+training_window:
             print(f"Dataset invalido: Insuficiente datos para configuración actual.\nNúmero de datos:{len(y)}\nNúmero Requerido:{horizon+training_window}")
@@ -300,7 +337,7 @@ def plot_series(series:np.ndarray,title:str="Ventas realizadas dentro del period
     ax.grid(True)
     return fig
 
-def load_dataset(model_name:str,dataset:str,config:ExperimentConfig|dict[str,Any]):
+def load_dataset(dataset:str,config:ExperimentConfig|dict[str,Any],train_split:bool=True)->tuple|pd.DataFrame:
     """
     Carga datos que se utilizaran para el experimento de entrenamiento de un modelo
 
@@ -320,14 +357,26 @@ def load_dataset(model_name:str,dataset:str,config:ExperimentConfig|dict[str,Any
     file_path = data_dir/'processed'/ branch / f'{productId}.parquet'
     
     data = pd.read_parquet(file_path)
-    dataset_config = DatasetFilterConfig(start_date= config.training_data_start_date,
-                                         end_date= config.training_data_end_date,
-                                         frequency= config.frequency,
-                                         horizon= config.horizon,
-                                         training_window=config.training_window)
+    if isinstance(config,ExperimentConfig):
+        dataset_config = DatasetFilterConfig(start_date= config.training_data_start_date,
+                                            end_date= config.training_data_end_date,
+                                            frequency= config.frequency,
+                                            horizon= config.horizon,
+                                            training_window=config.training_window)
+    else:
+        dataset_config = DatasetFilterConfig(start_date=config["training_data_start_date"],
+                                             end_date=config["training_data_end_date"],
+                                             frequency=config["frequency"],
+                                             horizon= config["horizon"],
+                                             training_window= config["training_window"])
+        
     df = DatasetFilters(dataset_config).apply_period_filter(data)
     
-    x_train,y_train,x_test,y_test = DatasetFilters(dataset_config).apply_split(data)
-    return df,x_train,y_train,x_test,y_test
+    if train_split:
+        x_train,y_train,x_test,y_test = DatasetFilters(dataset_config).apply_split(data)
+        return df,x_train,y_train,x_test,y_test
+    
+    return df
+
 
 

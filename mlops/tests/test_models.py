@@ -179,6 +179,22 @@ def test_predict_next_month_sale():
 
     assert result == 29
 
+def test_missing_month_data():
+    model= ForecastModel.from_name(model_name="Heuristic",
+                                    parameters={"l":8.4})
+    start_date = datetime.datetime(2024,9,1)
+    end_date = datetime.datetime(2025,2,5)
+
+    df = pd.DataFrame(data=[[start_date,"not_client",0],
+                            [end_date,"not_client",0]],
+                      columns=["date","clientId","quantity"])
+    df["year"]= df["date"].dt.year
+    df["month"]= df["date"].dt.month
+
+    model.fit(df)
+    prediction = model.predict_next_month_sale()
+    assert prediction == 0
+
 # ==================================================================== #
 #                       MODELO ARIMA
 # ==================================================================== #

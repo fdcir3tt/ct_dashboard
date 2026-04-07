@@ -44,10 +44,12 @@ class LossHistory:
 class ForecastModel(ABC):
     _registry: dict[str, type["ForecastModel"]] = {}
 
-    def __init__(self,parameters:dict[str,Any],test_metrics:list[str]=['mae','mfe','rmse','da'],seed:int|None=None):
+    def __init__(self,parameters:dict[str,Any],test_metrics:list[str]=['mae','mfe','rmse','da'],seed:int|None=None,type:str|None=None,name:str|None=None):
         self.parameters= parameters
         self.test_metrics = test_metrics # Metricas que se quieren evaluar
         self.seed = seed
+        self.type = type
+        self.name = name
 
     @classmethod
     def register(cls, name: str):
@@ -66,7 +68,7 @@ class ForecastModel(ABC):
                 f"Modelo desconocido '{model_name}'. Modelos disponibles: {list(cls._registry)}"
             )
 
-        return model_cls(parameters, test_metrics)
+        return model_cls(parameters, test_metrics,type=model_name)
     
 
     @abstractmethod
@@ -289,15 +291,13 @@ class HeuristicModel(ForecastModel):
         
         if not client_sales.empty:
             self.avg_n_month_client_sales = client_sales.groupby(["year","month"]).size().mean()
-            self.client_sales_distribution = gaussian_kde(client_sales["quantity"])
             client_sales["client_sales"]= client_sales.groupby(["year","month"])["quantity"].transform("sum")
             self.client_sales = client_sales[["year","month","client_sales"]].drop_duplicates()
         else: 
             self.client_sales= self.sales_period[["year","month"]]
             self.client_sales["client_sales"]=[0] * len(self.client_sales)
             self.avg_n_month_client_sales = client_sales.groupby(["year","month"]).size().mean()
-            self.client_sales_distribution = gaussian_kde(client_sales["quantity"])
-
+            
     def get_remaining_days(self,latest_date:pd.Timestamp)->None:
         """
         Cálcula los días restantes del último mes del periodo y los guarda cómo propiedades 
@@ -320,7 +320,13 @@ class HeuristicModel(ForecastModel):
         days_in_month = calendar.monthrange(self.current_year, self.current_month)[1]
         
         self.remaining_days = days_in_month - self.current_day
-    
+    def get_month_sales(self,quatrimester_idx:int)->int:
+        mask= self.sales_period["month"]==self.current_quatrimester[quatrimester_idx]
+        if self.sales_period[mask].empty:
+            return 0
+        else:
+            return int(self.sales_period[mask]["monthly_quantity"].iloc[0])
+
     def get_index_sum(self)->None:
         """
         Cálcula los valores de estimado ('s1','s2','s3','s4','s5') en base el índice de flujo de ventas y 
@@ -338,7 +344,7 @@ class HeuristicModel(ForecastModel):
             sales_idx = self.sales_idx
             current_day = self.current_day
             month_estimate = self.month_estimate
-            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_quantity"].iloc[0]) for i in range(4) ]
+            current_quatrimester = [ self.get_month_sales(i) for i in range(4) ]
 
 
             if sales_idx == "BES":
@@ -461,7 +467,7 @@ class HeuristicModel(ForecastModel):
             sales_idx = self.sales_idx
             current_day = self.current_day
             month_estimate = self.month_estimate
-            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_quantity"].iloc[0]) for i in range(4) ]
+            current_quatrimester = [ self.get_month_sales(i) for i in range(4) ]
 
             def count_non_zero_mn():
                 return sum(1 for v in current_quatrimester[1:3] if v != 0)
@@ -633,7 +639,7 @@ class HeuristicModel(ForecastModel):
             sales_idx = self.sales_idx
             current_day = self.current_day
             month_estimate = self.month_estimate
-            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_quantity"].iloc[0]) for i in range(4) ]
+            current_quatrimester = [ self.get_month_sales(i) for i in range(4) ]
 
             if sales_idx == "EBS":
                 if current_day <= 8:
@@ -790,7 +796,7 @@ class HeuristicModel(ForecastModel):
             sales_idx = self.sales_idx
             current_day = self.current_day
             month_estimate = self.month_estimate
-            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_quantity"].iloc[0]) for i in range(4) ]
+            current_quatrimester = [ self.get_month_sales(i) for i in range(4) ]
             
 
             if sales_idx == "ESS":
@@ -915,7 +921,7 @@ class HeuristicModel(ForecastModel):
             sales_idx = self.sales_idx
             current_day = self.current_day
             month_estimate = self.month_estimate
-            current_quatrimester = [ float(sales_period[sales_period["month"]==self.current_quatrimester[i]]["monthly_quantity"].iloc[0]) for i in range(4) ]
+            current_quatrimester = [ self.get_month_sales(i) for i in range(4) ]
             
 
             if sales_idx == "SES":
@@ -984,7 +990,7 @@ class HeuristicModel(ForecastModel):
         self.s_n = [s1(),s2(),s3(),s4(),s5()]
         self.idx_sum = s1()+s2()+s3()+s4()+s5()
 
-    def fit(self,dataset:pd.DataFrame,config:ExperimentConfig|None=None)->None:
+    def fit(self,dataset:pd.DataFrame,config:ExperimentConfig|dict[str,Any]|None=None)->None:
         """ 
         Cálcula las variables fundamentales para realizar predicciones de la venta mensual
         
@@ -1002,22 +1008,31 @@ class HeuristicModel(ForecastModel):
         """
         
         if config is not None:
-            dataset_config = DatasetFilterConfig(start_date=(config.get("training_data_start_date")),
-                                            end_date=(config.get("training_data_end_date")),
-                                            frequency=(config.get("frequency")),
-                                            horizon=(config.get("horizon")),
-                                            training_window=(config.get("training_window")))
-        
-            df = DatasetFilters(dataset_config).apply_period_filter(dataset)
+            if isinstance(config,ExperimentConfig):
+                dataset_config = DatasetFilterConfig(start_date=config.training_data_start_date,
+                                                    end_date=config.training_data_end_date,
+                                                    frequency=config.frequency,
+                                                    horizon=config.horizon,
+                                                    training_window=config.training_window)
+            
+                df = DatasetFilters(dataset_config).apply_period_filter(dataset)
+
+            else:
+                dataset_config = DatasetFilterConfig(start_date=(config.get("training_data_start_date")),
+                                                    end_date=(config.get("training_data_end_date")),
+                                                    frequency=(config.get("frequency")),
+                                                    horizon=(config.get("horizon")),
+                                                    training_window=(config.get("training_window")))
+            
+                df = DatasetFilters(dataset_config).apply_period_filter(dataset)
         
         else :
             df = dataset.copy()
-
         
         max_date = df["date"].max()
         df["monthly_quantity"] = df.groupby(["year","month"])["quantity"].transform("sum")
         
-        self.distribution = gaussian_kde(df["quantity"])
+        
         self.avg_n_month_sales = df.groupby(["year","month"]).size().mean()
         self.sales_period = df[["year","month","monthly_quantity"]].drop_duplicates()
     
