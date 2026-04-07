@@ -1,13 +1,12 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import matplotlib as mpl
 
 from functools import wraps
 from typing import List,Callable,Tuple,Dict
 from dashboard.utils import top_n
 from dashboard.graphs import *
-from dashboard.data_loader import *
+from dashboard.data_loader import load_branches,load_storage,load_inventory,load_sales_invoices
 
 def load_css(file_name):
 
@@ -828,17 +827,17 @@ def main():
         
         with right:
             right_section(data=data,
-                        global_data=global_data,
-                        main_element=main_element,
-                        cached_functions=cache_wrappers,
-                        selected_elements=selected_elements,
-                        element_column=element_column,
-                        branch=branch,
-                        include_outliers =include_outliers,
-                        period_start=period_start,
-                        period_end=period_end,
-                        analysis_lvl=analysis_lvl,
-                        tab='ventas')
+                          global_data=global_data,
+                          main_element=main_element,
+                          cached_functions=cache_wrappers,
+                          selected_elements=selected_elements,
+                          element_column=element_column,
+                          branch=branch,
+                          include_outliers =include_outliers,
+                          period_start=period_start,
+                          period_end=period_end,
+                          analysis_lvl=analysis_lvl,
+                          tab='ventas')
 
         
 
