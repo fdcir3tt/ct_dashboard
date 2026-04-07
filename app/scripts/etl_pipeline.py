@@ -63,8 +63,7 @@ def main():
                   exchange_rates,
                   branches,
                   products,
-                  categories,
-                  update=True)
+                  categories)
     print("Proceso de datos completo!!")
 
 

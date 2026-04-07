@@ -3,9 +3,11 @@ import yaml
 import datetime
 import json
 
+from pymongo.database import Database,Collection
+from typing import Callable ,Dict 
 from logging import Logger 
 
-Date = datetime.date
+Date = datetime.datetime
 Document =  dict[str, any]
 Documents = list[Document]
 

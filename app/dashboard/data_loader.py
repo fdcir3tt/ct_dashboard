@@ -29,7 +29,7 @@ warnings.filterwarnings('ignore')
 
 
 DATA_PATH= Path('data')
-TODAY= Date.today()
+TODAY= Date.today().date()
 BATCH_SIZE = 500 # número de documentos colectados por batch
 EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY")
 
@@ -562,7 +562,7 @@ def update_exchange_rates(logger:Logger, rates_dataframe:pd.DataFrame, rate:floa
     Actualiza tabla de conversiones de moneda USD a MXN acorde el valor específicado de 'rate'.
 
     Parametros:
-    - logger: Logger,
+    - logger: Logger, Objeto de logeo para capturar información relevante al proceso
     - rates_dataframe: pandas.Dataframe, Dataframe de conversiones de moneda USD a MXN
     - rate: float, Valor de conversión a imputar a tabla de conversiones
 
@@ -679,7 +679,7 @@ def load_invoices(start_date:Date= Date(TODAY.year,TODAY.month,1),
         current_df = pd.read_parquet(source_file_path)
         current_df = format_columns(current_df)
         save_file_safe(data=current_df,file_path=source_file_path)
-
+    
     latest_period = current_df['date'].max().date()
     not_updated = latest_period < end_date
     if not_updated:
