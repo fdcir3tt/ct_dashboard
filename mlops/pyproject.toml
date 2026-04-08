@@ -7,7 +7,7 @@ authors = [
 ]
 license = {text = "MIT"}
 readme = "README.md"
-requires-python = ">=3.12,<4"
+requires-python = ">=3.12,<=3.13"
 dependencies = [
     "pandas (<3.0.0)",
     "pyarrow (>=23.0.1,<24.0.0)",
@@ -19,6 +19,7 @@ dependencies = [
     "graphql-core (>=3.1.7,<4.0.0)",
     "graphene (>=3,<4)",
     "graphql-relay (>=3,<4)",
+    "great-expectations (>=1.15.2,<2.0.0)",
    
     
 ]

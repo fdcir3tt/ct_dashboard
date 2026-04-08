@@ -14,3 +14,5 @@
 
 [12 Essential MLOps Best Practices & Tips
 ](https://www.moontechnolabs.com/blog/mlops-best-practices/)
+
+[¿Qué es el perfilado de datos?](https://www.ibm.com/mx-es/think/topics/data-profiling)
