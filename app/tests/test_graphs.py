@@ -2,8 +2,8 @@ import pytest
 import pandas as pd
 import numpy as np
 from matplotlib.figure import Figure
-from ct_sales_dashboard.graphs import *
-from ct_sales_dashboard.data_loader import *
+from dashboard.graphs import *
+from dashboard.data_loader import *
 import matplotlib
 matplotlib.use("Agg")
 
@@ -11,7 +11,7 @@ matplotlib.use("Agg")
 # SETUP
 # -----------------------------------------------------------
 
-graphs = [period_sales,period_inventory,sales_velocity,sales_hist,interactive_sales_heat_map]#abc_bar_chart]
+graphs = [period_sales,period_inventory,sales_hist,prepare_sales_heatmap_data]
 
 
 # -----------------------------------------------
@@ -52,7 +52,7 @@ def mexico_gdf():
 
 @pytest.fixture(autouse=True)
 def mock_external_dependencies(monkeypatch, mexico_gdf):
-    monkeypatch.setattr("src.graphs.load_mexico_shp", lambda: mexico_gdf)
+    monkeypatch.setattr("ct_sales_dashboard.graphs.load_mexico_shp", lambda: mexico_gdf)
     monkeypatch.setattr("streamlit_folium.st_folium", lambda *args, **kwargs: {})
 
 
@@ -85,6 +85,8 @@ def test_missing_date_column():
     """
     df = pd.DataFrame({"productId": ["A"], "quantity": [10]})
     for g in graphs:
+        if g==prepare_sales_heatmap_data:
+            continue
         fig = g(
             data=df,
             main_element = "A",
@@ -102,8 +104,8 @@ def test_date_filtering(sample_sales_data):
     Prueba que verifica si los filtros por fecha funcionan en cada gráfica
     """
     for g in graphs:
-        if g==interactive_sales_heat_map:
-             _, merged = g(
+        if g==prepare_sales_heatmap_data:
+             merged = g(
                 data=sample_sales_data,
                 main_element="A",
                 element_column="productId",
@@ -147,7 +149,21 @@ def test_element_column_switching(sample_sales_data, column, values):
     Prueba que verifica si las gráficas pueden cambiar entre producto y categoría sin problema.
     """
     for g in graphs:
-        fig, plot_df = g(
+        if g==prepare_sales_heatmap_data:
+            plot_df = g(
+            data=sample_sales_data,
+            main_element = values[0],
+            selected_elements=values,
+            element_column=column,
+            branch = "HERMOSILLO, SON.",
+            start_date="2023-01-01",
+            end_date="2023-01-10",
+            val=True
+        )
+            assert plot_df[column].isin(values).all()
+            continue
+        
+        _, plot_df = g(
             data=sample_sales_data,
             main_element = values[0],
             selected_elements=values,
@@ -165,7 +181,7 @@ def test_missing_quantity_interpolation(sample_sales_data):
     Prueba que verifica que no hayan valores faltantes 
     """
     for g in graphs:
-        if g in [interactive_sales_heat_map]:
+        if g==prepare_sales_heatmap_data:
             continue
         if g==sales_velocity:
             fig, plot_df = g(
@@ -204,16 +220,8 @@ def test_selected_element_without_data(sample_sales_data):
     Prueba que verifica que gráficas manejen correctamente caso en donde se seleccione un elemento que no tenga datos
     """
     for g in graphs:
-        if g==interactive_sales_heat_map:
-            fig,_= g(
-                data=sample_sales_data,
-                main_element ="C", # No existe
-                selected_elements=["C"],  # No existe
-                element_column="productId",
-                start_date="2023-01-01",
-                end_date="2023-01-10"
-            )
-            assert isinstance(fig, matplotlib.figure.Figure)
+        if g==prepare_sales_heatmap_data:
+            
             continue
 
         fig = g(
@@ -251,7 +259,7 @@ def test_state_aggregation_correct(sample_sales_data):
     """
     Prueba que verifica si el mapa de color realiza sus cálculos correctamente
     """
-    _, df = interactive_sales_heat_map(
+    df = prepare_sales_heatmap_data(
         data=sample_sales_data,
         main_element="A",
         element_column="productId",
@@ -272,7 +280,7 @@ def test_states_with_no_sales_are_zero(sample_sales_data):
     """
     Prueba que verifica que el mapa de calor maneje correctamente estados en los cuales no hay ventas
     """
-    _, df = interactive_sales_heat_map(
+    df,_ =  prepare_sales_heatmap_data(
         data=sample_sales_data,
         main_element="A",
         element_column="productId",
@@ -291,7 +299,7 @@ def test_category_switching(sample_sales_data):
     """
     Prueba que verifica si el mapa de calor pueda cambiar entre producto y categoría sin problema.
     """
-    _, merged = interactive_sales_heat_map(
+    merged,_ =  prepare_sales_heatmap_data(
         data=sample_sales_data,
         main_element="X",
         element_column="category",

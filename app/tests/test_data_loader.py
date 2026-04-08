@@ -2,8 +2,9 @@ import pytest
 import re
 import pandas as pd
 import datetime
+from pathlib import Path
 from pandas.testing import assert_frame_equal
-from ct_sales_dashboard.data_loader import extract_table_parallel, update_table
+from dashboard.data_loader import extract_table_parallel, update_table
 
 
 
@@ -104,7 +105,7 @@ def make_fake_extract_table_parallel(update_data):
 # -----------------------------------------------------------
 
 @pytest.mark.parametrize("chunk_percent", [10, 25, 50, 100])
-def test_no_data_loss(monkeypatch, tmp_path, old_data,chunk_percent):
+def test_no_data_loss(monkeypatch, tmp_path:Path, old_data,chunk_percent):
     """
     Prueba diseñada para verificar si los métodos de extracción de datos no pierden información al momento de ser ejecutados.
 
@@ -126,12 +127,11 @@ def test_no_data_loss(monkeypatch, tmp_path, old_data,chunk_percent):
 
     extract_table_parallel(
         query="SELECT * FROM test",
-        output_file=str(output_file),
+        output_file=output_file,
         connection_str="fake",
-        file_format="parquet",
         order_column="id",
         chunk_percent=chunk_percent,
-        temp_dir=str(tmp_path / "chunks")
+        temp_dir=tmp_path / "chunks"
     )
 
     result = pd.read_parquet(output_file)
@@ -168,7 +168,7 @@ def test_update_table_partial(monkeypatch, tmp_path, old_data, update_data):
     
     monkeypatch.setattr("pyodbc.connect", lambda *a, **k: fake_conn)
     monkeypatch.setattr("pandas.read_sql", fake_read_sql)
-    monkeypatch.setattr("src.data_loader.extract_table_parallel", make_fake_extract_table_parallel(update_data))
+    monkeypatch.setattr("ct_sales_dashboard.data_loader.extract_table_parallel", make_fake_extract_table_parallel(update_data))
     monkeypatch.setenv("TYPE_DICT", '{"id":"string","folio":"string","value":"float","date":"datetime64[ns]"}')
     monkeypatch.setenv("NAME_DICT",'{"id":"productId","value":"price"}')
 
@@ -176,7 +176,7 @@ def test_update_table_partial(monkeypatch, tmp_path, old_data, update_data):
     update_table(
         table="data_table",
         latest_update=datetime.date(2025, 12, 1),
-        save_dir=str(tmp_path)
+        save_dir=tmp_path
     )
 
     result = pd.read_parquet(table_path)
@@ -212,7 +212,7 @@ def test_update_table_idempotent(monkeypatch, tmp_path, old_data, update_data):
     fake_conn = FakeConn(update_data)
     monkeypatch.setattr("pyodbc.connect", lambda *a, **k: fake_conn)
     monkeypatch.setattr("pandas.read_sql", fake_read_sql)
-    monkeypatch.setattr("src.data_loader.extract_table_parallel", make_fake_extract_table_parallel(update_data))
+    monkeypatch.setattr("dashboard.data_loader.extract_table_parallel", make_fake_extract_table_parallel(update_data))
     monkeypatch.setenv("TYPE_DICT", '{"id":"string","folio":"string","value":"float","date":"datetime64[ns]"}')
     monkeypatch.setenv("NAME_DICT", '{"id":"productId","value":"price"}')
 
@@ -220,12 +220,12 @@ def test_update_table_idempotent(monkeypatch, tmp_path, old_data, update_data):
     update_table(
         table="data_table",
         latest_update=datetime.date(2025, 12, 1),
-        save_dir=str(tmp_path)
+        save_dir=tmp_path
     )
     update_table(
         table="data_table",
         latest_update=datetime.date(2025, 12, 1),
-        save_dir=str(tmp_path)
+        save_dir=tmp_path
     )
 
     result = pd.read_parquet(table_path)

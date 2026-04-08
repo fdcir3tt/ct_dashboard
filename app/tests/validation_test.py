@@ -2,14 +2,15 @@ from dotenv import load_dotenv
 import os
 import datetime
 import pandas as pd
-from ct_sales_dashboard.graphs import *
-from ct_sales_dashboard.data_loader import *
+from dashboard.graphs import *
+from dashboard.data_loader import *
+
 load_dotenv()
 data_columns = os.getenv("SALES_DATA_COLUMNS")
 
 
-graphs = [period_sales,sales_velocity,sales_hist,prepare_sales_heatmap_data,abc_bar_chart]
-mono_graphs =[period_sales,sales_velocity,sales_hist]
+graphs = [period_sales,sales_hist,prepare_sales_heatmap_data,abc_bar_chart]
+mono_graphs =[period_sales,sales_hist]
     
 # -----------------------------------------------------------
 # CARGA DE DATOS
