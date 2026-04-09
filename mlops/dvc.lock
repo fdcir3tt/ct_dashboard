@@ -17,3 +17,41 @@ stages:
       md5: 8c63ae12dd96eb596f25fe31b1980648.dir
       size: 1756116261
       nfiles: 167500
+  train:
+    cmd: poetry run python scripts/train.py
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 8c63ae12dd96eb596f25fe31b1980648.dir
+      size: 1756116261
+      nfiles: 167500
+    - path: params.yaml
+      hash: md5
+      md5: 546f14189196b40812c5dec0dc3ec585
+      size: 347
+    - path: scripts/train.py
+      hash: md5
+      md5: b1bc667fb266e528f30c5c90f257303c
+      size: 4611
+    - path: src/mlops/models.py
+      hash: md5
+      md5: 824f9cc9bdd6a5ca8aa6b88f82083add
+      size: 55475
+    - path: src/mlops/utils.py
+      hash: md5
+      md5: 16e528e00fbecd5ca6f03551b9c6606d
+      size: 13424
+    params:
+      params.yaml:
+        feature_set: raw
+        frequency: daily
+        horizon: 30
+        model_type: ARIMA
+        seed: 42
+        training_window: 300
+    outs:
+    - path: plots/
+      hash: md5
+      md5: 0ce2b4869c2e3b25ff4fe048d0a32b79.dir
+      size: 61978
+      nfiles: 1

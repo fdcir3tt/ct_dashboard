@@ -214,7 +214,7 @@ def save_file_safe(data: pd.DataFrame, file_path: Path) -> None:
 
     os.replace(tmp_path, file_path)
 
-def get_experiment_config(file_path:Path=Path('config.yml'))->ExperimentConfig:
+def get_experiment_config(file_path:Path=Path('params.yaml'))->ExperimentConfig:
     """
     Lee archivo de configuración de experimentos y lo carga como objeto de configuración
 
