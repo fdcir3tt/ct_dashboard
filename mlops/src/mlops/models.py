@@ -68,7 +68,7 @@ class ForecastModel(ABC):
                 f"Modelo desconocido '{model_name}'. Modelos disponibles: {list(cls._registry)}"
             )
 
-        return model_cls(parameters, test_metrics,type=model_name)
+        return model_cls(parameters, test_metrics,name=model_name)
     
 
     @abstractmethod
@@ -1271,6 +1271,7 @@ class ARIMAModel(ForecastModel):
               enforce_invertibility=True)
         
         self.fitted_model = model.fit(method_kwargs={"maxiter": 1000})
+        self.model = self.fitted_model
 
     def predict(self,x_input:np.ndarray)->np.ndarray:
         known_data = self.known_data 

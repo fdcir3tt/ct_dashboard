@@ -1,0 +1,57 @@
+schema: '2.0'
+stages:
+  sales_etl:
+    cmd: poetry run python scripts/etl.py
+    deps:
+    - path: data/raw/facturas_ventas.parquet
+      hash: md5
+      md5: ba848f1512f11183d8d24a415b9f946f
+      size: 18399235
+    - path: scripts/etl.py
+      hash: md5
+      md5: 28acf243d2f01492271bde9a72fc1b18
+      size: 3305
+    outs:
+    - path: data/processed/
+      hash: md5
+      md5: 8c63ae12dd96eb596f25fe31b1980648.dir
+      size: 1756116261
+      nfiles: 167500
+  train:
+    cmd: poetry run python scripts/train.py
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 8c63ae12dd96eb596f25fe31b1980648.dir
+      size: 1756116261
+      nfiles: 167500
+    - path: params.yaml
+      hash: md5
+      md5: 7de06257fedb7fce33496990c15dcd54
+      size: 347
+    - path: scripts/train.py
+      hash: md5
+      md5: b7e0e1f0261bc4bd42cc853d31a89571
+      size: 4806
+    - path: src/mlops/models.py
+      hash: md5
+      md5: 824f9cc9bdd6a5ca8aa6b88f82083add
+      size: 55475
+    - path: src/mlops/utils.py
+      hash: md5
+      md5: 16e528e00fbecd5ca6f03551b9c6606d
+      size: 13424
+    params:
+      params.yaml:
+        feature_set: raw
+        frequency: daily
+        horizon: 30
+        model_type: ARIMA
+        seed: 12
+        training_window: 300
+    outs:
+    - path: plots/
+      hash: md5
+      md5: 0ce2b4869c2e3b25ff4fe048d0a32b79.dir
+      size: 61978
+      nfiles: 1

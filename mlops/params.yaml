@@ -1,0 +1,24 @@
+# Experiment Config
+model_type: ARIMA
+dataset: HERMOSILLO, SON_MEMSTY050
+metrics:
+  - mae
+  - mfe
+  - rmse
+  - da
+parameters:
+  p: 20
+  d: 1
+  q: 4
+training_data_start_date: "2025-03-01"
+training_data_end_date: "2026-03-15"
+frequency: "daily"
+horizon: 30
+training_window: 300
+seed: 12
+git_commit: null
+feature_set: raw
+
+
+
+
