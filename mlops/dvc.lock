@@ -1,0 +1,19 @@
+schema: '2.0'
+stages:
+  sales_etl:
+    cmd: poetry run python scripts/etl.py
+    deps:
+    - path: data/raw/facturas_ventas.parquet
+      hash: md5
+      md5: ba848f1512f11183d8d24a415b9f946f
+      size: 18399235
+    - path: scripts/etl.py
+      hash: md5
+      md5: 28acf243d2f01492271bde9a72fc1b18
+      size: 3305
+    outs:
+    - path: data/processed/
+      hash: md5
+      md5: 8c63ae12dd96eb596f25fe31b1980648.dir
+      size: 1756116261
+      nfiles: 167500
