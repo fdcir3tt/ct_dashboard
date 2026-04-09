@@ -6,7 +6,7 @@ import yaml
 
 from mlops.models import Metrics,Figure,ForecastModel,load_model
 from mlops.utils import get_experiment_config,ExperimentConfig,load_dataset
-
+from mlflow.data.pandas_dataset import PandasDataset
 
 def start_experiment(model_name:str,config:ExperimentConfig):
     """
@@ -105,20 +105,21 @@ def main():
     dataset,x_train,y_train,x_test,y_test = load_dataset(dataset_name,experiment_config)
     model = load_model(model_name,experiment_config)
     
+    
 
     branch = dataset_name.split("_")[0]
-   
-
     experiment_id = f"{branch}"
     run_name =f"{model_name}_{feature_set}_{seed}_<{frequency},{training_window},{horizon}>"
     
     print(f"Experimento '{experiment_id}'")
     print(f"Empezando intento: {run_name}")
 
-    
+    dataset_source_url = f"data/processed/{dataset_name}"
+    mlflow_dataset: PandasDataset = mlflow.data.from_pandas(dataset, source=dataset_source_url,targets="quantity",name=dataset_name)
+
     mlflow.set_experiment(experiment_name=experiment_id)
-   
     with mlflow.start_run(run_name=run_name,nested=True) as run:
+        mlflow.log_input(mlflow_dataset, context="training")
         if hasattr(model,"fit") and callable(getattr(model, "fit")):
             model.fit(dataset,experiment_config)
                 

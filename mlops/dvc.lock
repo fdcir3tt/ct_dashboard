@@ -27,12 +27,12 @@ stages:
       nfiles: 167500
     - path: params.yaml
       hash: md5
-      md5: 546f14189196b40812c5dec0dc3ec585
+      md5: 7de06257fedb7fce33496990c15dcd54
       size: 347
     - path: scripts/train.py
       hash: md5
-      md5: b1bc667fb266e528f30c5c90f257303c
-      size: 4611
+      md5: b7e0e1f0261bc4bd42cc853d31a89571
+      size: 4806
     - path: src/mlops/models.py
       hash: md5
       md5: 824f9cc9bdd6a5ca8aa6b88f82083add
@@ -47,7 +47,7 @@ stages:
         frequency: daily
         horizon: 30
         model_type: ARIMA
-        seed: 42
+        seed: 12
         training_window: 300
     outs:
     - path: plots/

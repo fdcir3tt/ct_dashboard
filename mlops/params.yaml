@@ -15,7 +15,7 @@ training_data_end_date: "2026-03-15"
 frequency: "daily"
 horizon: 30
 training_window: 300
-seed: 42
+seed: 12
 git_commit: null
 feature_set: raw
 
