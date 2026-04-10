@@ -1,8 +1,7 @@
 import os
 import mlflow 
 import subprocess
-import pickle
-import yaml
+
 
 from mlops.models import Metrics,Figure,ForecastModel,load_model
 from mlops.utils import get_experiment_config,ExperimentConfig,load_dataset
@@ -62,12 +61,6 @@ def logging(model_name:str,model:ForecastModel,config:ExperimentConfig,metrics:M
     mlflow.log_params(params=parameters)
     mlflow.log_param(key="training_starting_date",value=start_date)
 
-    # Dataset
-    
-    #mlflow.log_input(dataset=,context="training")
-
-    # Modelo
-    
     # Metricas
     for metric,value in metrics.__dict__.items():
        
@@ -83,7 +76,10 @@ def logging(model_name:str,model:ForecastModel,config:ExperimentConfig,metrics:M
             fig.savefig(fig_path)
             mlflow.log_artifact(fig_path)
 
-def log_model(model:ForecastModel):
+def log_model(model:ForecastModel,metrics:Metrics):
+    if metrics.rmse > 5:
+        return None
+    
     if model.name == "ARIMA":
         mlflow.statsmodels.log_model(
                         statsmodels_model=model.model,
@@ -132,7 +128,7 @@ def main():
             loss_history,loss_fig = train_results 
             figures={"loss_plot":loss_fig,"test_plot":test_fig}
 
-        log_model(model)
+        log_model(model,metrics)
                
         logging(model_name,model,experiment_config,metrics,figures)
         
