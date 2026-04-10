@@ -1279,8 +1279,23 @@ class ARIMAModel(ForecastModel):
 
         n_steps = len(x_input)-len(known_outputs)
         if n_steps >0:
-            forecast = self.fitted_model.get_forecast(steps=n_steps).predicted_mean
-            y_pred = np.concatenate((known_outputs, forecast), axis=0)
+            forecast_res = self.fitted_model.get_forecast(steps=n_steps)
+
+            forecast = forecast_res.predicted_mean
+            conf = forecast_res.conf_int()
+
+            
+            if isinstance(conf, np.ndarray):
+                conf = pd.DataFrame(conf, columns=["lower", "upper"])
+
+            if isinstance(forecast, np.ndarray):
+                forecast = pd.Series(forecast)
+
+            conf.index = forecast.index
+
+            self.confidence_int_lower_series = conf.iloc[:, 0]
+            self.confidence_int_upper_series = conf.iloc[:, 1]
+            y_pred = np.concatenate((known_outputs, forecast_res.predicted_mean), axis=0)
         else:
             y_pred=known_outputs
         return y_pred 
@@ -1288,3 +1303,37 @@ class ARIMAModel(ForecastModel):
 
     def train(self,x_train:np.ndarray,y_train:np.ndarray):
         return None
+    
+    def plot_prediction(self,y_pred:np.ndarray,y_true:np.ndarray, title:str="Predicción vs Real", xlabel:str="Tiempo (días)", ylabel:str="Ventas")->Figure:
+        """
+        Gráfica de predicción de modelo y datos reales.
+            
+        Parametros:
+        - y_true: array-like, Valores reales
+        - y_pred: array-like, Valores predecidos
+        - title: str, Título de gráfico
+        - xlabel: str, Etiqueta de eje horizontal
+        - ylabel: str,  Etiqueta de eje vertical
+
+        Regresa:
+        - test_fig: matplotlib Figure object, Gráfica de contraste entre predicción y datos reales
+
+        """
+        fig, ax = plt.subplots(figsize=(10,5))
+        ax.plot(y_true, label="Real", marker='o')
+        ax.plot(y_pred, label="Predicción", marker='x')
+        ax.fill_between(
+                        self.confidence_int_lower_series.index,
+                        self.confidence_int_lower_series,
+                        self.confidence_int_upper_series,
+                        color='k',
+                        alpha=0.15
+                    )
+        ax.set_ylim(0)
+        ax.set_title(title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.legend()
+        ax.grid(True)
+
+        return fig

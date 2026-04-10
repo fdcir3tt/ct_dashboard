@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 
 from mlops.models import ForecastModel,HeuristicModel,Metrics
+from mlops.utils import ExperimentConfig
 
 # ==================================================================== #
 #                       DATOS SINTÉTICOS
@@ -203,8 +204,7 @@ def test_missing_month_data():
 
 def test_predict():
     model = ForecastModel.from_name(model_name="ARIMA",
-                                parameters={"p":1,"d":1,"q":2})
-    model.seed = 42
+                                    parameters={"p":1,"d":1,"q":2})
 
     mask = dataset["productId"]=="product1"
     model.fit(dataset[mask])
@@ -227,5 +227,36 @@ def test_predict():
     assert type(results)==type(np.array([]))
     assert all(results==expected_series)
 
+    # Predecir puntos desconocidos
+    dates = []
+    current = datetime.datetime(2024,9,1)
+
+    while current <= datetime.datetime(2024,12,9):
+        dates.append(current)
+        current += datetime.timedelta(days=1)
+
+    x_input = np.array(dates)
+    config =   ExperimentConfig(
+        dataset= "fake_name",
+        parameters = {"p":1,
+                      "d":0,
+                      "q":0},
+        training_data_start_date =current.date() ,
+        training_data_end_date=datetime.datetime(2025,2,9).date(),
+        model_type="ARIMA",
+        horizon=30,
+        frequency="daily",
+        training_window=30,
+        seed=42
+        )
+    
+    model.fit(dataset,config)
+    results = model.predict(x_input)
+
+    assert type(results)==type(np.array([]))
+    assert len(results)==len(x_input)
+    assert len(model.known_data) == 30 # training_window
+    assert type(model.confidence_int_lower_series)==type(pd.Series())
+    assert type(model.confidence_int_upper_series)==type(pd.Series())
 
     
