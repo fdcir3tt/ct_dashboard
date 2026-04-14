@@ -4,23 +4,25 @@ import matplotlib.pyplot as plt
 
 from typing import Any
 from matplotlib.figure import Figure
-from mlops.utils import load_dataset,time_period,Date
+from mlops.utils import load_dataset,time_period,Date,ExperimentConfig
 from mlops.models import ForecastModel,HeuristicModel
 
 # Configuración
-MODEL_TYPE = "ARIMA"
-MODEL_PARAMS= {"p":20,"d":1,"q":4}
-DATASET_NAME = "HERMOSILLO, SON_MEMSTY050" # MEMSTY050 ,CARHPP4170 ,CAMDAH5500 , NBKAPC1690, PAPXRX080,GABACT340
+
+EVAL_CONFIG = ExperimentConfig(
+                                dataset = "HERMOSILLO, SON_PAPXRX080", # MEMSTY050 ,CARHPP4170 ,CAMDAH5500 , NBKAPC1690, PAPXRX080,GABACT340
+                                parameters ={"p":20,"d":2,"q":4},
+                                training_data_start_date="oldest",
+                                training_data_end_date="latest",
+                                model_type="ARIMA",
+                                frequency="daily",   # daily, weekly,monthly
+                                training_window=180, # 180 , 24 , 6
+                                horizon=30,          # 30, 4, 1
+                                seed=42,
+                                metrics =['mae','rmse','mfe'])
 
 
-EVAL_CONFIG = { "training_data_start_date":"oldest",
-              "training_data_end_date":"latest",
-              "frequency":"daily", # fijo
-              "horizon":30, #fijo
-              "training_window":180} #fijo
-
-
-def load_eval_models(model_type:str,model_parameters:dict[str,Any])->tuple[HeuristicModel,ForecastModel]:
+def load_eval_models(config:ExperimentConfig)->tuple[HeuristicModel,ForecastModel]:
     """
     Carga los modelos de pronóstico que se compararan. 
     
@@ -34,20 +36,20 @@ def load_eval_models(model_type:str,model_parameters:dict[str,Any])->tuple[Heuri
     """
     base_model = ForecastModel.from_name(model_name="Heuristic",
                                         parameters={"l":8.4},
-                                        test_metrics=['mae','rmse','mfe'])
+                                        test_metrics=config.metrics)
     
-    print(f"Modelo {base_model.type} cargado correctamente!")
+    print(f"Modelo {base_model.name} cargado correctamente!")
 
-    model = ForecastModel.from_name(model_name=model_type,
-                                    parameters=model_parameters,
-                                    test_metrics=['mae','rmse','mfe'])
-    print(f"Modelo {model.type} cargado correctamente!")
+    model = ForecastModel.from_name(model_name=config.model_type,
+                                    parameters=config.parameters,
+                                    test_metrics=config.metrics)
+    print(f"Modelo {model.name} cargado correctamente!")
 
     return base_model,model
 
-def load_eval_period_data(dataset_name:str,config:dict[str,Any])->tuple[list[tuple],Date,Date]:
+def load_eval_period_data(config:ExperimentConfig)->tuple[list[tuple],Date,Date]:
 
-    dataset = load_dataset(dataset_name,config,train_split=False)
+    dataset = load_dataset(config.dataset,config,train_split=False)
     dataset = dataset.sort_values(by="date")
     
 
@@ -63,16 +65,16 @@ def load_eval_period_data(dataset_name:str,config:dict[str,Any])->tuple[list[tup
         period = time_period (current_date.date(),(current_date+pd.DateOffset(months=7)).date())
         period = [pd.to_datetime(date) for date in period]
         
-        config["training_data_start_date"] = period[0]
-        config["training_data_end_date"] = period[-1]
+        config.training_data_start_date = period[0]
+        config.training_data_end_date = period[-1]
         
-        eval_periods.append(load_dataset(dataset_name,config))
+        eval_periods.append(load_dataset(config.dataset,config))
         current_date += pd.DateOffset(months=1)
     return eval_periods,current_date.date(),max_date.date()
 
 
 
-def calculate_eval_metrics(eval_periods:list[tuple],config:dict[str,Any],base_model:HeuristicModel,model:ForecastModel)->tuple[dict[str,Any],dict[str,Any]]:
+def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base_model:HeuristicModel,model:ForecastModel)->tuple[dict[str,Any],dict[str,Any]]:
     base_model_metrics = {}
     new_model_metrics = {}
     period = 1
@@ -95,12 +97,12 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:dict[str,Any],base_mo
         # Ajuste de periodo
         base_model.fit(df)
         if hasattr(model,"fit") and callable(getattr(model, "fit")):
-            model.fit(df)
+            model.fit(df,config)
 
         # Valor real de ventas del siguiente mes
-        if config["frequency"]=="daily" or config["frequency"]=="weekly":
+        if config.frequency=="daily" or config.frequency=="weekly":
             y_true = np.array( [y_test.sum()])
-        if config["frequency"]=="monthly":
+        if config.frequency=="monthly":
             y_true = y_test
         
         # Predicción del siguiente mes (base)
@@ -109,10 +111,10 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:dict[str,Any],base_mo
         base_metrics = base_model.calculate_metrics(base_pred,y_true) 
 
         # Predicción del siguiente mes (modelo nuevo)
-        if EVAL_CONFIG["frequency"]=="daily" or EVAL_CONFIG["frequency"]=="weekly":
+        if config.frequency=="daily" or config.frequency=="weekly":
             y_pred = model.predict(x_test).sum()
             y_pred = np.array([y_pred])
-        if EVAL_CONFIG["frequency"]=="monthly":
+        if config.frequency=="monthly":
             y_pred = model.predict(x_test)
         
         model_metrics = model.calculate_metrics(y_pred,y_true) 
@@ -168,14 +170,14 @@ def plot_eval_graph(base_model_metrics:dict[str,Any],new_model_metrics:dict[str,
 
 
 def main():
-    base_model,model = load_eval_models(MODEL_TYPE,MODEL_PARAMS)
-    eval_periods,current_date,max_date = load_eval_period_data(DATASET_NAME,EVAL_CONFIG)
+    base_model,model = load_eval_models(EVAL_CONFIG)
+    eval_periods,current_date,max_date = load_eval_period_data(EVAL_CONFIG)
 
     base_model_metrics,new_model_metrics = calculate_eval_metrics(eval_periods=eval_periods,
                                                                   config=EVAL_CONFIG,
                                                                   base_model=base_model,
                                                                   model=model)
-    branch,productId = DATASET_NAME.split("_",1)
+    branch,productId = EVAL_CONFIG.dataset.split("_",1)
     title=f"Predicción de Ventas Mensuales\nSucursal:{branch}  Producto:{productId}\nPeriodo:{current_date} / {max_date}"
     xlabel= "Periodo(meses)"
     ylabel= "Ventas (unidades de producto)"

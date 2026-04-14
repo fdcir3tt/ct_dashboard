@@ -18,13 +18,13 @@ data_dir = Path('data')
 class ExperimentConfig:
     dataset: str
     parameters : dict[str,Any]
-    training_data_start_date: Date
-    training_data_end_date: Date
     model_type: str
     horizon:int
     frequency: str
     training_window:int
     seed:int
+    training_data_start_date: Date|str="oldest"
+    training_data_end_date: Date|str="latest"
     metrics : list[str]|None=None
     git_commit: str|None =None
     feature_set: str|None =None
