@@ -4,7 +4,7 @@ import subprocess
 
 
 from mlops.models import Metrics,Figure,ForecastModel,load_model
-from mlops.utils import get_experiment_config,ExperimentConfig,load_dataset
+from mlops.utils import get_experiment_config,ExperimentConfig,Any,load_dataset
 from mlflow.data.pandas_dataset import PandasDataset
 
 def start_experiment(model_name:str,config:ExperimentConfig):
@@ -84,7 +84,7 @@ def log_model(model:ForecastModel,metrics:Metrics):
         mlflow.statsmodels.log_model(
                         statsmodels_model=model.model,
                         name="ARIMA", 
-                        registered_model_name=model.name  
+                        registered_model_name=model.name 
                     )
 
 
@@ -128,10 +128,9 @@ def main():
             loss_history,loss_fig = train_results 
             figures={"loss_plot":loss_fig,"test_plot":test_fig}
 
-        log_model(model,metrics)
-               
+    
         logging(model_name,model,experiment_config,metrics,figures)
-        
+        log_model(model,metrics)
 
 if __name__=="__main__":
     main()
