@@ -6,11 +6,6 @@ stages:
       - data/raw/facturas_ventas.parquet
     outs:
       - data/processed/
-  train_model:
-    cmd: poetry run python scripts/train.py
-    deps:
-      - scripts/train.py
-      - config.yml
   train:
     cmd: poetry run python scripts/train.py
     deps:
