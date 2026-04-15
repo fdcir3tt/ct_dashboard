@@ -3,17 +3,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from typing import Any
+from matplotlib.ticker import MultipleLocator,MaxNLocator
 from matplotlib.figure import Figure
 from mlops.utils import load_dataset,time_period,Date,ExperimentConfig
 from mlops.models import ForecastModel,HeuristicModel
 
-# Configuración
+# Configuración 
 
 EVAL_CONFIG = ExperimentConfig(
-                                dataset = "HERMOSILLO, SON_PAPXRX080", # MEMSTY050 ,CARHPP4170 ,CAMDAH5500 , NBKAPC1690, PAPXRX080,GABACT340
+                                dataset = "HERMOSILLO, SON_PAPXRX080", 
                                 parameters ={"p":20,"d":2,"q":4},
                                 training_data_start_date="oldest",
-                                training_data_end_date="latest",
+                                training_data_end_date= Date.today(),
                                 model_type="ARIMA",
                                 frequency="daily",   # daily, weekly,monthly
                                 training_window=180, # 180 , 24 , 6
@@ -52,15 +53,21 @@ def load_eval_period_data(config:ExperimentConfig)->tuple[list[tuple],Date,Date]
     dataset = load_dataset(config.dataset,config,train_split=False)
     dataset = dataset.sort_values(by="date")
     
+    if config.training_data_start_date == "oldest":
+        min_date = dataset["date"].min()
+    else:
+        min_date = pd.to_datetime(config.training_data_start_date)
 
-    current_date = dataset["date"].min()
-    max_date = dataset["date"].max()
+    if config.training_data_end_date == "latest":
+        max_date = dataset["date"].max()
+    else:
+        max_date = pd.to_datetime(config.training_data_end_date)
     
-    total_months =(max_date.year - current_date.year) * 12 + (max_date.month - current_date.month)
+    total_months =(max_date.year - min_date.year) * 12 + (max_date.month - min_date.month)
     number_of_periods = total_months - 6
     eval_periods = []
     print(f"Meses en total:{total_months}  Periodos : {number_of_periods}")
-
+    current_date = min_date
     for _ in range(number_of_periods):
         period = time_period (current_date.date(),(current_date+pd.DateOffset(months=7)).date())
         period = [pd.to_datetime(date) for date in period]
@@ -70,7 +77,7 @@ def load_eval_period_data(config:ExperimentConfig)->tuple[list[tuple],Date,Date]
         
         eval_periods.append(load_dataset(config.dataset,config))
         current_date += pd.DateOffset(months=1)
-    return eval_periods,current_date.date(),max_date.date()
+    return eval_periods,min_date.date(),max_date.date()
 
 
 
@@ -159,14 +166,14 @@ def plot_eval_graph(base_model_metrics:dict[str,Any],new_model_metrics:dict[str,
     ax.plot(base_model_predictions, label="Base", marker='o')
     ax.plot(new_model_predictions, label="ARIMA", marker='x')
     ax.set_ylim(0)
+    ax.xaxis.set_major_locator(MultipleLocator(1)) 
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True)) 
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.legend()
     ax.grid(True)
     return fig
-
-
 
 
 def main():
@@ -177,6 +184,34 @@ def main():
                                                                   config=EVAL_CONFIG,
                                                                   base_model=base_model,
                                                                   model=model)
+    print(f"Base")
+    print("            RMSE  |  MAE  |  MFE")
+    totals = {"rmse":0,"mae":0,"mfe":0}
+    for period,results in base_model_metrics.items():
+        metrics = results["metrics"]
+        print(f"{period} : {metrics.rmse} |{metrics.mae} | {metrics.mfe}")
+        
+        totals["rmse"]+=metrics.rmse
+        totals["mae"]+=metrics.mae
+        totals["mfe"]+=metrics.mfe
+        
+    print(f"Totales : {totals["rmse"]} | {totals["mae"]} |{totals["mfe"]}")     
+    
+    print(f"\n{EVAL_CONFIG.model_type}")
+    print("            RMSE  |  MAE  |  MFE")
+    totals = {"rmse":0,"mae":0,"mfe":0}
+
+    for period,results in new_model_metrics.items():
+        metrics = results["metrics"]
+        print(f"{period} : {metrics.rmse}{""}|{metrics.mae} | {metrics.mfe}")
+        
+        totals["rmse"]+=metrics.rmse
+        totals["mae"]+=metrics.mae
+        totals["mfe"]+=metrics.mfe
+    print(f"Totales : {round(totals["rmse"])} | {round(totals["mae"])} |{round(totals["mfe"])}") 
+
+
+
     branch,productId = EVAL_CONFIG.dataset.split("_",1)
     title=f"Predicción de Ventas Mensuales\nSucursal:{branch}  Producto:{productId}\nPeriodo:{current_date} / {max_date}"
     xlabel= "Periodo(meses)"
