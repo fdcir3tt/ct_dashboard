@@ -1,27 +1,28 @@
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import mlflow
+import subprocess
 
-from typing import Any
 from matplotlib.ticker import MultipleLocator,MaxNLocator
 from matplotlib.figure import Figure
-from mlops.utils import load_dataset,time_period,Date,ExperimentConfig
-from mlops.models import ForecastModel,HeuristicModel
+from mlops.utils import load_dataset,time_period,Date,ExperimentConfig,data_dir,Any
+from mlops.models import ForecastModel,HeuristicModel,Metrics
 
-# Configuración 
-
+BRANCH = "HERMOSILLO, SON"
+DATASETS_PATH = data_dir / 'processed' / BRANCH
 EVAL_CONFIG = ExperimentConfig(
-                                dataset = "HERMOSILLO, SON_PAPXRX080", 
-                                parameters ={"p":20,"d":2,"q":4},
-                                training_data_start_date="oldest",
+                                dataset = f"{BRANCH}_PAPXRX080", 
+                                parameters ={"p":1,"d":2,"q":1},
+                                training_data_start_date= Date(2025,1,1),
                                 training_data_end_date= Date.today(),
                                 model_type="ARIMA",
-                                frequency="daily",   # daily, weekly,monthly
+                                frequency="daily",   # daily, weekly, monthly
                                 training_window=180, # 180 , 24 , 6
                                 horizon=30,          # 30, 4, 1
                                 seed=42,
                                 metrics =['mae','rmse','mfe'])
-
 
 def load_eval_models(config:ExperimentConfig)->tuple[HeuristicModel,ForecastModel]:
     """
@@ -65,17 +66,20 @@ def load_eval_period_data(config:ExperimentConfig)->tuple[list[tuple],Date,Date]
     
     total_months =(max_date.year - min_date.year) * 12 + (max_date.month - min_date.month)
     number_of_periods = total_months - 6
+
+    print(f"Meses en total:{total_months}  Periodos de evaluación : {number_of_periods}")
+
     eval_periods = []
-    print(f"Meses en total:{total_months}  Periodos : {number_of_periods}")
     current_date = min_date
+    dummy_config = config.copy()
     for _ in range(number_of_periods):
         period = time_period (current_date.date(),(current_date+pd.DateOffset(months=7)).date())
         period = [pd.to_datetime(date) for date in period]
         
-        config.training_data_start_date = period[0]
-        config.training_data_end_date = period[-1]
+        dummy_config.training_data_start_date = period[0]
+        dummy_config.training_data_end_date = period[-1]
         
-        eval_periods.append(load_dataset(config.dataset,config))
+        eval_periods.append(load_dataset(dummy_config.dataset,dummy_config))
         current_date += pd.DateOffset(months=1)
     return eval_periods,min_date.date(),max_date.date()
 
@@ -120,14 +124,14 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base
         # Predicción del siguiente mes (modelo nuevo)
         if config.frequency=="daily" or config.frequency=="weekly":
             y_pred = model.predict(x_test).sum()
-            y_pred = np.array([y_pred])
+            y_pred = np.array([y_pred]).round()
         if config.frequency=="monthly":
             y_pred = model.predict(x_test)
         
         model_metrics = model.calculate_metrics(y_pred,y_true) 
 
-        print(f"Métricas de modelo Base: { base_metrics}")
-        print(f"Métricas de modelo nuevo: {model_metrics}")
+        #print(f"Métricas de modelo Base: { base_metrics}")
+        #print(f"Métricas de modelo nuevo: {model_metrics}")
 
         key = f"period_{period}"
         base_model_metrics [key]={"y_pred":base_pred,
@@ -175,44 +179,93 @@ def plot_eval_graph(base_model_metrics:dict[str,Any],new_model_metrics:dict[str,
     ax.grid(True)
     return fig
 
-
-def main():
-    base_model,model = load_eval_models(EVAL_CONFIG)
-    eval_periods,current_date,max_date = load_eval_period_data(EVAL_CONFIG)
-
-    base_model_metrics,new_model_metrics = calculate_eval_metrics(eval_periods=eval_periods,
-                                                                  config=EVAL_CONFIG,
-                                                                  base_model=base_model,
-                                                                  model=model)
-    print(f"Base")
-    print("            RMSE  |  MAE  |  MFE")
-    totals = {"rmse":0,"mae":0,"mfe":0}
-    for period,results in base_model_metrics.items():
-        metrics = results["metrics"]
-        print(f"{period} : {metrics.rmse} |{metrics.mae} | {metrics.mfe}")
-        
-        totals["rmse"]+=metrics.rmse
-        totals["mae"]+=metrics.mae
-        totals["mfe"]+=metrics.mfe
-        
-    print(f"Totales : {totals["rmse"]} | {totals["mae"]} |{totals["mfe"]}")     
-    
-    print(f"\n{EVAL_CONFIG.model_type}")
+def metrics_table (metrics_results:dict[str,Any])->None:
     print("            RMSE  |  MAE  |  MFE")
     totals = {"rmse":0,"mae":0,"mfe":0}
 
-    for period,results in new_model_metrics.items():
+    for period,results in metrics_results.items():
         metrics = results["metrics"]
         print(f"{period} : {metrics.rmse}{""}|{metrics.mae} | {metrics.mfe}")
         
         totals["rmse"]+=metrics.rmse
         totals["mae"]+=metrics.mae
         totals["mfe"]+=metrics.mfe
-    print(f"Totales : {round(totals["rmse"])} | {round(totals["mae"])} |{round(totals["mfe"])}") 
+    print(f"Totales : {round(totals["rmse"])} | {round(totals["mae"])} |{round(totals["mfe"])}")
+
+def new_model_wins_draws_losses(base_model_metrics:dict[str,Any],new_model_metrics:dict[str,Any])->tuple[int,int,int]:
+    wins = 0
+    draws = 0 
+    losses = 0
+    for period,data in base_model_metrics.items():
+     base_metrics = data["metrics"]
+     new_metrics = new_model_metrics[period]["metrics"]
+     if new_metrics.rmse < base_metrics.rmse :
+        wins +=1
+     elif new_metrics.rmse == base_metrics.rmse:
+        draws +=1
+     else:
+        losses+=1
+    return wins,draws,losses  
+
+def metric_analysis(global_results:dict[str,Any],model_name:str)->dict[str,Any]:
+    
+    distribution = {'rmse':[]}
+    for productId,results in global_results.items():
+        model_metrics = results[model_name]
+        for period,data in model_metrics.items():
+            metrics = data["metrics"] 
+            distribution["rmse"].append(metrics.rmse)
+        
+    vector = np.array(distribution["rmse"])
+    analytics = {f"{model_name}_RMSE_avg" : vector.mean(), 
+                 f"{model_name}_RMSE_std" : vector.std(),
+                 f"{model_name}_RMSE_min_value":vector.min(), 
+                 f"{model_name}_RMSE_max_value":vector.max()}
+    
+    return analytics
 
 
+def top_evaluations(global_results:dict[str,Any],model_name:str,best:bool=True)->list[Figure]:
+    df_data = []
+    for productId,results in global_results.items():
+        model_metrics = results[model_name]
+        distribution = {'rmse':[]}
+        for period,data in model_metrics.items():
+            metrics = data["metrics"] 
+            distribution["rmse"].append(metrics.rmse)
+        
+        vector = np.array(distribution["rmse"])
+        analytics = {"productId":productId,"RMSE_avg" : vector.mean()}
+        df_data.append(analytics)
+    df = pd.DataFrame(data=df_data)
+    df = df.sort_values("RMSE_avg",ascending=best)
+    top_products = df['productId'][:5]
 
-    branch,productId = EVAL_CONFIG.dataset.split("_",1)
+    figures = []
+    for productId in top_products:
+        figures.append(global_results[productId]["prediction_plot"])
+        
+    return figures
+    
+
+
+def main(dataset_name:str,config:ExperimentConfig)->dict[str,Any]:
+    model_name = config.model_type
+    base_model,model = load_eval_models(config)
+    eval_periods,current_date,max_date = load_eval_period_data(config)
+
+    base_model_metrics,new_model_metrics = calculate_eval_metrics(eval_periods=eval_periods,
+                                                                  config=config,
+                                                                  base_model=base_model,
+                                                                  model=model)
+    print(f"Base")
+    metrics_table(base_model_metrics)     
+    
+    print(f"\n{model_name}")
+    metrics_table(new_model_metrics) 
+
+
+    branch,productId = dataset_name.split("_",1)
     title=f"Predicción de Ventas Mensuales\nSucursal:{branch}  Producto:{productId}\nPeriodo:{current_date} / {max_date}"
     xlabel= "Periodo(meses)"
     ylabel= "Ventas (unidades de producto)"
@@ -221,7 +274,69 @@ def main():
                           title=title,
                           xlabel=xlabel,
                           ylabel=ylabel)
-    plt.show()
+    return {"productId":productId,"HeuristicModel":base_model_metrics,f"{model_name}":new_model_metrics,"prediction_plot":fig}
+    
+    
 
 if __name__=="__main__":
-    main()
+    model_name=EVAL_CONFIG.model_type
+    mlflow.set_experiment(experiment_name=BRANCH)
+    with mlflow.start_run(run_name=f"{model_name}_vs_HeuristicModel",nested=True) as run:
+        win_counter = {"wins":0,"draws":0,"losses":0}
+        branch_products = os.listdir(DATASETS_PATH)
+        global_results = {}
+        for productId in branch_products:
+            productId = productId.split('.')[0]
+            dataset_name = f"{BRANCH}_{productId}"
+            EVAL_CONFIG.dataset = dataset_name
+            
+            print(f"\nComenzando comparación de modelos con producto: {productId}...\n")
+            results = main(dataset_name,EVAL_CONFIG)
+            global_results[productId] = results
+
+            # Victorias de periodo
+            wins,draws,losses = new_model_wins_draws_losses(results["HeuristicModel"],results[model_name])
+            
+            win_counter["wins"]+=wins
+            win_counter["draws"]+=draws
+            win_counter["losses"]+=losses
+        
+
+
+        # Analisis de métricas
+        model_analysis = metric_analysis(global_results,model_name)
+        base_analysis = metric_analysis(global_results,"HeuristicModel")
+
+        # Mejores y peores evaluaciones
+
+        best_figures = top_evaluations(global_results,model_name)
+        worst_figures = top_evaluations(global_results,model_name,best=False)
+
+        # Logging
+        dvc_rev = subprocess.check_output(["git", "rev-parse", "HEAD"]).strip().decode()
+
+        mlflow.log_param("git_commit", dvc_rev)
+        mlflow.log_metrics(win_counter)
+        mlflow.log_metrics(base_analysis)
+        mlflow.log_metrics(model_analysis)
+        
+
+        i = 1
+        for fig in best_figures:
+            output_dir = r"./plots"
+            os.makedirs(output_dir, exist_ok=True)  
+
+            fig_path = os.path.join(output_dir, f"top_{i}_eval_plot.png")
+            fig.savefig(fig_path)
+            mlflow.log_artifact(fig_path)
+            i+=1
+
+        i = 1
+        for fig in worst_figures:
+            output_dir = r"./plots"
+            os.makedirs(output_dir, exist_ok=True)  
+
+            fig_path = os.path.join(output_dir, f"bottom_{i}_eval_plot.png")
+            fig.savefig(fig_path)
+            mlflow.log_artifact(fig_path)
+            i+=1
