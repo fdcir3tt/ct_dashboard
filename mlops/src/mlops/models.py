@@ -13,7 +13,6 @@ from abc import ABC,abstractmethod
 from statsmodels.tsa.arima.model import ARIMA
 
 
-
 @dataclass
 class Metrics:
     mae: float |None = None
@@ -1264,8 +1263,14 @@ class ARIMAModel(ForecastModel):
         
         
         self.known_data = pd.Series(y_train,index=x_train)
-        
-        model = ARIMA(y_train,
+
+        self.mean = y_train.mean()
+        self.std = y_train.std()
+        if self.std == 0:
+            self.std = 1
+        y_scaled = (y_train - self.mean) / self.std
+
+        model = ARIMA(y_scaled,
               order=(p, d, q), # p,d,q
               enforce_stationarity=True,
               enforce_invertibility=True)
@@ -1281,10 +1286,14 @@ class ARIMAModel(ForecastModel):
         if n_steps >0:
             forecast_res = self.fitted_model.get_forecast(steps=n_steps)
 
-            forecast = forecast_res.predicted_mean
-            conf = forecast_res.conf_int()
-
+            # Escalamiento
             
+            forecast = forecast_res.predicted_mean
+            forecast = forecast*self.std + self.mean
+            conf = forecast_res.conf_int()
+            conf = conf * self.std + self.mean
+            predicted_values = forecast
+
             if isinstance(conf, np.ndarray):
                 conf = pd.DataFrame(conf, columns=["lower", "upper"])
 
@@ -1295,10 +1304,11 @@ class ARIMAModel(ForecastModel):
 
             self.confidence_int_lower_series = conf.iloc[:, 0]
             self.confidence_int_upper_series = conf.iloc[:, 1]
-            y_pred = np.concatenate((known_outputs, forecast_res.predicted_mean), axis=0)
+            y_pred = np.concatenate((known_outputs, predicted_values), axis=0)
         else:
             y_pred=known_outputs
-        return y_pred 
+
+        return y_pred
 
 
     def train(self,x_train:np.ndarray,y_train:np.ndarray):
