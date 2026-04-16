@@ -8,25 +8,31 @@ import subprocess
 import matplotlib
 import warnings
 
+from mlflow.pyfunc import PythonModel
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from matplotlib.ticker import MultipleLocator,MaxNLocator
 from matplotlib.figure import Figure
-from mlops.utils import load_dataset,time_period,Date,ExperimentConfig,data_dir,Any,DEBUG
-from mlops.models import ForecastModel,HeuristicModel,Metrics
+from mlops.utils import load_dataset,time_period,Date,ExperimentConfig,data_dir,Any,DEBUG,Path,calculate_metrics
+from mlops.models import ForecastModel,HeuristicModel
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
-if not DEBUG:
+DEBUG=True
+if DEBUG:
+    np.seterr(all='raise')
+else:
     warnings.filterwarnings("ignore", category=ConvergenceWarning)
     warnings.filterwarnings(
     "ignore",
     message="Non-invertible starting MA parameters found.*"
 )
 matplotlib.use("Agg")
+REGISTERED_MODEL_NAME = "arima_prototype"
+MODEL_VERSION = 2
 BRANCH = "HERMOSILLO, SON"
 DATASETS_PATH = data_dir / 'processed' / BRANCH
 EVAL_CONFIG = ExperimentConfig(
                                 dataset = f"{BRANCH}_PAPXRX080", 
-                                parameters ={"p":1,"d":2,"q":1},
+                                parameters ={"p":2,"d":1,"q":1},
                                 training_data_start_date= Date(2025,1,1),
                                 training_data_end_date= Date.today(),
                                 model_type="ARIMA",
@@ -36,7 +42,7 @@ EVAL_CONFIG = ExperimentConfig(
                                 seed=42,
                                 metrics =['mae','rmse','mfe'])
 
-def load_eval_models(config:ExperimentConfig)->tuple[HeuristicModel,ForecastModel]:
+def load_eval_models(config:ExperimentConfig)->tuple[HeuristicModel,PythonModel]:
     """
     Carga los modelos de pronóstico que se compararan. 
     
@@ -54,11 +60,9 @@ def load_eval_models(config:ExperimentConfig)->tuple[HeuristicModel,ForecastMode
     if DEBUG:
         print(f"Modelo {base_model.name} cargado correctamente!")
 
-    model = ForecastModel.from_name(model_name=config.model_type,
-                                    parameters=config.parameters,
-                                    test_metrics=config.metrics)
+    model = mlflow.pyfunc.load_model(f"models:/{REGISTERED_MODEL_NAME}/{MODEL_VERSION}")
     if DEBUG:
-        print(f"Modelo {model.name} cargado correctamente!")
+        print(f"Modelo de comparación cargado correctamente!")
 
     return base_model,model
 
@@ -98,7 +102,7 @@ def load_eval_period_data(config:ExperimentConfig)->tuple[list[tuple],Date,Date]
 
 
 
-def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base_model:HeuristicModel,model:ForecastModel)->tuple[dict[str,Any],dict[str,Any]]:
+def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base_model:HeuristicModel,model:PythonModel)->tuple[dict[str,Any],dict[str,Any]]:
     base_model_metrics = {}
     new_model_metrics = {}
     period = 1
@@ -120,8 +124,6 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base
         
         # Ajuste de periodo
         base_model.fit(df)
-        if hasattr(model,"fit") and callable(getattr(model, "fit")):
-            model.fit(df,config)
 
         # Valor real de ventas del siguiente mes
         if config.frequency=="daily" or config.frequency=="weekly":
@@ -132,7 +134,7 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base
         # Predicción del siguiente mes (base)
         base_pred = base_model.predict_next_month_sale()
         base_pred = np.array([base_pred])
-        base_metrics = base_model.calculate_metrics(base_pred,y_true) 
+        base_metrics = calculate_metrics(base_pred,y_true) 
 
         # Predicción del siguiente mes (modelo nuevo)
         if config.frequency=="daily" or config.frequency=="weekly":
@@ -141,7 +143,7 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base
         if config.frequency=="monthly":
             y_pred = model.predict(x_test)
         
-        model_metrics = model.calculate_metrics(y_pred,y_true) 
+        model_metrics = calculate_metrics(y_pred,y_true) 
         if DEBUG:
             print(f"Métricas de modelo Base: { base_metrics}")
             print(f"Métricas de modelo nuevo: {model_metrics}")
@@ -314,7 +316,7 @@ if __name__=="__main__":
     with mlflow.start_run(run_name=f"{model_name}_vs_HeuristicModel",nested=True) as run:
 
         with ProcessPoolExecutor(max_workers=4) as executor:
-            branch_products = branch_products[4000:4100]
+            branch_products = branch_products[4050:4100]
             futures = [executor.submit(evaluate_with_product, productId) for productId in branch_products]
             counter = 0
             total_products = len(branch_products)
