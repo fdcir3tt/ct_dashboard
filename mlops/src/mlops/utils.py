@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any,Iterable
 from dataclasses import dataclass,replace
 
+DEBUG = False
 Date = datetime.date
 data_dir = Path('data')
 
@@ -89,7 +90,8 @@ class DatasetFilters:
         df = data[mask]
         
         if df.empty:
-            print("Dataset vacío: No hay datos en el periodo específicado")
+            if DEBUG:
+                print("Dataset vacío: No hay datos en el periodo específicado")
             if not data.empty:
                 productId = data["productId"].iloc[0]
             df = pd.DataFrame(data=[{"quantity":0,"date":start_date,"productId":productId,"clientId":"NO_CLIENT"},{"quantity":0,"date":end_date,"productId":productId,"clientId":"NO_CLIENT"}])
