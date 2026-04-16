@@ -1,15 +1,27 @@
 import os
+import copy
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import mlflow
 import subprocess
+import matplotlib
+import warnings
 
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from matplotlib.ticker import MultipleLocator,MaxNLocator
 from matplotlib.figure import Figure
-from mlops.utils import load_dataset,time_period,Date,ExperimentConfig,data_dir,Any
+from mlops.utils import load_dataset,time_period,Date,ExperimentConfig,data_dir,Any,DEBUG
 from mlops.models import ForecastModel,HeuristicModel,Metrics
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
+if not DEBUG:
+    warnings.filterwarnings("ignore", category=ConvergenceWarning)
+    warnings.filterwarnings(
+    "ignore",
+    message="Non-invertible starting MA parameters found.*"
+)
+matplotlib.use("Agg")
 BRANCH = "HERMOSILLO, SON"
 DATASETS_PATH = data_dir / 'processed' / BRANCH
 EVAL_CONFIG = ExperimentConfig(
@@ -39,13 +51,14 @@ def load_eval_models(config:ExperimentConfig)->tuple[HeuristicModel,ForecastMode
     base_model = ForecastModel.from_name(model_name="Heuristic",
                                         parameters={"l":8.4},
                                         test_metrics=config.metrics)
-    
-    print(f"Modelo {base_model.name} cargado correctamente!")
+    if DEBUG:
+        print(f"Modelo {base_model.name} cargado correctamente!")
 
     model = ForecastModel.from_name(model_name=config.model_type,
                                     parameters=config.parameters,
                                     test_metrics=config.metrics)
-    print(f"Modelo {model.name} cargado correctamente!")
+    if DEBUG:
+        print(f"Modelo {model.name} cargado correctamente!")
 
     return base_model,model
 
@@ -66,8 +79,8 @@ def load_eval_period_data(config:ExperimentConfig)->tuple[list[tuple],Date,Date]
     
     total_months =(max_date.year - min_date.year) * 12 + (max_date.month - min_date.month)
     number_of_periods = total_months - 6
-
-    print(f"Meses en total:{total_months}  Periodos de evaluación : {number_of_periods}")
+    if DEBUG:
+        print(f"Meses en total:{total_months}  Periodos de evaluación : {number_of_periods}")
 
     eval_periods = []
     current_date = min_date
@@ -95,8 +108,8 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base
         end_date =pd.Timestamp(x_test.max()).date()
 
         months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
-
-        print(f"Periodo de evaluación: {start_date} - {end_date}")
+        if DEBUG:
+            print(f"Periodo de evaluación: {start_date} - {end_date}")
     
         if df.empty:
             df = pd.DataFrame(data=[[start_date+pd.DateOffset(months=i),"not_client",0] for i  in range(months)],
@@ -129,9 +142,9 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base
             y_pred = model.predict(x_test)
         
         model_metrics = model.calculate_metrics(y_pred,y_true) 
-
-        #print(f"Métricas de modelo Base: { base_metrics}")
-        #print(f"Métricas de modelo nuevo: {model_metrics}")
+        if DEBUG:
+            print(f"Métricas de modelo Base: { base_metrics}")
+            print(f"Métricas de modelo nuevo: {model_metrics}")
 
         key = f"period_{period}"
         base_model_metrics [key]={"y_pred":base_pred,
@@ -180,16 +193,19 @@ def plot_eval_graph(base_model_metrics:dict[str,Any],new_model_metrics:dict[str,
     return fig
 
 def metrics_table (metrics_results:dict[str,Any])->None:
+    
     print("            RMSE  |  MAE  |  MFE")
     totals = {"rmse":0,"mae":0,"mfe":0}
 
     for period,results in metrics_results.items():
         metrics = results["metrics"]
+        
         print(f"{period} : {metrics.rmse}{""}|{metrics.mae} | {metrics.mfe}")
         
         totals["rmse"]+=metrics.rmse
         totals["mae"]+=metrics.mae
         totals["mfe"]+=metrics.mfe
+    
     print(f"Totales : {round(totals["rmse"])} | {round(totals["mae"])} |{round(totals["mfe"])}")
 
 def new_model_wins_draws_losses(base_model_metrics:dict[str,Any],new_model_metrics:dict[str,Any])->tuple[int,int,int]:
@@ -197,14 +213,14 @@ def new_model_wins_draws_losses(base_model_metrics:dict[str,Any],new_model_metri
     draws = 0 
     losses = 0
     for period,data in base_model_metrics.items():
-     base_metrics = data["metrics"]
-     new_metrics = new_model_metrics[period]["metrics"]
-     if new_metrics.rmse < base_metrics.rmse :
-        wins +=1
-     elif new_metrics.rmse == base_metrics.rmse:
-        draws +=1
-     else:
-        losses+=1
+        base_metrics = data["metrics"]
+        new_metrics = new_model_metrics[period]["metrics"]
+        if new_metrics.rmse < base_metrics.rmse :
+            wins +=1
+        elif new_metrics.rmse == base_metrics.rmse:
+            draws +=1
+        else:
+            losses+=1
     return wins,draws,losses  
 
 def metric_analysis(global_results:dict[str,Any],model_name:str)->dict[str,Any]:
@@ -246,9 +262,7 @@ def top_evaluations(global_results:dict[str,Any],model_name:str,best:bool=True)-
         figures.append(global_results[productId]["prediction_plot"])
         
     return figures
-    
-
-
+     
 def main(dataset_name:str,config:ExperimentConfig)->dict[str,Any]:
     model_name = config.model_type
     base_model,model = load_eval_models(config)
@@ -258,11 +272,12 @@ def main(dataset_name:str,config:ExperimentConfig)->dict[str,Any]:
                                                                   config=config,
                                                                   base_model=base_model,
                                                                   model=model)
-    print(f"Base")
-    metrics_table(base_model_metrics)     
+    if DEBUG:
+        print(f"Base")
+        metrics_table(base_model_metrics)     
     
-    print(f"\n{model_name}")
-    metrics_table(new_model_metrics) 
+        print(f"\n{model_name}")
+        metrics_table(new_model_metrics) 
 
 
     branch,productId = dataset_name.split("_",1)
@@ -276,32 +291,43 @@ def main(dataset_name:str,config:ExperimentConfig)->dict[str,Any]:
                           ylabel=ylabel)
     return {"productId":productId,"HeuristicModel":base_model_metrics,f"{model_name}":new_model_metrics,"prediction_plot":fig}
     
-    
+def evaluate_with_product(productId:str):
+    dataset_name = f"{BRANCH}_{productId}"
+    local_config = copy.deepcopy(EVAL_CONFIG)
+    local_config.dataset = dataset_name
+    results = main(dataset_name, local_config)
+    if DEBUG:
+        print(f"\nComenzando comparación de modelos con producto: {productId}...\n")
+    # Victorias de periodo
+    wins,draws,losses = new_model_wins_draws_losses(results["HeuristicModel"],results[local_config.model_type])
+
+    return productId,results,(wins,draws,losses)
+
 
 if __name__=="__main__":
     model_name=EVAL_CONFIG.model_type
     mlflow.set_experiment(experiment_name=BRANCH)
+    win_counter = {"wins":0,"draws":0,"losses":0}
+    branch_products = [ p.split('.')[0] for p in os.listdir(DATASETS_PATH)]
+    global_results = {}
+
     with mlflow.start_run(run_name=f"{model_name}_vs_HeuristicModel",nested=True) as run:
-        win_counter = {"wins":0,"draws":0,"losses":0}
-        branch_products = os.listdir(DATASETS_PATH)
-        global_results = {}
-        for productId in branch_products:
-            productId = productId.split('.')[0]
-            dataset_name = f"{BRANCH}_{productId}"
-            EVAL_CONFIG.dataset = dataset_name
-            
-            print(f"\nComenzando comparación de modelos con producto: {productId}...\n")
-            results = main(dataset_name,EVAL_CONFIG)
-            global_results[productId] = results
 
-            # Victorias de periodo
-            wins,draws,losses = new_model_wins_draws_losses(results["HeuristicModel"],results[model_name])
-            
-            win_counter["wins"]+=wins
-            win_counter["draws"]+=draws
-            win_counter["losses"]+=losses
-        
+        with ProcessPoolExecutor(max_workers=4) as executor:
+            branch_products = branch_products[4000:4100]
+            futures = [executor.submit(evaluate_with_product, productId) for productId in branch_products]
+            counter = 0
+            total_products = len(branch_products)
+            for f in as_completed(futures):
+                productId, results, (wins, draws, losses) = f.result()
 
+                # Actualización 
+                global_results[productId] = results
+                win_counter["wins"]+=wins
+                win_counter["draws"]+=draws
+                win_counter["losses"]+=losses
+                print(f"Productos evaluados:{counter} / {total_products}",end='\r')
+                counter +=1
 
         # Analisis de métricas
         model_analysis = metric_analysis(global_results,model_name)
