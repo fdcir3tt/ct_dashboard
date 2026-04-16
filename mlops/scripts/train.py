@@ -2,10 +2,10 @@ import os
 import mlflow 
 import subprocess
 
-
-from mlops.models import Metrics,Figure,ForecastModel,load_model
-from mlops.utils import get_experiment_config,ExperimentConfig,Any,load_dataset
+from mlops.models import Metrics,Figure,ForecastModel,PyfuncWrapper,load_model
+from mlops.utils import get_experiment_config,ExperimentConfig,Any,load_dataset,Path
 from mlflow.data.pandas_dataset import PandasDataset
+
 
 def start_experiment(model_name:str,config:ExperimentConfig):
     """
@@ -79,13 +79,21 @@ def logging(model_name:str,model:ForecastModel,config:ExperimentConfig,metrics:M
 def log_model(model:ForecastModel,metrics:Metrics):
     if metrics.rmse > 5:
         return None
+    models_dir = Path("./models")
+    os.makedirs(models_dir, exist_ok=True) 
     
     if model.name == "ARIMA":
-        mlflow.statsmodels.log_model(
-                        statsmodels_model=model.model,
-                        name="ARIMA", 
-                        registered_model_name=model.name 
-                    )
+        model_path = models_dir/"arima.pkl"
+        model.save(model_path)
+        mlflow.log_artifact(model_path)
+        mlflow.pyfunc.log_model(
+                                artifact_path="arima_model",
+                                python_model=PyfuncWrapper(),
+                                artifacts={"model_path": str(model_path)},
+                                registered_model_name="arima_prototype"
+                            )
+    
+    
 
 
 def main():
@@ -128,7 +136,7 @@ def main():
             loss_history,loss_fig = train_results 
             figures={"loss_plot":loss_fig,"test_plot":test_fig}
 
-    
+
         logging(model_name,model,experiment_config,metrics,figures)
         log_model(model,metrics)
 
