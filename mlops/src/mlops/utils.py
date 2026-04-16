@@ -9,7 +9,7 @@ import pyodbc
 from dotenv import load_dotenv
 from pathlib import Path
 from typing import Any,Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass,replace
 
 Date = datetime.date
 data_dir = Path('data')
@@ -29,7 +29,8 @@ class ExperimentConfig:
     git_commit: str|None =None
     feature_set: str|None =None
 
-
+    def copy(self):
+        return replace(self)
 
 @dataclass
 class DatasetFilterConfig:
@@ -244,7 +245,13 @@ def get_client_list()->pd.DataFrame:
     - :None,
     Regresa:
     - df: pandas.Dataframe, Columna que contiene las claves de cliente
+    - local_df: pandas.Dataframe, Columna que contiene las claves de cliente guardados localmente
     """
+    file =data_dir/'raw'/'clients.parquet'
+    if file.exists():
+        local_df = pd.read_parquet(file)
+        return local_df
+    
     load_dotenv()
     
     connection_str = (
@@ -264,6 +271,7 @@ def get_client_list()->pd.DataFrame:
         df = pd.read_sql(query,conn)
         conn.close()
         df = df.rename(columns={os.getenv("ID_COLUMN"):"clientId"})
+        save_file_safe(df,file)
 
         return df
 
