@@ -88,8 +88,13 @@ class DatasetFilters:
         df = data[mask]
         
         if df.empty:
-            print("Dataset invalido: No hay datos en el periodo específicado")
-            return pd.DataFrame()
+            print("Dataset vacío: No hay datos en el periodo específicado")
+            if not data.empty:
+                productId = data["productId"].iloc[0]
+            df = pd.DataFrame(data=[{"quantity":0,"date":start_date,"productId":productId,"clientId":"NO_CLIENT"},{"quantity":0,"date":end_date,"productId":productId,"clientId":"NO_CLIENT"}])
+            df ["month"] = df["date"].dt.month
+            df ["year"] = df["date"].dt.year
+            return df
         df = df.sort_values("date")
         return df
     
