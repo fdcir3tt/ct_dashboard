@@ -16,6 +16,25 @@ Date = datetime.date
 data_dir = Path('data')
 
 @dataclass
+class Metrics:
+    mae: float |None = None
+    mfe : float|None = None
+    rmse : float |None = None
+    da:float|None = None
+
+    def __post_init__(self):
+        if self.rmse:
+            if self.rmse <= 0:
+                raise ValueError("Raíz del error cuadrado promedio debe ser positivo")
+        if self.mae:  
+            if self.mae <= 0:
+                raise ValueError("Error absoluto promedio debe ser positivo")
+            
+        if self.da:
+            if self.da <= 0:
+                raise ValueError("Error direccional debe ser positivo")
+            
+@dataclass
 class ExperimentConfig:
     dataset: str
     parameters : dict[str,Any]
@@ -395,3 +414,37 @@ def load_dataset(dataset:str,config:ExperimentConfig|dict[str,Any],train_split:b
 
 
 
+def calculate_metrics(y_pred:np.ndarray,y_true:np.ndarray,test_metrics:list[str]=['mae','mfe','rmse','da'])->Metrics:
+        """
+        Calcula las métricas específicadas acorde la predicción del modelo y los datos reales
+
+        Parametros:
+        - y_pred: array-like , Predicciones del modelo 
+        - y_true: array-like , Datos reales
+
+        Regresa:
+        - Metrics(**result_metrics): Metrics, Resultado de los cálculos de métricas  
+        """
+        def directional_accuracy(y_pred:np.ndarray,y_true:np.ndarray)->float:
+            true_direction =np.sign(y_true[1:] - y_true[:-1])
+            pred_direction =np.sign(y_pred[1:] - y_pred[:-1])
+            d_i = (true_direction == pred_direction).astype(float)
+            return d_i.mean()
+        
+        if len(y_pred)!=len(y_true):
+            print(f"Discrepancia en cantidad de datos :  y_pred = {len(y_pred)} , y_true = {len(y_true)}")
+            return Metrics()
+        result_metrics = {} 
+        for m in test_metrics:
+            if m=='mae': # Mean Absolute Error
+                result_metrics['mae'] = np.mean(abs(y_true-y_pred))
+
+            if m=='mfe':# Mean Forecast Error
+                result_metrics['mfe'] = np.mean(y_pred-y_true)
+                
+            if m=='rmse':# Root Mean Square Error
+                result_metrics['rmse'] = np.sqrt( np.mean( (y_true-y_pred)**2 ) )
+
+            if m=='da':# Directional Accuracy
+                result_metrics['da'] = directional_accuracy(y_pred,y_true)
+        return Metrics(**result_metrics)

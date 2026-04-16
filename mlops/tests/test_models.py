@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 from mlops.models import ForecastModel,HeuristicModel,Metrics
-from mlops.utils import ExperimentConfig
+from mlops.utils import ExperimentConfig,calculate_metrics
 
 # ==================================================================== #
 #                       DATOS SINTÉTICOS
@@ -67,7 +67,7 @@ def test_calculate_metrics():
                                rmse= np.sqrt(111.50),
                                da= 5/9)
     
-    result_metrics = HeuristicModel(parameters={}).calculate_metrics(y_pred,y_true)
+    result_metrics = calculate_metrics(y_pred,y_true)
     assert result_metrics.mae == expected_metrics.mae
     assert result_metrics.mfe == expected_metrics.mfe
     assert result_metrics.rmse == expected_metrics.rmse

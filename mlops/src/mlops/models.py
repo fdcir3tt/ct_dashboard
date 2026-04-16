@@ -5,7 +5,8 @@ import calendar
 import random
 
 from scipy.stats import gaussian_kde
-from mlops.utils import get_client_list,time_period,make_time_series,ExperimentConfig,DatasetFilterConfig,DatasetFilters,Date
+from mlflow.pyfunc import PythonModel
+from mlops.utils import get_client_list,time_period,make_time_series,calculate_metrics,Path,ExperimentConfig,DatasetFilterConfig,DatasetFilters,Date,Metrics
 from typing import Iterable,Any
 from matplotlib.figure import Figure
 from dataclasses import dataclass
@@ -13,32 +14,31 @@ from abc import ABC,abstractmethod
 from statsmodels.tsa.arima.model import ARIMA
 
 
-@dataclass
-class Metrics:
-    mae: float |None = None
-    mfe : float|None = None
-    rmse : float |None = None
-    da:float|None = None
-
-    def __post_init__(self):
-        if self.rmse:
-            if self.rmse <= 0:
-                raise ValueError("Raíz del error cuadrado promedio debe ser positivo")
-        if self.mae:  
-            if self.mae <= 0:
-                raise ValueError("Error absoluto promedio debe ser positivo")
-            
-        if self.da:
-            if self.da <= 0:
-                raise ValueError("Error direccional debe ser positivo")
-            
-        
-
 
 @dataclass
 class LossHistory:
     train_loss:Iterable|None=None
     test_loss:Iterable|None=None
+
+class PyfuncWrapper(PythonModel):
+
+    def load_context(self, context):
+        import pickle
+        self.model = pickle.load(open(context.artifacts["model_path"], "rb"))
+
+    def predict(self, context, model_input):
+
+        # Manejo de entradas
+        if isinstance(model_input, pd.DataFrame):
+            x_input = model_input.values
+        elif isinstance(model_input, pd.Series):
+            x_input = model_input.values.reshape(-1, 1)
+        elif isinstance(model_input, np.ndarray):
+            x_input = model_input
+        else:
+            x_input = np.array(model_input)
+
+        return self.model.predict(x_input)
         
 class ForecastModel(ABC):
     _registry: dict[str, type["ForecastModel"]] = {}
@@ -102,40 +102,6 @@ class ForecastModel(ABC):
         pass
 
 
-    def calculate_metrics(self,y_pred:np.ndarray,y_true:np.ndarray)->Metrics:
-        """
-        Calcula las métricas específicadas acorde la predicción del modelo y los datos reales
-
-        Parametros:
-        - y_pred: array-like , Predicciones del modelo 
-        - y_true: array-like , Datos reales
-
-        Regresa:
-        - Metrics(**result_metrics): Metrics, Resultado de los cálculos de métricas  
-        """
-        def directional_accuracy(y_pred:np.ndarray,y_true:np.ndarray)->float:
-            true_direction =np.sign(y_true[1:] - y_true[:-1])
-            pred_direction =np.sign(y_pred[1:] - y_pred[:-1])
-            d_i = (true_direction == pred_direction).astype(float)
-            return d_i.mean()
-        
-        if len(y_pred)!=len(y_true):
-            print(f"Discrepancia en cantidad de datos :  y_pred = {len(y_pred)} , y_true = {len(y_true)}")
-            return Metrics()
-        result_metrics = {} 
-        for m in self.test_metrics:
-            if m=='mae': # Mean Absolute Error
-                result_metrics['mae'] = np.mean(abs(y_true-y_pred))
-
-            if m=='mfe':# Mean Forecast Error
-                result_metrics['mfe'] = np.mean(y_pred-y_true)
-                
-            if m=='rmse':# Root Mean Square Error
-                result_metrics['rmse'] = np.sqrt( np.mean( (y_true-y_pred)**2 ) )
-
-            if m=='da':# Directional Accuracy
-                result_metrics['da'] = directional_accuracy(y_pred,y_true)
-        return Metrics(**result_metrics)
     
 
     def plot_loss(self,loss_history:LossHistory, title:str="Loss", xlabel:str="Epochs", ylabel:str="Loss")->Figure:
@@ -210,7 +176,7 @@ class ForecastModel(ABC):
         end_date = x_test.max().astype('datetime64[D]').astype(Date)
         
         title= f"Periodo : {start_date}  /   {end_date}"
-        metrics = self.calculate_metrics(y_pred,y_true)
+        metrics = calculate_metrics(y_pred,y_true,self.test_metrics)
         test_fig = self.plot_prediction(y_pred,y_true,title)
         return test_fig,metrics 
 
@@ -1275,7 +1241,7 @@ class ARIMAModel(ForecastModel):
               enforce_stationarity=True,
               enforce_invertibility=True)
         
-        self.fitted_model = model.fit(method_kwargs={"maxiter": 1000})
+        self.fitted_model = model.fit(method_kwargs={"maxiter": 9000})
         self.model = self.fitted_model
 
     def predict(self,x_input:np.ndarray)->np.ndarray:
@@ -1347,3 +1313,14 @@ class ARIMAModel(ForecastModel):
         ax.grid(True)
 
         return fig
+    
+    def save(self, path:Path):
+        import pickle
+        with open(path, "wb") as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load(cls, path: Path):
+        import pickle
+        with open(path, "rb") as f:
+            return pickle.load(f)    
