@@ -1216,9 +1216,16 @@ class ARIMAModel(ForecastModel):
             training_window = config.training_window
             horizon = config.horizon
         
-    
-            start_date = pd.to_datetime(config.training_data_start_date)
-            end_date = pd.to_datetime(config.training_data_end_date)
+            if config.training_data_start_date == "oldest":
+                start_date = pd.to_datetime( dataset['date'].min())
+            else:
+                start_date = pd.to_datetime(config.training_data_start_date)
+                
+            if config.training_data_end_date == "latest":
+                end_date = pd.to_datetime( dataset['date'].max())
+            else:
+                end_date = pd.to_datetime(config.training_data_end_date)
+            
             period = time_period(start_date=start_date,end_date=end_date)
 
         x,y = make_time_series(df,period,target_column)
@@ -1230,7 +1237,10 @@ class ARIMAModel(ForecastModel):
         x_train = x[:training_window]
         y_train = y[:training_window]
         
-        
+        print(f"{start_date}-{end_date}")
+        print(f"Dataset:{dataset}")
+        print(f"Entrenamiento:{y_train}")
+        print(f"Prueba:{y[training_window:training_window+horizon]}")
         self.known_data = pd.Series(y_train,index=x_train)
 
         self.mean = y_train.mean()
@@ -1238,8 +1248,8 @@ class ARIMAModel(ForecastModel):
         if self.std == 0:
             self.std = 1
         y_scaled = (y_train - self.mean) / self.std
-
-        model = ARIMA(y_scaled,
+        
+        model = ARIMA(y_train,
               order=(p, d, q), # p,d,q
               enforce_stationarity=True,
               enforce_invertibility=True)
@@ -1258,9 +1268,9 @@ class ARIMAModel(ForecastModel):
             # Escalamiento
             
             forecast = forecast_res.predicted_mean
-            forecast = forecast*self.std + self.mean
+            #forecast = forecast*self.std + self.mean
             conf = forecast_res.conf_int()
-            conf = conf * self.std + self.mean
+            #conf = conf * self.std + self.mean
             predicted_values = forecast
 
             if isinstance(conf, np.ndarray):

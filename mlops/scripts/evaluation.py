@@ -16,7 +16,7 @@ from mlops.utils import load_dataset,time_period,Date,ExperimentConfig,data_dir,
 from mlops.models import ForecastModel,HeuristicModel
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
-DEBUG=False
+DEBUG=True
 
 if DEBUG:
     np.seterr(all='raise')
@@ -28,14 +28,14 @@ else:
 )
 matplotlib.use("Agg")
 REGISTERED_MODEL_NAME = "arima_prototype"
-MODEL_VERSION = 3
+MODEL_VERSION = 11
 BRANCH = "HERMOSILLO, SON"
 DATASETS_PATH = data_dir / 'processed' / BRANCH
 EVAL_CONFIG = ExperimentConfig(
                                 dataset = f"{BRANCH}_PAPXRX080", 
                                 parameters ={"p":2,"d":1,"q":1},
                                 training_data_start_date= Date(2025,1,1),
-                                training_data_end_date= Date.today(),
+                                training_data_end_date= Date(2026,4,1),
                                 model_type="ARIMA",
                                 frequency="daily",   # daily, weekly, monthly
                                 training_window=180, # 180 , 24 , 6
@@ -126,11 +126,13 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base
         
         
         # Ajuste de periodo
+        dummy_config = config.copy()
+        dummy_config.training_data_start_date = "oldest"
+        dummy_config.training_data_end_date = "latest"
         base_model.fit(df)
         py_model = model._model_impl.python_model
         if hasattr(py_model,"fit") and callable(getattr(py_model, "fit")):
-            
-            py_model.fit(df,config)
+            py_model.fit(df,dummy_config)
 
         # Valor real de ventas del siguiente mes
         if config.frequency=="daily" or config.frequency=="weekly":
@@ -144,10 +146,11 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base
         base_pred = base_model.predict_next_month_sale()
         base_pred = np.array([base_pred])
         if DEBUG:
-            print(y_true)
+            print(f"Valores de prueba:{y_test}")
+            print(f"Verdadero valor:{y_true}")
             
-            print(base_pred)
-        base_metrics = calculate_metrics(base_pred,y_true,['rmse']) 
+            print(f"Predicción heurística:{base_pred}")
+        base_metrics = calculate_metrics(base_pred,y_true,['rmse','mae','mfe']) 
 
         # Predicción del siguiente mes (modelo nuevo)
         if config.frequency=="daily" or config.frequency=="weekly":
@@ -157,11 +160,9 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base
             y_pred = model.predict(x_test)
 
         if DEBUG:
-            print(y_test)
-            print(y_true)
-            print(y_pred)
+            print(f"Predicción de nuevo modelo:{y_pred}")
 
-        model_metrics = calculate_metrics(y_pred,y_true,['rmse']) 
+        model_metrics = calculate_metrics(y_pred,y_true,['rmse','mae','mfe']) 
         if DEBUG:
             print(f"Métricas de modelo Base: { base_metrics}")
             print(f"Métricas de modelo nuevo: {model_metrics}")
@@ -334,7 +335,8 @@ if __name__=="__main__":
     with mlflow.start_run(run_name=f"{model_name}_vs_HeuristicModel",nested=True) as run:
 
         with ProcessPoolExecutor(max_workers=4) as executor:
-            branch_products = branch_products[4050:4100]
+            #branch_products = branch_products[4050:4100]
+            branch_products = ['PAPXRX080']#['MEMKGN3510', 'MEMSTY050', 'ARRGEN410', 'ARRGEN390', 'ARRGEN420','MEMSTY040', 'MEMHYU050', 'MEMDAH010', 'IMPQIA080', 'PAQLOC010']
             futures = [executor.submit(evaluate_with_product, productId) for productId in branch_products]
             counter = 0
             total_products = len(branch_products)
@@ -346,7 +348,7 @@ if __name__=="__main__":
                 win_counter["wins"]+=wins
                 win_counter["draws"]+=draws
                 win_counter["losses"]+=losses
-                print(f"Productos evaluados:{counter} / {total_products}",end='\r')
+                print(f"Productos evaluados: {counter} / {total_products}",end='\r')
                 counter +=1
 
         # Analisis de métricas
