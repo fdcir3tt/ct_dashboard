@@ -12,11 +12,12 @@ from mlflow.pyfunc import PythonModel
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from matplotlib.ticker import MultipleLocator,MaxNLocator
 from matplotlib.figure import Figure
-from mlops.utils import load_dataset,time_period,Date,ExperimentConfig,data_dir,Any,DEBUG,Path,calculate_metrics
+from mlops.utils import load_dataset,time_period,Date,ExperimentConfig,data_dir,Any,calculate_metrics
 from mlops.models import ForecastModel,HeuristicModel
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
-DEBUG=True
+DEBUG=False
+
 if DEBUG:
     np.seterr(all='raise')
 else:
@@ -27,7 +28,7 @@ else:
 )
 matplotlib.use("Agg")
 REGISTERED_MODEL_NAME = "arima_prototype"
-MODEL_VERSION = 2
+MODEL_VERSION = 3
 BRANCH = "HERMOSILLO, SON"
 DATASETS_PATH = data_dir / 'processed' / BRANCH
 EVAL_CONFIG = ExperimentConfig(
@@ -114,7 +115,9 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base
         months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
         if DEBUG:
             print(f"Periodo de evaluación: {start_date} - {end_date}")
-    
+            print(f"Dataframe:")
+            print(df)
+
         if df.empty:
             df = pd.DataFrame(data=[[start_date+pd.DateOffset(months=i),"not_client",0] for i  in range(months)],
                             columns=["date","clientId","quantity"])
@@ -124,17 +127,27 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base
         
         # Ajuste de periodo
         base_model.fit(df)
+        py_model = model._model_impl.python_model
+        if hasattr(py_model,"fit") and callable(getattr(py_model, "fit")):
+            
+            py_model.fit(df,config)
 
         # Valor real de ventas del siguiente mes
         if config.frequency=="daily" or config.frequency=="weekly":
             y_true = np.array( [y_test.sum()])
         if config.frequency=="monthly":
             y_true = y_test
+
         
+
         # Predicción del siguiente mes (base)
         base_pred = base_model.predict_next_month_sale()
         base_pred = np.array([base_pred])
-        base_metrics = calculate_metrics(base_pred,y_true) 
+        if DEBUG:
+            print(y_true)
+            
+            print(base_pred)
+        base_metrics = calculate_metrics(base_pred,y_true,['rmse']) 
 
         # Predicción del siguiente mes (modelo nuevo)
         if config.frequency=="daily" or config.frequency=="weekly":
@@ -142,8 +155,13 @@ def calculate_eval_metrics(eval_periods:list[tuple],config:ExperimentConfig,base
             y_pred = np.array([y_pred]).round()
         if config.frequency=="monthly":
             y_pred = model.predict(x_test)
-        
-        model_metrics = calculate_metrics(y_pred,y_true) 
+
+        if DEBUG:
+            print(y_test)
+            print(y_true)
+            print(y_pred)
+
+        model_metrics = calculate_metrics(y_pred,y_true,['rmse']) 
         if DEBUG:
             print(f"Métricas de modelo Base: { base_metrics}")
             print(f"Métricas de modelo nuevo: {model_metrics}")

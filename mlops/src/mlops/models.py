@@ -26,7 +26,7 @@ class PyfuncWrapper(PythonModel):
         import pickle
         self.model = pickle.load(open(context.artifacts["model_path"], "rb"))
 
-    def predict(self, context, model_input):
+    def predict(self, context, model_input:np.ndarray)->np.ndarray:
 
         # Manejo de entradas
         if isinstance(model_input, pd.DataFrame):
@@ -39,6 +39,9 @@ class PyfuncWrapper(PythonModel):
             x_input = np.array(model_input)
 
         return self.model.predict(x_input)
+    
+    def fit(self,data:pd.DataFrame,config:ExperimentConfig)->None:
+        return self.model.fit(data,config)
         
 class ForecastModel(ABC):
     _registry: dict[str, type["ForecastModel"]] = {}
