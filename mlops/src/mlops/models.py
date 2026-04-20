@@ -6,7 +6,7 @@ import random
 
 from scipy.stats import gaussian_kde
 from mlflow.pyfunc import PythonModel
-from mlops.utils import get_client_list,time_period,make_time_series,calculate_metrics,Path,ExperimentConfig,DatasetFilterConfig,DatasetFilters,Date,Metrics
+from mlops.utils import get_client_list,time_period,make_time_series,calculate_metrics,Path,ExperimentConfig,DatasetFilterConfig,DatasetFilters,Date,Metrics,DEBUG
 from typing import Iterable,Any
 from matplotlib.figure import Figure
 from dataclasses import dataclass
@@ -1220,7 +1220,7 @@ class ARIMAModel(ForecastModel):
                 start_date = pd.to_datetime( dataset['date'].min())
             else:
                 start_date = pd.to_datetime(config.training_data_start_date)
-                
+
             if config.training_data_end_date == "latest":
                 end_date = pd.to_datetime( dataset['date'].max())
             else:
@@ -1230,17 +1230,17 @@ class ARIMAModel(ForecastModel):
 
         x,y = make_time_series(df,period,target_column)
 
-        if len(y)< horizon+training_window:
+        if len(y)< horizon+training_window :
             print(f"Dataset invalido: Insuficiente datos para configuración actual.\nNúmero de datos:{len(y)}\nNúmero Requerido:{horizon+training_window}")
             return None
         
         x_train = x[:training_window]
         y_train = y[:training_window]
-        
-        print(f"{start_date}-{end_date}")
-        print(f"Dataset:{dataset}")
-        print(f"Entrenamiento:{y_train}")
-        print(f"Prueba:{y[training_window:training_window+horizon]}")
+        if DEBUG:
+            print(f"{start_date}-{end_date}")
+            print(f"Dataset:{dataset}")
+            print(f"Entrenamiento:{y_train}")
+            print(f"Prueba:{y[training_window:training_window+horizon]}")
         self.known_data = pd.Series(y_train,index=x_train)
 
         self.mean = y_train.mean()
@@ -1254,7 +1254,7 @@ class ARIMAModel(ForecastModel):
               enforce_stationarity=True,
               enforce_invertibility=True)
         
-        self.fitted_model = model.fit(method_kwargs={"maxiter": 9000})
+        self.fitted_model = model.fit(method_kwargs={"maxiter": 1000})
         self.model = self.fitted_model
 
     def predict(self,x_input:np.ndarray)->np.ndarray:
