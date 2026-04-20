@@ -77,7 +77,7 @@ def logging(model_name:str,model:ForecastModel,config:ExperimentConfig,metrics:M
             mlflow.log_artifact(fig_path)
 
 def log_model(model:ForecastModel,metrics:Metrics):
-    if metrics.rmse > 5:
+    if metrics.rmse > 3:
         return None
     models_dir = Path("./models")
     os.makedirs(models_dir, exist_ok=True) 
