@@ -448,3 +448,25 @@ def calculate_metrics(y_pred:np.ndarray,y_true:np.ndarray,test_metrics:list[str]
             if m=='da':# Directional Accuracy
                 result_metrics['da'] = directional_accuracy(y_pred,y_true)
         return Metrics(**result_metrics)
+
+def calculate_iqr_bounds(sales_series:pd.Series)->tuple[float,float]:
+    q1 = sales_series.quantile(0.25)
+    q3 = sales_series.quantile(0.75)
+    iqr = q3 - q1
+    return (q1 - 1.5 * iqr, q3 + 1.5 * iqr)
+
+
+def identify_outlier_sales(data: pd.DataFrame,
+                           element_column:str)->pd.DataFrame:
+    df = data.copy()
+
+    bounds_dict = df.groupby(element_column)['quantity'].apply(calculate_iqr_bounds).to_dict()
+    
+    df['iqr_bounds'] = df[element_column].map(bounds_dict)
+    df['is_outlier'] = ~df['quantity'].between(
+                                              df['iqr_bounds'].str[0], 
+                                              df['iqr_bounds'].str[1]
+                                              )
+
+    df = df.drop(columns='iqr_bounds')
+    return df
