@@ -12,23 +12,22 @@ from mlflow.pyfunc import PythonModel
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from matplotlib.ticker import MultipleLocator,MaxNLocator
 from matplotlib.figure import Figure
-from mlops.utils import load_dataset,time_period,Date,ExperimentConfig,data_dir,Any,calculate_metrics
+from mlops.utils import load_dataset,time_period,Date,ExperimentConfig,data_dir,Any,calculate_metrics,DEBUG
 from mlops.models import ForecastModel,HeuristicModel
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
-DEBUG=True
 
 if DEBUG:
     np.seterr(all='raise')
 else:
     warnings.filterwarnings("ignore", category=ConvergenceWarning)
     warnings.filterwarnings(
-    "ignore",
-    message="Non-invertible starting MA parameters found.*"
-)
+    "ignore",message="Non-invertible starting MA parameters found.*")
+    warnings.filterwarnings("ignore",message='Non-stationary starting autoregressive parameters')
+
 matplotlib.use("Agg")
 REGISTERED_MODEL_NAME = "arima_prototype"
-MODEL_VERSION = 11
+MODEL_VERSION = 30
 BRANCH = "HERMOSILLO, SON"
 DATASETS_PATH = data_dir / 'processed' / BRANCH
 EVAL_CONFIG = ExperimentConfig(
@@ -335,8 +334,8 @@ if __name__=="__main__":
     with mlflow.start_run(run_name=f"{model_name}_vs_HeuristicModel",nested=True) as run:
 
         with ProcessPoolExecutor(max_workers=4) as executor:
-            #branch_products = branch_products[4050:4100]
-            branch_products = ['PAPXRX080']#['MEMKGN3510', 'MEMSTY050', 'ARRGEN410', 'ARRGEN390', 'ARRGEN420','MEMSTY040', 'MEMHYU050', 'MEMDAH010', 'IMPQIA080', 'PAQLOC010']
+            #branch_products = branch_products[3000:4100]
+            branch_products =['MEMKGN3510', 'MEMSTY050', 'ARRGEN410', 'ARRGEN390', 'ARRGEN420','MEMSTY040', 'MEMHYU050', 'MEMDAH010', 'IMPQIA080', 'PAQLOC010','PAPXRX080']
             futures = [executor.submit(evaluate_with_product, productId) for productId in branch_products]
             counter = 0
             total_products = len(branch_products)
@@ -364,6 +363,7 @@ if __name__=="__main__":
         dvc_rev = subprocess.check_output(["git", "rev-parse", "HEAD"]).strip().decode()
 
         mlflow.log_param("git_commit", dvc_rev)
+        mlflow.log_param("model_path",f"models:/{REGISTERED_MODEL_NAME}/{MODEL_VERSION}")
         mlflow.log_metrics(win_counter)
         mlflow.log_metrics(base_analysis)
         mlflow.log_metrics(model_analysis)

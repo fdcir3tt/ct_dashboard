@@ -27,20 +27,20 @@ stages:
       nfiles: 167500
     - path: params.yaml
       hash: md5
-      md5: 23c173f74acdc5adc136097eb340b468
+      md5: 9194ae75b012bb606dfa10aa586a40d9
       size: 346
     - path: scripts/train.py
       hash: md5
-      md5: 59ce6cbca2a3c4d04f71a062e23000c4
-      size: 4762
+      md5: 05ffc19b609379d692399a6278f29b2b
+      size: 4765
     - path: src/mlops/models.py
       hash: md5
-      md5: 824f9cc9bdd6a5ca8aa6b88f82083add
-      size: 55475
+      md5: 7bb86b0dcd3930cef38f4e353a05d167
+      size: 57278
     - path: src/mlops/utils.py
       hash: md5
-      md5: 16e528e00fbecd5ca6f03551b9c6606d
-      size: 13424
+      md5: 422706e817dcad528db6967593780e87
+      size: 13450
     params:
       params.yaml:
         feature_set: raw
@@ -48,10 +48,10 @@ stages:
         horizon: 30
         model_type: ARIMA
         seed: 12
-        training_window: 40
+        training_window: 50
     outs:
     - path: plots/
       hash: md5
-      md5: 185948f14648def1a4c0663a7f224ba0.dir
-      size: 37309
+      md5: 87ddc729384260b8b25599d080024a0c.dir
+      size: 56834
       nfiles: 1
