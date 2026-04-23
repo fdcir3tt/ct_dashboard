@@ -1249,7 +1249,7 @@ class ARIMAModel(ForecastModel):
             self.std = 1
         y_scaled = (y_train - self.mean) / self.std
         
-        model = ARIMA(y_train,
+        model = ARIMA(y_scaled,
               order=(p, d, q), # p,d,q
               enforce_stationarity=True,
               enforce_invertibility=True)
@@ -1268,9 +1268,9 @@ class ARIMAModel(ForecastModel):
             # Escalamiento
             
             forecast = forecast_res.predicted_mean
-            #forecast = forecast*self.std + self.mean
+            forecast = forecast*self.std + self.mean
             conf = forecast_res.conf_int()
-            #conf = conf * self.std + self.mean
+            conf = conf * self.std + self.mean
             predicted_values = forecast
 
             if isinstance(conf, np.ndarray):
