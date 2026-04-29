@@ -9,10 +9,14 @@ services:
       POSTGRES_DB: airflow
     ports:
       - "5432:5432"
+    networks: [airflow]
+    volumes:
+      - ./postgres-init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 5s
       retries: 5
+    
 
   airflow-init:
     image: apache/airflow:2.9.3
@@ -22,12 +26,16 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__WEBSERVER__SECRET_KEY: "secret_key"
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__HOSTNAME_CALLABLE: "socket.getfqdn"
       PYTHONPATH: /opt/airflow
+    networks: [airflow]
     volumes:
       - ./orchestrations:/opt/airflow/dags
       - ./pipelines:/opt/airflow/pipelines
       - ./common:/opt/airflow/common
+      - ./logs:/opt/airflow/logs
     entrypoint: >
       bash -c "
       airflow db migrate &&
@@ -47,11 +55,16 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
+      AIRFLOW__WEBSERVER__SECRET_KEY: "secret_key"
+      AIRFLOW__CORE__HOSTNAME_CALLABLE: "socket.getfqdn"
       PYTHONPATH: /opt/airflow
+    networks: [airflow]
     volumes:
       - ./orchestrations:/opt/airflow/dags
       - ./pipelines:/opt/airflow/pipelines
       - ./common:/opt/airflow/common
+      - ./logs:/opt/airflow/logs
     ports:
       - "8080:8080"
     command: webserver
@@ -68,9 +81,18 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__WEBSERVER__SECRET_KEY: "secret_key"
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
+      AIRFLOW__CORE__HOSTNAME_CALLABLE: "socket.getfqdn"
       PYTHONPATH: /opt/airflow
+    networks: [airflow]
     volumes:
       - ./orchestrations:/opt/airflow/dags
       - ./pipelines:/opt/airflow/pipelines
       - ./common:/opt/airflow/common
+      - ./logs:/opt/airflow/logs
     command: scheduler
+
+networks:
+    airflow:
+      driver: bridge

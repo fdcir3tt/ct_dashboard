@@ -2,5 +2,10 @@ __pycache__/
 .git/
 .venv/
 .env
-
+logs/
+*.log
+__pycache__/
+*.pyc
+.git
+.env
 data/
