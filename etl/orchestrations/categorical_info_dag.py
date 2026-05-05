@@ -21,22 +21,22 @@ with DAG(
     schedule_interval="0 6 1 */2 *",  # Bimensual a las 6am
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    tags=["ETL"],
+    tags=["raw"],
 ) as dag:
 
    
     extract_task = PythonOperator(
-        task_id="extract",
+        task_id="extract_categories_and_products",
         python_callable=run_extract,
     )
 
     transform_task = PythonOperator(
-        task_id="transform",
+        task_id="rename_and_merge_columns",
         python_callable=run_transform,
     )
 
     load_task = PythonOperator(
-        task_id="load",
+        task_id="load_categories_and_products",
         python_callable=run_load,
     )
 
