@@ -1,5 +1,3 @@
-version: "3.8"
-
 x-airflow-common: &airflow-common
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -20,7 +18,7 @@ x-airflow-common: &airflow-common
 services:
 
   postgres:
-    image: postgres:15
+    image: postgis/postgis:15-3.4
     ports:
       - "5432:5432"
     volumes:
