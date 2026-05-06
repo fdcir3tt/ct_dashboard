@@ -26,12 +26,14 @@ def extract(raw_data_directory:Path)->tuple[pd.DataFrame,pd.DataFrame]:
     categories = pd.read_parquet(raw_data_directory/"categorias.parquet",engine="pyarrow")
     categories = categories.drop(columns=["imagen","slug","fecha"])
     raw_rates = pd.read_csv(raw_data_directory/"historical_data_usd_mxn_2008-12-31_to_2026-01-20.csv",sep=";")
+    extracted_rates = pd.read_parquet(raw_data_directory/"usd_mxn_rates.parquet",engine="pyarrow")
+    extracted_rates["date"]=extracted_rates.index
+    extracted_rates["date"] = extracted_rates["date"].dt.date
+    return categories,raw_rates,extracted_rates
+
+def transform(categories:pd.DataFrame,raw_rates:pd.DataFrame,extracted_rates:pd.DataFrame)->tuple[pd.DataFrame,pd.DataFrame]:
+
     
-    return categories,raw_rates
-
-def transform(categories:pd.DataFrame,raw_rates:pd.DataFrame)->tuple[pd.DataFrame,pd.DataFrame]:
-
-    print(raw_rates.columns)
     raw_rates = raw_rates[["Date","Close"]]
     raw_rates = ( raw_rates .rename(columns={"Date":"date",
                                             "Close":"exchange_rate"})
@@ -42,10 +44,10 @@ def transform(categories:pd.DataFrame,raw_rates:pd.DataFrame)->tuple[pd.DataFram
     categories = categories.rename(columns={"idCategoria":"categoryId",
                                             "idPadre":"parentId",
                                             "nombre":"category"})
-    
-    return categories,raw_rates
+    extracted_rates["fallback"]=""
+    return categories,raw_rates,extracted_rates
 
-def load(categories:pd.DataFrame,raw_rates:pd.DataFrame,conn_str):
+def load(categories:pd.DataFrame,raw_rates:pd.DataFrame,extracted_rates:pd.DataFrame,conn_str):
     hook = PostgresHook(postgres_conn_id=conn_str)
     create_table(hook,"raw","tazas_historicas",{"date"           :"DATE PRIMARY KEY",
                                             "exchange_rate"  :"NUMERIC"})
@@ -58,29 +60,36 @@ def load(categories:pd.DataFrame,raw_rates:pd.DataFrame,conn_str):
     print("Poblando tabla de categorias de productos...")
     upsert_df(hook,"raw","categorias",categories,["categoryId"])
 
+    create_table(hook,"raw","tazas_extraidas",{"date"         :"DATE PRIMARY KEY",
+                                               "exchange_rate":"NUMERIC",
+                                               "fallback"     :"VARCHAR"})
+    upsert_df(hook,"raw","tazas_extraidas",extracted_rates,["date"])
 
 
 def run_extract(**context):
     extracted_data = extract(raw_data_path)
     context["ti"].xcom_push(key="categories", value=extracted_data[0].to_dict(orient="records"))
     context["ti"].xcom_push(key="raw_rates", value=extracted_data[1].to_dict(orient="records"))
+    context["ti"].xcom_push(key="extracted_rates", value=extracted_data[2].to_dict(orient="records"))
 
 def run_transform(**context):
     categories = pd.DataFrame(context["ti"].xcom_pull(task_ids="extract_historical_data", key="categories"))
     raw_rates  = pd.DataFrame(context["ti"].xcom_pull(task_ids="extract_historical_data", key="raw_rates"))
+    extracted_rates  = pd.DataFrame(context["ti"].xcom_pull(task_ids="extract_historical_data", key="extracted_rates"))
 
-    transformed_data = transform(categories,raw_rates)
+    transformed_data = transform(categories,raw_rates,extracted_rates)
     context["ti"].xcom_push(key="categories", value = transformed_data[0].to_dict(orient="records"))
     context["ti"].xcom_push(key="raw_rates",  value = transformed_data[1].to_dict(orient="records"))
+    context["ti"].xcom_push(key="extracted_rates",  value = transformed_data[2].to_dict(orient="records"))
 
 
 def run_load(**context):
     categories = pd.DataFrame( context["ti"].xcom_pull(task_ids="rename_columns", key="categories"))
     raw_rates  = pd.DataFrame( context["ti"].xcom_pull(task_ids="rename_columns", key="raw_rates"))
+    extracted_rates  = pd.DataFrame( context["ti"].xcom_pull(task_ids="rename_columns", key="extracted_rates"))
 
-    
-    
-    load(categories,raw_rates,conn_str)
+    print(extracted_rates.head())
+    load(categories,raw_rates,extracted_rates,conn_str)
     
     
 
