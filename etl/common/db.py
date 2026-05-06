@@ -1,9 +1,6 @@
-import os
 import io
-import uuid
 import pandas as pd
 
-from psycopg.connection import Connection,Cursor
 from psycopg import sql
 from typing import Any
 from pymongo import MongoClient 
@@ -89,7 +86,7 @@ def insert_df(conn, table_name: str, df: pd.DataFrame):
 def create_table(hook, schema: str, table_name: str, format: dict[str, str], if_not_exists=True):
 
     cols = ", ".join(
-        f"{col} {dtype}" for col, dtype in format.items()
+        f'"{col}" {dtype}' for col, dtype in format.items()
     )
 
     query = f"""
@@ -122,10 +119,11 @@ def upsert_df(hook, schema: str, table_name: str, df, key_columns):
 
     conn = hook.get_conn()
 
-    cols = list(df.columns)
+    cols = [f'"{c}"' for c in list(df.columns) ]
 
-    update_cols = [c for c in cols if c not in key_columns]
+    key_columns_quoted = [f'"{c}"' for c in key_columns]
 
+    update_cols = [c for c in cols if c not in key_columns_quoted]
     
     if not update_cols:
         raise ValueError(
@@ -136,7 +134,7 @@ def upsert_df(hook, schema: str, table_name: str, df, key_columns):
     query = f"""
         INSERT INTO {schema}.{table_name} ({", ".join(cols)})
         VALUES ({", ".join(["%s"] * len(cols))})
-        ON CONFLICT ({", ".join(key_columns)})
+        ON CONFLICT ({", ".join(key_columns_quoted)})
         DO UPDATE SET {", ".join(
             f"{c}=EXCLUDED.{c}" for c in update_cols
         )}
