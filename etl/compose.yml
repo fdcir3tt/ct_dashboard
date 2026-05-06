@@ -11,6 +11,7 @@ x-airflow-common: &airflow-common
     - ./orchestrations:/opt/airflow/dags
     - ./pipelines:/opt/airflow/pipelines
     - ./common:/opt/airflow/common
+    - ./data:/opt/airflow/data
     - ./logs:/opt/airflow/logs
   networks:
     - airflow
