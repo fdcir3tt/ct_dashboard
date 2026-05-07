@@ -2,6 +2,7 @@ import pandas as pd
 
 from typing import Any
 from common.dates import date
+from common.data import save_data,load_data,delete_files
 
 today = date("today")
 
@@ -36,7 +37,9 @@ def transform(documents:list[dict[str,Any]])->list[dict[str,Any]]:
 
 def run_transform(**context):
     
-    existences_docs = context["ti"].xcom_pull(task_ids="extract_existence_docs", key="product_existences")
+    existences_docs_path = context["ti"].xcom_pull(task_ids="extract_existence_docs", key="product_existences_path")
+    existences_docs = load_data(existences_docs_path)
     transformed_data = transform(existences_docs)
 
-    context["ti"].xcom_push(key="docs_to_insert", value=transformed_data)
+    context["ti"].xcom_push(key="docs_to_insert_path", value=transformed_data)
+    delete_files(existences_docs_path)

@@ -6,6 +6,7 @@ from typing import Any
 from dotenv import load_dotenv
 from common.db import connect_to_mongo_db,get_documents
 from common.paths import ENV_DIR
+from common.data import save_data
 
 env_path = ENV_DIR /".env"
 load_dotenv(env_path)
@@ -74,5 +75,8 @@ def run_extract(**context):
     extracted_data = extract()
     is_up_to_date = extracted_data is None
     
-    context["ti"].xcom_push(key="product_existences", value=extracted_data)
+    product_existences_path = "/tmp/product_existences.json"
+    save_data(extracted_data,product_existences_path)
+    
+    context["ti"].xcom_push(key="product_existences_path", value=product_existences_path)
     context["ti"].xcom_push(key="up_to_date", value=is_up_to_date)

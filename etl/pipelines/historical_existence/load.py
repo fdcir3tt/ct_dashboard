@@ -6,6 +6,7 @@ from typing import Any
 from dotenv import load_dotenv
 from common.db import connect_to_mongo_db
 from common.paths import ENV_DIR
+from common.data import load_data,delete_files
 
 env_path = ENV_DIR /".env"
 load_dotenv(env_path)
@@ -23,7 +24,10 @@ def load(documents:list[dict[str,Any]],database:pymongo.database.Database,collec
         database[collection_name].insert_many(chunk)
 
 def run_load(**context):
-    insert_documents = context["ti"].xcom_pull(task_ids="make_new_docs", key="docs_to_insert")
+    insert_documents_path = context["ti"].xcom_pull(task_ids="make_new_docs", key="docs_to_insert_path")
+    insert_documents = load_data(insert_documents_path)
+    
     hist_database = connect_to_mongo_db(hist_mongo_uri,hist_db_name)
     load(insert_documents,hist_database,table_name,batch_size)
     
+    delete_files(insert_documents_path)
