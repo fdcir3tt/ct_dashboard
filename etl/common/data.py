@@ -4,6 +4,17 @@ import pandas as pd
 from pathlib import Path
 from typing import Any
 
+def generate_tmp_path_strings(data_dict:dict[str,pd.DataFrame|list[dict[str,Any]]])->list[str]:
+    path_strings = []
+    for file_name,data in data_dict:
+        if isinstance(data,pd.DataFrame):
+            suffix=".parquet"
+        if isinstance(data,list):
+            suffix=".json"
+        path_str = f"/tmp/{file_name}{suffix}"
+        path_strings.append(path_str)
+    return path_strings
+
 def save_data(data:list[dict[str,Any]]|pd.DataFrame|dict[str,Any],path_strings:str|list[str])->None:
     # Un archivo
     if isinstance(path_strings,str):
