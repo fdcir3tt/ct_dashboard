@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from common.dates import date
+from common.data import save_data,load_data,delete_files
 
 start_date = date("2020-01-01")
 end_date = date("today")
@@ -61,16 +62,23 @@ def transform(historic_df:pd.DataFrame,extracted_rates_df:pd.DataFrame)->pd.Data
     
     filled_rates = fill_exchange_rates(rates_dataframe=merged)
     filled_rates = filled_rates.drop(columns=["index","fallback"])
+    filled_rates["date"] = filled_rates["date"].dt.date
     return filled_rates
     
     
 
 def run_transform(**context):
-    
-    historic_rates_df     = pd.DataFrame(context["ti"].xcom_pull(task_ids="extract_past_rates", key="historic_exchange_rates"))
-    raw_exchange_rates_df = pd.DataFrame(context["ti"].xcom_pull(task_ids="extract_past_rates", key="extracted_exchange_rates"))
+    path_strings = context["ti"].xcom_pull(task_ids="extract_past_rates", key="path_strings")
+    extracted_data = load_data(path_strings)
+
+    raw_exchange_rates_df = extracted_data["extracted_rates"]
+    historic_rates_df     = extracted_data["historic_exchange_rates"]
     
     transformed_data = transform(historic_rates_df,raw_exchange_rates_df)
-    transformed_data["date"] = transformed_data["date"].dt.date
-    print(transformed_data.head())
-    context["ti"].xcom_push(key="clean_rates", value=transformed_data.to_dict(orient="records"))
+    
+    clean_rates_path = "/tmp/clean_rates.parquet"
+    save_data(transformed_data,clean_rates_path)
+    
+    context["ti"].xcom_push(key="clean_rates_path", value=clean_rates_path)
+    
+    delete_files(path_strings)

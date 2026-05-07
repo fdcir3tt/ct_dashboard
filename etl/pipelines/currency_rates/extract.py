@@ -1,10 +1,12 @@
 import pandas as pd
 
+from common.data import save_data,generate_tmp_path_strings
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 conn_str = "dashboard_app_db"
 
-def extract()->tuple[pd.DataFrame,pd.DataFrame]:
+def extract()->dict[str,pd.DataFrame]:
+    extracted_data = {}
     hook = PostgresHook(postgres_conn_id=conn_str)
     try:
         historic_exchange_rates = hook.get_pandas_df("SELECT * FROM raw.tazas_historicas")
@@ -18,10 +20,15 @@ def extract()->tuple[pd.DataFrame,pd.DataFrame]:
         print("Tabla no encontrada, regresando DF vacío")
         extracted_rates = pd.DataFrame()
 
-    return historic_exchange_rates,extracted_rates
+    extracted_data["historic_exchange_rates"]= historic_exchange_rates
+    extracted_data["extracted_rates"] = extracted_rates
+
+    return extracted_data
 
 def run_extract(**context):
     extracted_data = extract()
-    context["ti"].xcom_push(key="historic_exchange_rates",  value=extracted_data[0].to_dict(orient="records"))
-    context["ti"].xcom_push(key="extracted_exchange_rates", value=extracted_data[1].to_dict(orient="records"))
+    path_strings = generate_tmp_path_strings(extracted_data)
+
+    save_data(extracted_data,path_strings)
+    context["ti"].xcom_push(key="path_strings",  value=path_strings)
     
