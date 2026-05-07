@@ -28,7 +28,7 @@ def save_data(data:list[dict[str,Any]]|pd.DataFrame|dict[str,Any],path_strings:s
         for path_str in path_strings:
             file_path = Path(path_str)
             file_name = str(file_path.stem)
-
+            print(f"Guardando {file_name} ... ")
             if file_path.suffix==".json":
                 save_records(data[file_name],file_path)
             

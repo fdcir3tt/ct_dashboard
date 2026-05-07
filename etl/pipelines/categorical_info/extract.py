@@ -2,8 +2,10 @@ import os
 import MySQLdb 
 import pyodbc
 
+from typing import Any
 from dotenv import load_dotenv
 from common.paths import ENV_DIR
+from common.data import save_data,generate_tmp_path_strings
 from common.db import connect_to_mongo_db,get_documents
 
 env_path = ENV_DIR /".env"
@@ -16,7 +18,8 @@ product_table_name = os.getenv("PRODUCT_TABLE_NAME")
 product_columns = os.getenv("PRODUCT_COLUMNS")
 
 
-def extract()->tuple[list,list,list]:
+def extract()->dict[str,list[str,Any]]:
+    extracted_data = {}
     with MySQLdb.connect(host=os.getenv("CDB_IP"),user=os.getenv("CDB_UID"),password=os.getenv("CDB_PASSWORD"),database=os.getenv('CDB_NAME')) as conn:
         print("Extrayendo categorías de producto...")
     # Categorías de producto 
@@ -61,7 +64,13 @@ def extract()->tuple[list,list,list]:
         columns = [col[0] for col in cursor.description]
         product_codes = [dict(zip(columns, row)) for row in cursor.fetchall()]
         
-    
+        for doc in product_codes:
+            doc["ART_COS"] = float(doc.get("ART_COS"))
+            doc["ART_MCOM"] = int(doc.get("ART_MCOM"))
+            doc["ART_MVEN"] = int(doc.get("ART_MVEN"))
+        
+        
+
     # Almacenes           
         database = connect_to_mongo_db(mongo_uri,public_API)
 
@@ -73,16 +82,19 @@ def extract()->tuple[list,list,list]:
 
         
         
-        
-        
-        
-        
-    return product_catalogue_rows,product_category_rows,client_list,product_codes,branch_docs     
+        extracted_data["product_catalogue_rows"]= product_catalogue_rows
+        extracted_data["product_category_rows"] = product_category_rows
+        extracted_data["client_list"]= client_list
+        extracted_data["product_codes"] = product_codes
+        extracted_data["branch_docs"] = branch_docs
+    
+    return extracted_data
     
 def run_extract(**context):
     extracted_data = extract()
-    context["ti"].xcom_push(key="product_catalogue_rows", value=extracted_data[0])
-    context["ti"].xcom_push(key="product_category_rows", value=extracted_data[1])
-    context["ti"].xcom_push(key="client_list", value=extracted_data[2])
-    context["ti"].xcom_push(key="product_codes", value=extracted_data[3])
-    context["ti"].xcom_push(key="branch_docs", value=extracted_data[4])
+    path_strings = generate_tmp_path_strings(extracted_data)
+
+    save_data(extracted_data,path_strings)
+
+    context["ti"].xcom_push(key="path_strings", value=path_strings)
+    
