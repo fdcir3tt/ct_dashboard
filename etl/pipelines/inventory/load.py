@@ -1,8 +1,7 @@
 import pandas as pd
 
-from pathlib import Path
 from common.db import upsert_df,create_table
-from common.paths import delete_files
+from common.data import load_data,delete_files
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 
@@ -26,8 +25,10 @@ def load(inventory:pd.DataFrame,conn_str:str="dashboard_app_db"):
 def run_load(**context):
     
     print("Convirtiendo contexto a dataframes...")
-    inventory_path = Path(context["ti"].xcom_pull(task_ids="explode_and_rearrange_data", key="inventory_path"))
-    inventory = pd.read_parquet(inventory_path,engine="pyarrow")
+    inventory_path = context["ti"].xcom_pull(task_ids="explode_and_rearrange_data", key="inventory_path")
+    inventory = load_data(inventory_path)
+    
     print("Comenzando carga de datos...")
     load(inventory)
+    
     delete_files(inventory_path)

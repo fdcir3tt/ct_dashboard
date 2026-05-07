@@ -3,7 +3,7 @@ import pandas as pd
 
 from typing import Any
 from pathlib import Path
-from common.paths import load_records,delete_files
+from common.data import save_data,load_data,delete_files
 from common.dates import time_period
 
 def make_storage_dict(branches:pd.DataFrame)->dict[str,list[str]]:
@@ -70,17 +70,16 @@ def transform(historical_existence_documents:dict[str,Any],branches:pd.DataFrame
         return inventory
 
 def run_transform(**context):
-    historical_path = Path(context["ti"].xcom_pull(task_ids="extract_historical_data_and_branches", key="historical_existence_documents_path"))
-    historical_existence_documents = load_records(historical_path)
-
-    branches_path = Path(context["ti"].xcom_pull(task_ids="extract_historical_data_and_branches", key="branches_path" ))
-    branches = pd.read_parquet(branches_path,engine="pyarrow")
+    path_strings = context["ti"].xcom_pull(task_ids="extract_historical_data_and_branches", key="path_strings")
+    extracted_data = load_data(path_strings)
+    
+    historical_existence_documents = extracted_data["historical_existence_documents"]
+    branches = extracted_data["branches"]
 
     transformed_data = transform(historical_existence_documents,branches)
-    delete_files([historical_path,branches_path])
+ 
+    inventory_path ="/tmp/inventory.parquet"
+    save_data(transformed_data,inventory_path)
 
-    inventory = transformed_data
-    inventory_path =Path("/tmp/inventory.parquet")
-    inventory.to_parquet(inventory_path,engine="pyarrow")
-
-    context["ti"].xcom_push(key="inventory_path", value=str(inventory_path))
+    context["ti"].xcom_push(key="inventory_path", value=inventory_path)
+    delete_files(path_strings)
