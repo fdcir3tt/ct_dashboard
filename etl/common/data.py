@@ -6,7 +6,7 @@ from typing import Any
 
 def generate_tmp_path_strings(data_dict:dict[str,pd.DataFrame|list[dict[str,Any]]])->list[str]:
     path_strings = []
-    for file_name,data in data_dict:
+    for file_name,data in data_dict.items():
         if isinstance(data,pd.DataFrame):
             suffix=".parquet"
         if isinstance(data,list):
