@@ -13,7 +13,7 @@ def load_extracted_data(path_strings:list[str])->dict[str,Any]:
                 extracted_data[file_name] = load_records(file_path)
             if file_path.suffix == ".parquet":
                 extracted_data[file_name] = pd.read_parquet(file_path,engine="pyarrow")
-
+    return extracted_data 
 def save_records(records:list[dict[str,Any]],file_path:Path)->None:
     with open(file_path, "w") as f:
         json.dump(records, f)
