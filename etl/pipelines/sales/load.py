@@ -1,6 +1,7 @@
 import pandas as pd
 
 from common.db import upsert_df,create_table
+from common.data import load_data,delete_files
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 
@@ -32,7 +33,8 @@ def load(sales_invoices_df:pd.DataFrame,conn_str:str="dashboard_app_db"):
 def run_load(**context):
     
     print("Convirtiendo contexto a dataframes...")
-    sales_invoices_df = pd.DataFrame(context["ti"].xcom_pull(task_ids="merge_and_normalize_coins", key="sales_invoices"))
-    
+    sales_path = context["ti"].xcom_pull(task_ids="merge_and_normalize_coins", key="sales_invoices_path")
+    sales_invoices_df = load_data(sales_path)
     print("Comenzando carga de datos...")
     load(sales_invoices_df)
+    delete_files(sales_path)

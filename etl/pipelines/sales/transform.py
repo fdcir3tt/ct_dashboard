@@ -1,6 +1,8 @@
 import pandas as pd
 import hashlib
 
+from pathlib import Path
+from common.data import save_data,load_data,delete_files
 from typing import Any
 
 def normalize_coins(df:pd.DataFrame)->pd.DataFrame:
@@ -43,13 +45,14 @@ def sales_filters(df:pd.DataFrame)->pd.DataFrame:
 def transform(extracted_invoice_documents:dict[str,Any],products_info:pd.DataFrame,exchange_rates:pd.DataFrame,branches:pd.DataFrame,categories:pd.DataFrame)->pd.DataFrame:
     invoices = pd.DataFrame(extracted_invoice_documents)
     invoices = (invoices.rename(columns={"articulo" :"productId",
-                                        "factura" :"folio",
-                                        "cantidad":"quantity",
-                                        "fecha" :"date",
-                                        "cliente" :"clientId",
-                                        "descripcion" :"sale_description",
-                                        "almacen" :"sale_storageId",
-                                        "precio" :"price",})
+                                         "factura" :"folio",
+                                         "cantidad":"quantity",
+                                         "fecha" :"date",
+                                         "cliente" :"clientId",
+                                         "descripcion" :"sale_description",
+                                         "almacen" :"sale_storageId",
+                                         "precio" :"price",})
+                        
                         .astype(dtype={"productId":"str",
                                        "folio":"str",
                                        "quantity":"int",
@@ -59,7 +62,7 @@ def transform(extracted_invoice_documents:dict[str,Any],products_info:pd.DataFra
                                        })
                          )
 
-    
+    invoices["date"]=pd.to_datetime(invoices["date"])
     invoices["date"]=invoices["date"].dt.date
     df = invoices.merge(products_info,
                         how="inner",on="productId")
@@ -92,12 +95,21 @@ def transform(extracted_invoice_documents:dict[str,Any],products_info:pd.DataFra
 
 
 def run_transform(**context):
-    extracted_invoice_documents = pd.DataFrame(context["ti"].xcom_pull(task_ids="extract_rates_branches_products_and_categories", key="extracted_invoice_documents"))
-    products_info               = pd.DataFrame(context["ti"].xcom_pull(task_ids="extract_rates_branches_products_and_categories", key="products_info"))
-    exchange_rates              = pd.DataFrame(context["ti"].xcom_pull(task_ids="extract_rates_branches_products_and_categories", key="exchange_rates"))
-    branches                    = pd.DataFrame(context["ti"].xcom_pull(task_ids="extract_rates_branches_products_and_categories", key="branches"))
-    categories                  = pd.DataFrame(context["ti"].xcom_pull(task_ids="extract_rates_branches_products_and_categories", key="categories"))
+    path_strings = context["ti"].xcom_pull(task_ids="extract_rates_branches_products_and_categories", key="path_strings")
+    
+    extracted_data = load_data(path_strings)
+
+    extracted_invoice_documents = extracted_data["extracted_invoice_documents"]
+    products_info               = extracted_data["products_info"]
+    exchange_rates              = extracted_data["exchange_rates"]
+    branches                    = extracted_data["branches"]
+    categories                  = extracted_data["categories"]
     
     transformed_data = transform(extracted_invoice_documents,products_info,exchange_rates,branches,categories)
     
-    context["ti"].xcom_push(key="sales_invoices", value=transformed_data.to_dict(orient="records"))
+    sales_path = "/tmp/sales.parquet" 
+    save_data(transformed_data,sales_path)
+    
+    context["ti"].xcom_push(key="sales_invoices_path", value=sales_path)
+    
+    delete_files(path_strings)

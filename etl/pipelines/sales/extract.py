@@ -2,9 +2,11 @@ import os
 import pandas as pd
 
 from typing import Any
+from pathlib import Path
 from dotenv import load_dotenv
 from common.db import connect_to_mongo_db,get_documents
 from common.dates import date,date_interval
+from common.data import save_data
 from common.paths import ENV_DIR
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
@@ -17,7 +19,8 @@ invoices_collection = os.getenv("INVOICES_COLLECTION")
 period_length= 30 # días
 conn_str = "dashboard_app_db"
 
-def extract()->list[dict[str,Any]]:
+def extract()->dict[str,Any]:
+    extracted_data = {}
     # invoices
     database = connect_to_mongo_db(mongo_uri,public_API)
     today = date("today")
@@ -39,6 +42,9 @@ def extract()->list[dict[str,Any]]:
         
     documents = get_documents(database,invoices_collection,consult_info["filters"],consult_info["fields"])
     print(f"Cantidad de docs extraídos:{len(documents)}")
+    
+    for doc in documents:
+        doc["fecha"]=str(doc.get("fecha"))
 
     # product_codes
     hook = PostgresHook(postgres_conn_id=conn_str)
@@ -48,13 +54,14 @@ def extract()->list[dict[str,Any]]:
         print("Tabla 'raw.productos' no encontrada, regresando DF vacío")
         products_info = pd.DataFrame()
     
+
     # exchange_rates
     try:
         exchange_rates = hook.get_pandas_df("SELECT * FROM staging.tazas_clean")
     except Exception as e:
         print("Tabla 'staging.tazas_clean' no encontrada, regresando DF vacío")
         exchange_rates = pd.DataFrame()
-
+    
     # branches
     try:
         branches = hook.get_pandas_df("SELECT * FROM raw.almacenes")
@@ -68,15 +75,26 @@ def extract()->list[dict[str,Any]]:
     except Exception as e:
         print("Tabla 'raw.categorias' no encontrada, regresando DF vacío")
         categories = pd.DataFrame()
-    return documents,products_info,exchange_rates,branches,categories
+
+
+    extracted_data["extracted_invoice_documents"] = documents
+    extracted_data["products_info"] = products_info
+    extracted_data["exchange_rates"] = exchange_rates
+    extracted_data["branches"] = branches
+    extracted_data["categories"] = categories
+
+
+    return extracted_data
 
 
 def run_extract(**context):
     extracted_data = extract()
-    context["ti"].xcom_push(key="extracted_invoice_documents", value=extracted_data[0])
-    context["ti"].xcom_push(key="products_info", value=extracted_data[1].to_dict(orient="records"))
-    context["ti"].xcom_push(key="exchange_rates", value=extracted_data[2].to_dict(orient="records"))
-    context["ti"].xcom_push(key="branches", value=extracted_data[3].to_dict(orient="records"))
-    context["ti"].xcom_push(key="categories", value=extracted_data[4].to_dict(orient="records"))
+    path_strings = ["/tmp/extracted_invoice_documents.json",
+                    "/tmp/products_info.parquet",
+                    "/tmp/exchange_rates.parquet",
+                    "/tmp/branches.parquet",
+                    "/tmp/categories.parquet"]
     
-    
+    save_data(extracted_data,path_strings)
+    context["ti"].xcom_push(key="path_strings", value=path_strings)
+       
