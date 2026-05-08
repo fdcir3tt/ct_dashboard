@@ -1,0 +1,8 @@
+# Inventario (etl.inventario)
+| **Nombre de variable**                | **Descripción**                                                    | **Formato**                     | **Fuentes**                    |
+| ------------------------------------- | ------------------------------------------------------------------ | ------------------------------- |------------------------------- |
+| **existenceId**(Primary Key)                 | Llave identificadora de existencia de un producto dado en un día y almacen                                       |   VARCHAR                         | Codificación de "productId-storageId-date"           |
+| **productId**(Foreign key)                     | Llave identificadora de producto                          |   VARCHAR                       | CT_Histórico/tbl_existenciasHistorial.productoReferencia.codigo  |
+| **date**                    | Fecha asociada a la existencia                          |   DATE                       | CT_Histórico/tbl_existenciasHistorial.fechaRegistro  |
+| **stock**                     | Cantidad de unidades de producto disponibles en almacen                          |   Integer                       | CT_Histórico/tbl_existenciasHistorial.almacenes  |
+| **storageId**(Foreign key)                     | Llave identificadora de almacen                          |   VARCHAR                       | CT_Histórico/tbl_existenciasHistorial.almacenes  |
