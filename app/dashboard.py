@@ -4,7 +4,7 @@ import datetime
 
 from functools import wraps
 from typing import List,Callable,Tuple,Dict
-from dashboard.utils import top_n,add_states_column
+from dashboard.utils import top_n,add_states_column,identify_outlier_sales,calculate_top_product_and_category,calculate_frequent_branch,growth_rate
 from dashboard.graphs import *
 from dashboard.data import load_data
 from dashboard.filters import include_outliers_filter,analysis_lvl_filter,products_filter,categories_filter,branch_filter,main_element_filter,period_filter
@@ -22,81 +22,6 @@ def make_cached(func:Callable):
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
     return wrapper
-
-
-
-def growth_rate(current:float, previous:float):
-
-    if previous == 0:
-        return 0
-    return round(((current - previous) / previous) * 100, 2)
-
-def calculate_iqr_bounds(sales_series:pd.Series)->Tuple[float,float]:
-    q1 = sales_series.quantile(0.25)
-    q3 = sales_series.quantile(0.75)
-    iqr = q3 - q1
-    return (q1 - 1.5 * iqr, q3 + 1.5 * iqr)
-
-
-def identify_outlier_sales(data: pd.DataFrame,
-                           element_column:str)->pd.DataFrame:
-    df = data.copy()
-
-    bounds_dict = df.groupby(element_column)['quantity'].apply(calculate_iqr_bounds).to_dict()
-    
-    df['iqr_bounds'] = df[element_column].map(bounds_dict)
-    df['is_outlier'] = ~df['quantity'].between(
-                                              df['iqr_bounds'].str[0], 
-                                              df['iqr_bounds'].str[1]
-                                              )
-
-    df = df.drop(columns='iqr_bounds')
-    return df
-
-def calculate_top_product_and_category(data:pd.DataFrame,
-                                       period_start:Date,
-                                       period_end:Date)->Tuple[str,str]:
-    df = data.copy()
-    is_in_period = ( period_start <= df['date'] ) & ( df['date'] <= period_end )
-    
-    if df[is_in_period].empty:
-        top_product= (
-            data
-            .groupby("productId")["quantity"]
-            .sum()
-            .idxmax()
-        )
-        top_category= (
-        data
-        .groupby("category")["quantity"]
-        .sum()
-        .idxmax()
-    )   
-        return top_product,top_category
-    else:     
-        top_product= (
-            data[is_in_period]
-            .groupby("productId")["quantity"]
-            .sum()
-            .idxmax()
-        )
-        top_category= (
-        data[is_in_period]
-        .groupby("category")["quantity"]
-        .sum()
-        .idxmax()
-    )   
-        return top_product,top_category
-    
-def calculate_frequent_branch(data:pd.DataFrame,top_product:str)->str:
-    is_top_product= data["productId"]==top_product
-    frequent_branch= (
-        data[is_top_product]
-        .groupby("branch")["date"]
-        .nunique() 
-        .idxmax()
-    )
-    return frequent_branch
 
 
 def left_section(data:pd.DataFrame,
