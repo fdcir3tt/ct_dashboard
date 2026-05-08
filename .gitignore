@@ -7,7 +7,8 @@ gadm41_MEX_shp/
 __pycache__/
 .pytest_cache/
 data
-log
+log/
+logs/
 mlruns/
 plots/
 processed/
