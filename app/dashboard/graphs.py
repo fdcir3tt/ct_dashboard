@@ -11,7 +11,7 @@ import matplotlib as mpl
 import io
 import base64
 
-
+from datetime import date
 from dataclasses import dataclass
 from dashboard.utils import month_dict,Date
 from streamlit_folium import st_folium
@@ -22,8 +22,8 @@ warnings.filterwarnings('ignore')
 
 @dataclass
 class GraphFilterConfig:
-    start_date: pd.Timestamp
-    end_date: pd.Timestamp
+    start_date: date
+    end_date: date
     element_column: str | None = None
     selected_elements: list | None = None
     branch: str | None = None
@@ -35,7 +35,7 @@ class GraphFilters:
         self.cfg = config
 
     def apply(self, data: pd.DataFrame):
-
+        print(data["date"].dtype)
         mask = (
             (data['date'] >= self.cfg.start_date) &
             (data['date'] <= self.cfg.end_date) 
@@ -100,14 +100,15 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     """
 
     # --- Asegurar que las fechas SON datetime ---
-    data["date"] = pd.to_datetime(data["date"], errors="coerce")
-    data["month"] = data["date"].dt.month
-    data["year"] = data["date"].dt.year
+    df = data.copy()
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["month"] = df["date"].dt.month
+    df["year"] = df["date"].dt.year
 
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
 
-    df = data.copy()
+    
     filters = GraphFilters(config= GraphFilterConfig(start_date=start_date,
                                                      end_date=end_date,
                                                      element_column=element_column,
@@ -209,12 +210,13 @@ def period_inventory(data: pd.DataFrame,branch_storage:dict[str,list[str]], sele
     """
     
     # --- Asegurar que las fechas SON datetime ---
-    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    df = data.copy().reset_index(drop=True)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
 
-    df = data.copy().reset_index(drop=True)
+    
     filters = GraphFilters(config= GraphFilterConfig(start_date=start_date,
                                                      end_date=end_date,
                                                      element_column=element_column,
@@ -594,9 +596,9 @@ def abc_bar_chart(data:pd.DataFrame,element_column:str,start_date:Date,end_date:
     type_selected = element_column
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
-
-    data["date"] = pd.to_datetime(data["date"], errors="coerce")
     df = data.copy()
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    
     filters = GraphFilters(config= GraphFilterConfig(start_date=start_date,
                                                      end_date=end_date,
                                                      branch=branch,

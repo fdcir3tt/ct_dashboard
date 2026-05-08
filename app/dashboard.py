@@ -4,9 +4,10 @@ import datetime
 
 from functools import wraps
 from typing import List,Callable,Tuple,Dict
-from dashboard.utils import top_n
+from dashboard.utils import top_n,add_states_column
 from dashboard.graphs import *
 from dashboard.data import load_data
+
 
 def load_css(file_name):
 
@@ -23,7 +24,7 @@ def make_cached(func:Callable):
 
 def pick_date(label: str, 
               default: datetime.datetime = None, 
-              key: str = "selected_date"):
+              key: str = "selected_date")->datetime.date:
     
     if key not in st.session_state:
         st.session_state[key] = default
@@ -206,7 +207,7 @@ def left_section(data:pd.DataFrame,
         
         return analysis_lvl,branch,include_outliers,categories,products
     
-    def analysis_element_and_period_select(start_date,end_date,tab):
+    def analysis_element_and_period_select(start_date:datetime.date,end_date:datetime.date,tab:str):
         col1,col2 = st.columns(2)
         with col1:
 
@@ -768,8 +769,8 @@ def main():
 
         with st.spinner("Cargando datos..."):
             branch_storage = cache_wrappers['load_data']("SELECT * FROM raw.almacenes")
-            inventory = cache_wrappers['load_data']("SELECT * FROM etl.inventory")
-
+            inventory = load_data("SELECT * FROM etl.inventory")
+            
             data_query = f"""SELECT v."productId",
                                     v.quantity,
                                     v.date,
@@ -788,12 +789,14 @@ def main():
                              WHERE v."categoryId"<>'unknown'
                              AND v.date BETWEEN '{period_start}' AND '{period_end}' """
             global_data = load_data(data_query)
+            global_data = add_states_column(global_data)
+            global_data = global_data.astype(dtype={"date":"date32[pyarrow]"})
             global_data['income'] = global_data['price'] * global_data['quantity']
             global_data = cache_wrappers['identify_outlier_sales'](global_data,element_column='productId')
 
 
             data = global_data.copy()
-            
+            print(data.dtypes)        
         # Producto con cantidad de unidades más vendidas dentro de periodo
         top_product,top_category = calculate_top_product_and_category(data=data,
                                                                     period_start=period_start,
