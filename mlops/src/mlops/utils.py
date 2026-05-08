@@ -9,27 +9,48 @@ import pyodbc
 from dotenv import load_dotenv
 from pathlib import Path
 from typing import Any,Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass,replace
 
+DEBUG = False
 Date = datetime.date
 data_dir = Path('data')
 
 @dataclass
+class Metrics:
+    mae: float |None = None
+    mfe : float|None = None
+    rmse : float |None = None
+    da:float|None = None
+
+    def __post_init__(self):
+        if self.rmse:
+            if self.rmse <= 0:
+                raise ValueError("Raíz del error cuadrado promedio debe ser positivo")
+        if self.mae:  
+            if self.mae <= 0:
+                raise ValueError("Error absoluto promedio debe ser positivo")
+            
+        if self.da:
+            if self.da <= 0:
+                raise ValueError("Error direccional debe ser positivo")
+            
+@dataclass
 class ExperimentConfig:
     dataset: str
     parameters : dict[str,Any]
-    training_data_start_date: Date
-    training_data_end_date: Date
     model_type: str
     horizon:int
     frequency: str
     training_window:int
     seed:int
+    training_data_start_date: Date|str="oldest"
+    training_data_end_date: Date|str="latest"
     metrics : list[str]|None=None
     git_commit: str|None =None
     feature_set: str|None =None
 
-
+    def copy(self):
+        return replace(self)
 
 @dataclass
 class DatasetFilterConfig:
@@ -88,8 +109,14 @@ class DatasetFilters:
         df = data[mask]
         
         if df.empty:
-            print("Dataset invalido: No hay datos en el periodo específicado")
-            return pd.DataFrame()
+            if DEBUG:
+                print("Dataset vacío: No hay datos en el periodo específicado")
+            if not data.empty:
+                productId = data["productId"].iloc[0]
+            df = pd.DataFrame(data=[{"quantity":0,"date":start_date,"productId":productId,"clientId":"NO_CLIENT"},{"quantity":0,"date":end_date,"productId":productId,"clientId":"NO_CLIENT"}])
+            df ["month"] = df["date"].dt.month
+            df ["year"] = df["date"].dt.year
+            return df
         df = df.sort_values("date")
         return df
     
@@ -239,7 +266,13 @@ def get_client_list()->pd.DataFrame:
     - :None,
     Regresa:
     - df: pandas.Dataframe, Columna que contiene las claves de cliente
+    - local_df: pandas.Dataframe, Columna que contiene las claves de cliente guardados localmente
     """
+    file =data_dir/'raw'/'clients.parquet'
+    if file.exists():
+        local_df = pd.read_parquet(file)
+        return local_df
+    
     load_dotenv()
     
     connection_str = (
@@ -259,6 +292,7 @@ def get_client_list()->pd.DataFrame:
         df = pd.read_sql(query,conn)
         conn.close()
         df = df.rename(columns={os.getenv("ID_COLUMN"):"clientId"})
+        save_file_safe(df,file)
 
         return df
 
@@ -380,3 +414,59 @@ def load_dataset(dataset:str,config:ExperimentConfig|dict[str,Any],train_split:b
 
 
 
+def calculate_metrics(y_pred:np.ndarray,y_true:np.ndarray,test_metrics:list[str]=['mae','mfe','rmse','da'])->Metrics:
+        """
+        Calcula las métricas específicadas acorde la predicción del modelo y los datos reales
+
+        Parametros:
+        - y_pred: array-like , Predicciones del modelo 
+        - y_true: array-like , Datos reales
+
+        Regresa:
+        - Metrics(**result_metrics): Metrics, Resultado de los cálculos de métricas  
+        """
+        def directional_accuracy(y_pred:np.ndarray,y_true:np.ndarray)->float:
+            true_direction =np.sign(y_true[1:] - y_true[:-1])
+            pred_direction =np.sign(y_pred[1:] - y_pred[:-1])
+            d_i = (true_direction == pred_direction).astype(float)
+            return d_i.mean()
+        
+        if len(y_pred)!=len(y_true):
+            print(f"Discrepancia en cantidad de datos :  y_pred = {len(y_pred)} , y_true = {len(y_true)}")
+            return Metrics()
+        result_metrics = {} 
+        for m in test_metrics:
+            if m=='mae': # Mean Absolute Error
+                result_metrics['mae'] = np.mean(abs(y_true-y_pred))
+
+            if m=='mfe':# Mean Forecast Error
+                result_metrics['mfe'] = np.mean(y_pred-y_true)
+                
+            if m=='rmse':# Root Mean Square Error
+                result_metrics['rmse'] = np.sqrt( np.mean( (y_true-y_pred)**2 ) )
+
+            if m=='da':# Directional Accuracy
+                result_metrics['da'] = directional_accuracy(y_pred,y_true)
+        return Metrics(**result_metrics)
+
+def calculate_iqr_bounds(sales_series:pd.Series)->tuple[float,float]:
+    q1 = sales_series.quantile(0.25)
+    q3 = sales_series.quantile(0.75)
+    iqr = q3 - q1
+    return (q1 - 1.5 * iqr, q3 + 1.5 * iqr)
+
+
+def identify_outlier_sales(data: pd.DataFrame,
+                           element_column:str)->pd.DataFrame:
+    df = data.copy()
+
+    bounds_dict = df.groupby(element_column)['quantity'].apply(calculate_iqr_bounds).to_dict()
+    
+    df['iqr_bounds'] = df[element_column].map(bounds_dict)
+    df['is_outlier'] = ~df['quantity'].between(
+                                              df['iqr_bounds'].str[0], 
+                                              df['iqr_bounds'].str[1]
+                                              )
+
+    df = df.drop(columns='iqr_bounds')
+    return df

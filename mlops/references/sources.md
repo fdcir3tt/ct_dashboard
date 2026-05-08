@@ -21,6 +21,8 @@
 
 ## Data Profiling & Data Versioning
 
+[Data Quality Testing: Ways to Test Data Validity and Accuracy](https://lakefs.io/data-quality/data-quality-testing/)
+
 [¿Qué es el perfilado de datos?](https://www.ibm.com/mx-es/think/topics/data-profiling)
 
 [Principles and best practices in

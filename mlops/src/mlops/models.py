@@ -5,7 +5,8 @@ import calendar
 import random
 
 from scipy.stats import gaussian_kde
-from mlops.utils import get_client_list,time_period,make_time_series,ExperimentConfig,DatasetFilterConfig,DatasetFilters,Date
+from mlflow.pyfunc import PythonModel
+from mlops.utils import get_client_list,time_period,make_time_series,calculate_metrics,Path,ExperimentConfig,DatasetFilterConfig,DatasetFilters,Date,Metrics,DEBUG
 from typing import Iterable,Any
 from matplotlib.figure import Figure
 from dataclasses import dataclass
@@ -15,31 +16,32 @@ from statsmodels.tsa.arima.model import ARIMA
 
 
 @dataclass
-class Metrics:
-    mae: float |None = None
-    mfe : float|None = None
-    rmse : float |None = None
-    da:float|None = None
-
-    def __post_init__(self):
-        if self.rmse:
-            if self.rmse <= 0:
-                raise ValueError("Raíz del error cuadrado promedio debe ser positivo")
-        if self.mae:  
-            if self.mae <= 0:
-                raise ValueError("Error absoluto promedio debe ser positivo")
-            
-        if self.da:
-            if self.da <= 0:
-                raise ValueError("Error direccional debe ser positivo")
-            
-        
-
-
-@dataclass
 class LossHistory:
     train_loss:Iterable|None=None
     test_loss:Iterable|None=None
+
+class PyfuncWrapper(PythonModel):
+
+    def load_context(self, context):
+        import pickle
+        self.model = pickle.load(open(context.artifacts["model_path"], "rb"))
+
+    def predict(self, context, model_input:np.ndarray)->np.ndarray:
+
+        # Manejo de entradas
+        if isinstance(model_input, pd.DataFrame):
+            x_input = model_input.values
+        elif isinstance(model_input, pd.Series):
+            x_input = model_input.values.reshape(-1, 1)
+        elif isinstance(model_input, np.ndarray):
+            x_input = model_input
+        else:
+            x_input = np.array(model_input)
+
+        return self.model.predict(x_input)
+    
+    def fit(self,data:pd.DataFrame,config:ExperimentConfig)->None:
+        return self.model.fit(data,config)
         
 class ForecastModel(ABC):
     _registry: dict[str, type["ForecastModel"]] = {}
@@ -103,40 +105,6 @@ class ForecastModel(ABC):
         pass
 
 
-    def calculate_metrics(self,y_pred:np.ndarray,y_true:np.ndarray)->Metrics:
-        """
-        Calcula las métricas específicadas acorde la predicción del modelo y los datos reales
-
-        Parametros:
-        - y_pred: array-like , Predicciones del modelo 
-        - y_true: array-like , Datos reales
-
-        Regresa:
-        - Metrics(**result_metrics): Metrics, Resultado de los cálculos de métricas  
-        """
-        def directional_accuracy(y_pred:np.ndarray,y_true:np.ndarray)->float:
-            true_direction =np.sign(y_true[1:] - y_true[:-1])
-            pred_direction =np.sign(y_pred[1:] - y_pred[:-1])
-            d_i = (true_direction == pred_direction).astype(float)
-            return d_i.mean()
-        
-        if len(y_pred)!=len(y_true):
-            print(f"Discrepancia en cantidad de datos :  y_pred = {len(y_pred)} , y_true = {len(y_true)}")
-            return Metrics()
-        result_metrics = {} 
-        for m in self.test_metrics:
-            if m=='mae': # Mean Absolute Error
-                result_metrics['mae'] = np.mean(abs(y_true-y_pred))
-
-            if m=='mfe':# Mean Forecast Error
-                result_metrics['mfe'] = np.mean(y_pred-y_true)
-                
-            if m=='rmse':# Root Mean Square Error
-                result_metrics['rmse'] = np.sqrt( np.mean( (y_true-y_pred)**2 ) )
-
-            if m=='da':# Directional Accuracy
-                result_metrics['da'] = directional_accuracy(y_pred,y_true)
-        return Metrics(**result_metrics)
     
 
     def plot_loss(self,loss_history:LossHistory, title:str="Loss", xlabel:str="Epochs", ylabel:str="Loss")->Figure:
@@ -211,7 +179,7 @@ class ForecastModel(ABC):
         end_date = x_test.max().astype('datetime64[D]').astype(Date)
         
         title= f"Periodo : {start_date}  /   {end_date}"
-        metrics = self.calculate_metrics(y_pred,y_true)
+        metrics = calculate_metrics(y_pred,y_true,self.test_metrics)
         test_fig = self.plot_prediction(y_pred,y_true,title)
         return test_fig,metrics 
 
@@ -1248,24 +1216,40 @@ class ARIMAModel(ForecastModel):
             training_window = config.training_window
             horizon = config.horizon
         
-    
-            start_date = pd.to_datetime(config.training_data_start_date)
-            end_date = pd.to_datetime(config.training_data_end_date)
+            if config.training_data_start_date == "oldest":
+                start_date = pd.to_datetime( dataset['date'].min())
+            else:
+                start_date = pd.to_datetime(config.training_data_start_date)
+
+            if config.training_data_end_date == "latest":
+                end_date = pd.to_datetime( dataset['date'].max())
+            else:
+                end_date = pd.to_datetime(config.training_data_end_date)
+            
             period = time_period(start_date=start_date,end_date=end_date)
 
         x,y = make_time_series(df,period,target_column)
 
-        if len(y)< horizon+training_window:
+        if len(y)< horizon+training_window :
             print(f"Dataset invalido: Insuficiente datos para configuración actual.\nNúmero de datos:{len(y)}\nNúmero Requerido:{horizon+training_window}")
             return None
         
         x_train = x[:training_window]
         y_train = y[:training_window]
-        
-        
+        if DEBUG:
+            print(f"{start_date}-{end_date}")
+            print(f"Dataset:{dataset}")
+            print(f"Entrenamiento:{y_train}")
+            print(f"Prueba:{y[training_window:training_window+horizon]}")
         self.known_data = pd.Series(y_train,index=x_train)
+
+        self.mean = y_train.mean()
+        self.std = y_train.std()
+        if self.std == 0:
+            self.std = 1
+        y_scaled = (y_train - self.mean) / self.std
         
-        model = ARIMA(y_train,
+        model = ARIMA(y_scaled,
               order=(p, d, q), # p,d,q
               enforce_stationarity=True,
               enforce_invertibility=True)
@@ -1279,12 +1263,77 @@ class ARIMAModel(ForecastModel):
 
         n_steps = len(x_input)-len(known_outputs)
         if n_steps >0:
-            forecast = self.fitted_model.get_forecast(steps=n_steps).predicted_mean
-            y_pred = np.concatenate((known_outputs, forecast), axis=0)
+            forecast_res = self.fitted_model.get_forecast(steps=n_steps)
+
+            # Escalamiento
+            
+            forecast = forecast_res.predicted_mean
+            forecast = forecast*self.std + self.mean
+            conf = forecast_res.conf_int()
+            conf = conf * self.std + self.mean
+            predicted_values = forecast
+
+            if isinstance(conf, np.ndarray):
+                conf = pd.DataFrame(conf, columns=["lower", "upper"])
+
+            if isinstance(forecast, np.ndarray):
+                forecast = pd.Series(forecast)
+
+            conf.index = forecast.index
+
+            self.confidence_int_lower_series = conf.iloc[:, 0]
+            self.confidence_int_upper_series = conf.iloc[:, 1]
+            y_pred = np.concatenate((known_outputs, predicted_values), axis=0)
         else:
             y_pred=known_outputs
-        return y_pred 
+
+        return y_pred
 
 
     def train(self,x_train:np.ndarray,y_train:np.ndarray):
         return None
+    
+    def plot_prediction(self,y_pred:np.ndarray,y_true:np.ndarray, title:str="Predicción vs Real", xlabel:str="Tiempo (días)", ylabel:str="Ventas")->Figure:
+        """
+        Gráfica de predicción de modelo y datos reales.
+            
+        Parametros:
+        - y_true: array-like, Valores reales
+        - y_pred: array-like, Valores predecidos
+        - title: str, Título de gráfico
+        - xlabel: str, Etiqueta de eje horizontal
+        - ylabel: str,  Etiqueta de eje vertical
+
+        Regresa:
+        - test_fig: matplotlib Figure object, Gráfica de contraste entre predicción y datos reales
+
+        """
+        fig, ax = plt.subplots(figsize=(10,5))
+        ax.plot(y_true, label="Real", marker='o')
+        ax.plot(y_pred, label="Predicción", marker='x')
+        ax.fill_between(
+                        self.confidence_int_lower_series.index,
+                        self.confidence_int_lower_series,
+                        self.confidence_int_upper_series,
+                        color='k',
+                        alpha=0.15
+                    )
+        ax.set_ylim(0)
+        ax.set_title(title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.legend()
+        ax.grid(True)
+
+        return fig
+    
+    def save(self, path:Path):
+        import pickle
+        with open(path, "wb") as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load(cls, path: Path):
+        import pickle
+        with open(path, "rb") as f:
+            return pickle.load(f)    
