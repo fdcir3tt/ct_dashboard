@@ -768,8 +768,18 @@ def main():
             period_end =  today 
 
         with st.spinner("Cargando datos..."):
-            branch_storage = cache_wrappers['load_data']("SELECT * FROM raw.almacenes")
-            inventory = load_data("SELECT * FROM etl.inventory")
+            branch_storage = load_data("SELECT * FROM raw.almacenes")
+            inventory = load_data("""SELECT inv.*,
+                                            alm.branch,
+                                            ca.category
+                                     FROM etl.inventory AS inv
+                                     JOIN raw.almacenes AS alm ON inv."storageId"=alm."storageId"
+                                     JOIN raw.productos AS prod ON inv."productId"=prod."productId"
+                                     LEFT JOIN raw.categorias as ca ON CAST(prod."categoryId" AS numeric)::integer=ca."categoryId"
+                                     WHERE prod."categoryId"<>'unknown'   
+                                  """)
+            inventory = add_states_column(inventory)
+
             
             data_query = f"""SELECT v."productId",
                                     v.quantity,
@@ -796,7 +806,7 @@ def main():
 
 
             data = global_data.copy()
-            print(data.dtypes)        
+                
         # Producto con cantidad de unidades más vendidas dentro de periodo
         top_product,top_category = calculate_top_product_and_category(data=data,
                                                                     period_start=period_start,

@@ -35,7 +35,7 @@ class GraphFilters:
         self.cfg = config
 
     def apply(self, data: pd.DataFrame):
-        print(data["date"].dtype)
+        
         mask = (
             (data['date'] >= self.cfg.start_date) &
             (data['date'] <= self.cfg.end_date) 
@@ -233,12 +233,19 @@ def period_inventory(data: pd.DataFrame,branch_storage:dict[str,list[str]], sele
     year = df["year"].iloc[0]
     
     if branch:
-        storages = branch_storage[branch]
+        if isinstance(branch_storage,dict):
+            storages = branch_storage[branch]
+        elif isinstance(branch_storage,pd.DataFrame):
+            storages = list(branch_storage[branch_storage["branch"]==branch]["storageId"].unique())
         mask = df['storageId'].isin(storages)
     else:
-        storages = []
-        for b in branch_storage.values():
-            storages+=b
+        if isinstance(branch_storage,dict):
+            storages = []
+            for b in branch_storage.values():
+                storages+=b
+
+        elif isinstance(branch_storage,pd.DataFrame):
+            storages = list(branch_storage["storageId"].unique())
 
         mask = df['storageId'].isin(storages)
 
@@ -402,8 +409,8 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,main_element: str,element_colu
 
     """
     
-    start_date = pd.to_datetime(start_date)
-    end_date = pd.to_datetime(end_date)
+    start_date = start_date
+    end_date = end_date
     df = data.copy()
     filters = GraphFilters(config= GraphFilterConfig(start_date=start_date,
                                                      end_date=end_date,
