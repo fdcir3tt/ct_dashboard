@@ -7,6 +7,7 @@ from typing import List,Callable,Tuple,Dict
 from dashboard.utils import top_n,add_states_column
 from dashboard.graphs import *
 from dashboard.data import load_data
+from dashboard.filters import include_outliers_filter,analysis_lvl_filter,products_filter,categories_filter,branch_filter,main_element_filter,period_filter
 
 
 def load_css(file_name):
@@ -22,58 +23,7 @@ def make_cached(func:Callable):
         return func(*args, **kwargs)
     return wrapper
 
-def pick_date(label: str, 
-              default: datetime.datetime = None, 
-              key: str = "selected_date")->datetime.date:
-    
-    if key not in st.session_state:
-        st.session_state[key] = default
-    
-    return st.date_input(label, key=key)
 
-
-def pick_elements(label: str,
-                  options:List,
-                  default: List[str]= None, 
-                  key: str = "selected_elements")->List[str]:
-    
-    if key not in st.session_state:
-        st.session_state[key] = default
-
-    return st.multiselect(label, 
-                          options ,
-                          max_selections= 4 ,
-                          key=key)
-    
-
-def pick_main_element(label: str,
-                      options:List,
-                      default: str= None, 
-                      key: str = "selected_element")->str:
-    
-    if key not in st.session_state:
-        st.session_state[key] = default
-    
-    return st.radio(label=label,
-                    options= options,
-                    key=key)
-
-def pick_branch(label:str,
-                options:List,
-                index:int,
-                key:str='selected branch')->str:
-    
-    if key not in st.session_state:
-        st.session_state[key] = index
-
-    return st.selectbox(label=label, 
-                              options=options,
-                              key=key)
-
-def load_css(file_name):
-
-    with open(file_name) as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 def growth_rate(current:float, previous:float):
 
@@ -164,84 +114,36 @@ def left_section(data:pd.DataFrame,
         st.markdown('**Filtros**')
         col1, col2 = st.columns(2)
         with col1 :
-            analysis_lvl = pick_main_element(label='Nivel de análisis',
-                                             options=["Productos","Categorías"],
-                                             default='Productos',
-                                             key=f'Nivel de análisis {tab} seleccionado')
+            analysis_lvl = analysis_lvl_filter(tab)
         with col2 :
-            if tab=='ventas':
-                outliers= pick_main_element(label='Análisis con ventas anomalas incluídas',
-                                            options= ['Sí','No'],
-                                            default='Sí',
-                                            key=f'Incluir {tab} anómalas')
-                if outliers=='Sí':
-                    include_outliers = True
-                else: 
-                    include_outliers = False
-            else:
-                include_outliers = None 
-                
+            include_outliers = include_outliers_filter(tab) 
                        
-        branch = pick_branch(label='Sucursal',
-                             options=branch_list,
-                             index=frequent_branch_index,
-                             key=f'Sucursal seleccionada {tab}')
+        branch = branch_filter(branch_list,frequent_branch_index,tab)
         
+        categories = categories_filter(category_list,top_category,analysis_lvl,tab)   
+        products = products_filter(product_list,top_product,analysis_lvl,tab)
 
-
-        
-
-        if analysis_lvl=="Productos":
-                categories = []
-                products = pick_elements(label="Producto(s)",
-                                         options=product_list,
-                                         default=[top_product],
-                                         key=f"Sucursal Productos Seleccionados {tab}")
-            
-        if analysis_lvl=="Categorías":
-                products = []
-                categories = pick_elements(label="Categoría(s)",
-                                           options=category_list,
-                                           default=[top_category],
-                                           key=f"Sucursal Categorías Seleccionadas {tab}")
-        
         return analysis_lvl,branch,include_outliers,categories,products
     
-    def analysis_element_and_period_select(start_date:datetime.date,end_date:datetime.date,tab:str):
+    def analysis_element_and_period_select(analysis_lvl:str,element_list:list[str],top_element:str,start_date:datetime.date,end_date:datetime.date,tab:str):
         col1,col2 = st.columns(2)
         with col1:
-
-            if analysis_lvl=='Productos':
-                main_element = pick_main_element(label='Producto de análisis',
-                                                 options= products,
-                                                 key=f'producto de análisis {tab}',
-                                                 default=top_product)
-                element_title= f"**producto:** {main_element}"
-
-            if analysis_lvl=='Categorías':
-                main_element = pick_main_element(label='Categoría de análisis',
-                                                 options= categories,
-                                                 key=f'categoría de análisis {tab}',
-                                                 default=top_category)
-                element_title = f'**categoría:** {main_element}'
+            if analysis_lvl=="Productos":
+                main_element,element_title = main_element_filter(analysis_lvl,element_list,top_element,tab)
         with col2:
             st.markdown('Periodo')
-            period_start = pick_date(label='Inicio',
-                                     default=start_date,
-                                     key=f'Sucursal Inicio {tab}')
-            period_end = pick_date(label='Fin',
-                                   default=end_date,
-                                   key=f'Sucursal Fin {tab}')
+            period_start,period_end = period_filter(start_date,end_date,tab)
+            
         return main_element,element_title,period_start,period_end
 
     def element_selection(analysis_lvl,
                           products,
                           categories):
         elements={"Productos":products,
-                            "Categorías":categories}[analysis_lvl]
+                  "Categorías":categories}[analysis_lvl]
         
         column={"Productos":"productId",
-                        "Categorías":"category"}[analysis_lvl]
+                "Categorías":"category"}[analysis_lvl]
         return elements,column
     
     def element_info(data:pd.DataFrame,
@@ -297,10 +199,20 @@ def left_section(data:pd.DataFrame,
 
 
     analysis_lvl,branch,include_outliers,categories,products = filters(tab)
- 
-    main_element,element_title,period_start,period_end = analysis_element_and_period_select(start_date=period_start,
-                                                                                            end_date=period_end,
-                                                                                            tab=tab)
+    if len(products)==0:
+        element_list = categories
+        top_element = top_category
+    else:
+        element_list = products
+        top_element = top_product
+
+    main_element,element_title,period_start,period_end = analysis_element_and_period_select(analysis_lvl= analysis_lvl,
+                                                                                            element_list= element_list,
+                                                                                            top_element = top_element,
+                                                                                            start_date  = period_start,
+                                                                                            end_date    = period_end,
+                                                                                            tab         = tab
+                                                                                            )
  
     selected_elements,element_column = element_selection(analysis_lvl=analysis_lvl,
                                                          products=products,
