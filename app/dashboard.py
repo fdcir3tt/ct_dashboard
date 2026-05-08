@@ -23,6 +23,72 @@ def make_cached(func:Callable):
         return func(*args, **kwargs)
     return wrapper
 
+def get_element_info(element_data:pd.DataFrame,element_column:str)->dict[str,str|float]:
+    top_clients = list ( top_n(element_data,element_column,type="cliente")["clientId"] )
+    clients_str=''
+    for client in top_clients:
+        clients_str+=client+','
+    clients_str = clients_str[:-1]
+
+    element_info = {
+        "cost_per_unit" : round(element_data["cost"].max(),2),
+        "price_range":( round(element_data["price"].min(),2) , round( element_data["price"].max(),2) ),
+        "category":element_data["category"].iloc[0],
+        "clients_str":clients_str }
+    return element_info
+    
+
+def display_element_info(data:pd.DataFrame,
+                 element_title:str,
+                 analysis_lvl:str,
+                 selected_element:str,
+                 element_column:str)->None:
+        
+        is_element = data[element_column]== selected_element
+        filtered = data[is_element]
+        if filtered.empty:
+            st.warning("No hay datos para el elemento seleccionado en este periodo.")
+            st.stop()
+
+        element_info = get_element_info(filtered,element_column)
+        category = element_info["category"]
+        cost_per_unit = element_info["cost_per_unit"]
+        price_range = element_info["price_range"]
+        clients_str = element_info["clients_str"]
+
+        st.markdown(f'**Información de** {element_title}')
+        if analysis_lvl=="Productos":
+            st.table(pd.DataFrame({
+                        "": [
+                            "Código",
+                            "Categoría",
+                            "Costo por unidad(MXN)",
+                            "Precio por unidad(MXN)",
+                            "Clientes frecuentes"
+                        ],
+                        "Valor": [
+                            str(selected_element),
+                            str(category),
+                            str(cost_per_unit),
+                            str(price_range[1]),
+                            str(clients_str)
+                        ]
+                    }))
+        if analysis_lvl=="Categorías":
+            
+            st.table(pd.DataFrame({
+                    "": [
+                        "Categoría",
+                        "Clientes frecuentes"
+                    ],
+                    "Valor": [
+                        category,
+                        clients_str
+                    ]
+                }))
+
+
+    
 
 def left_section(data:pd.DataFrame,
                  period_start:Date,
@@ -71,58 +137,7 @@ def left_section(data:pd.DataFrame,
                 "Categorías":"category"}[analysis_lvl]
         return elements,column
     
-    def element_info(data:pd.DataFrame,
-                     selected_element:str,
-                     element_column:str,):
-        
-        is_element = data[element_column]== selected_element
-        filtered = data[is_element]
-        if filtered.empty:
-            st.warning("No hay datos para el elemento seleccionado en este periodo.")
-            st.stop()
-
-        cost_per_unit = round(filtered["cost"].max(),2)
-        price_range =( round(filtered["price"].min(),2) , round( filtered["price"].max(),2) )
-        category = filtered["category"].iloc[0]
-        top_clients = list ( top_n(filtered,element_column,type="cliente")["clientId"] )
-
-        clients_str=''
-        for client in top_clients:
-            clients_str+=client+','
-        clients_str = clients_str[:-1]
-
-        st.markdown(f'**Información de** {element_title}')
-        if analysis_lvl=="Productos":
-            st.table(pd.DataFrame({
-                        "": [
-                            "Código",
-                            "Categoría",
-                            "Costo por unidad(MXN)",
-                            "Precio por unidad(MXN)",
-                            "Clientes frecuentes"
-                        ],
-                        "Valor": [
-                            str(main_element),
-                            str(category),
-                            str(cost_per_unit),
-                            str(price_range[1]),
-                            str(clients_str)
-                        ]
-                    }))
-        if analysis_lvl=="Categorías":
-            
-            st.table(pd.DataFrame({
-                    "": [
-                        "Categoría",
-                        "Clientes frecuentes"
-                    ],
-                    "Valor": [
-                        category,
-                        clients_str
-                    ]
-                }))
-
-
+    
     analysis_lvl,branch,include_outliers,categories,products = filters(tab)
     if len(products)==0:
         element_list = categories
@@ -144,7 +159,9 @@ def left_section(data:pd.DataFrame,
                                                          categories=categories)
 
     
-    element_info(data=data,
+    display_element_info(data=data,
+                         element_title=element_title,
+                         analysis_lvl=analysis_lvl,
                  selected_element=main_element,
                  element_column=element_column)
 
