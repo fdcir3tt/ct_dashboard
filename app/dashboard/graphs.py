@@ -364,7 +364,7 @@ def sales_hist(data: pd.DataFrame,main_element: str,
 
     plot_df = filters.apply(df)
     if plot_df.empty:
-        return filters.empty_plot(df)
+        return filters.empty_plot(plot_df)
 
     
     fig, ax = plt.subplots(figsize=(10, 6))

@@ -25,8 +25,11 @@ def sales_plots(data:pd.DataFrame,
                                         element_column=element_column,
                                         include_outliers = include_outliers,
                                         start_date=period_start,end_date=period_end)
-
-    return branch_period_sales_fig,global_period_sales_fig
+    col1, col2 = st.columns(2)
+    with col1:
+        st.pyplot(branch_period_sales_fig)
+    with col2:
+        st.pyplot(global_period_sales_fig)
 
 
 
@@ -302,25 +305,25 @@ def histogram_plots(data:pd.DataFrame,
         c1, c2 = st.columns(2)
 
         with c1:
-                branch_histogram = sales_hist(data=data,
+            branch_histogram = sales_hist(data=data,
                             main_element=main_element,
                             element_column=element_column,
                             branch=branch,
                             include_outliers = include_outliers,
                             start_date=period_start,end_date=period_end)
-
-                st.markdown(f"**{branch}**")
-                st.pyplot(branch_histogram)
+            print(type(branch_histogram))
+            st.markdown(f"**{branch}**")
+            st.pyplot(branch_histogram)
 
         with c2:
-                global_histogram = sales_hist(data=data,
+            global_histogram = sales_hist(data=data,
                             main_element=main_element,
                             element_column=element_column,
                             include_outliers = include_outliers,
                             start_date=period_start,end_date=period_end)
 
-                st.markdown("**Global**")
-                st.pyplot(global_histogram)
+            st.markdown("**Global**")
+            st.pyplot(global_histogram)
 
 def priority_and_map_plots(global_data:pd.DataFrame|None,
                                inventory:pd.DataFrame|None,

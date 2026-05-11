@@ -118,17 +118,13 @@ def right_section(data:pd.DataFrame,
             
     if tab=='ventas':
         st.markdown("### Ventas Diarias")
-        branch_period_sales_fig,global_period_sales_fig = sales_plots(data,
-                                                                      selected_elements,
-                                                                      element_column,
-                                                                      branch,
-                                                                      include_outliers,
-                                                                      period_start,period_end)    
-        col1, col2 = st.columns(2)
-        with col1:
-            st.pyplot(branch_period_sales_fig)
-        with col2:
-            st.pyplot(global_period_sales_fig)
+        sales_plots(data,
+                    selected_elements,
+                    element_column,
+                    branch,
+                    include_outliers,
+                    period_start,period_end)    
+        
 
         histogram_plots(data=data,
                     element_column=element_column,
