@@ -168,19 +168,14 @@ def right_section(data:pd.DataFrame,
                                 tab=tab) 
 
     if tab=='inventario':
-        branch_period_inventory_fig,global_period_inventory_fig = inventory_plots(inventory=data,
-                                                                                branch_storage=branch_storage,
-                                                                                selected_elements=selected_elements,
-                                                                                element_column=element_column,
-                                                                                branch=branch,
-                                                                                period_start=period_start,
-                                                                                period_end=period_end)
         st.markdown("### Existencia Diaria")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.pyplot(branch_period_inventory_fig)
-        with col2:
-            st.pyplot(global_period_inventory_fig) 
+        inventory_plots(inventory=data,
+                       branch_storage=branch_storage,
+                       selected_elements=selected_elements,
+                       element_column=element_column,
+                       branch=branch,
+                       period_start=period_start,
+                       period_end=period_end)
 
         # KPIs de Sucursal
         branch_inventory_rates = kpi_calculator(data=data,

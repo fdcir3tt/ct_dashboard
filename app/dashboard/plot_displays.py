@@ -11,7 +11,45 @@ def sales_plots(data:pd.DataFrame,
                     element_column:str,
                     branch:str,
                     include_outliers :bool,
-                    period_start,period_end)->tuple[Figure,Figure]:
+                    period_start,period_end)->None:
+    """
+    Genera y muestra gráficas de ventas por periodo.
+
+    Construye dos visualizaciones de ventas:
+
+    - Ventas de una sucursal específica.
+    - Ventas globales.
+
+    Ambas gráficas se muestran en columnas dentro de la interfaz
+    de Streamlit.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        DataFrame con los datos de ventas.
+    selected_elements : list
+        Lista de elementos seleccionados para el análisis.
+    element_column : str
+        Nombre de la columna que identifica los elementos
+        analizados.
+    branch : str
+        Nombre de la sucursal seleccionada.
+    include_outliers : bool
+        Indica si deben incluirse ventas anómalas.
+    period_start :
+        Fecha inicial del periodo de análisis.
+    period_end :
+        Fecha final del periodo de análisis.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Las figuras son generadas mediante ``period_sales`` y
+    renderizadas usando ``st.pyplot``.
+    """
 
     branch_period_sales_fig = period_sales(data=data,
                                         selected_elements=selected_elements,
@@ -39,7 +77,39 @@ def inventory_plots(inventory:pd.DataFrame,
                         element_column:str,
                         branch:str,
                         period_start,
-                        period_end)->tuple[Figure,Figure]:   
+                        period_end)->None:
+    """
+    Genera y muestra gráficas de inventario por periodo.
+
+    Construye visualizaciones de inventario tanto para una
+    sucursal específica como para el contexto global.
+
+    Parameters
+    ----------
+    inventory : pandas.DataFrame
+        DataFrame con datos de inventario.
+    branch_storage : dict
+        Diccionario con información de almacenamiento
+        por sucursal.
+    selected_elements : list
+        Lista de elementos seleccionados para el análisis.
+    element_column : str
+        Nombre de la columna que identifica los elementos.
+    branch : str
+        Nombre de la sucursal seleccionada.
+    period_start :
+        Fecha inicial del periodo de análisis.
+    period_end :
+        Fecha final del periodo de análisis.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Las figuras son generadas mediante ``period_inventory``.
+    """   
                  
     branch_period_inventory_fig = period_inventory(data=inventory,
                                         branch_storage=branch_storage,
@@ -53,7 +123,11 @@ def inventory_plots(inventory:pd.DataFrame,
                                         selected_elements=selected_elements,
                                         element_column=element_column,
                                         start_date=period_start,end_date=period_end)
-    return branch_period_inventory_fig,global_period_inventory_fig
+    col1, col2 = st.columns(2)
+    with col1:
+        st.pyplot(branch_period_inventory_fig)
+    with col2:
+            st.pyplot(global_period_inventory_fig) 
 
  
 def kpi_calculator(data:pd.DataFrame,
@@ -63,6 +137,45 @@ def kpi_calculator(data:pd.DataFrame,
                     include_outliers:bool|None,
                     tab:str,
                     branch:str=None)->dict[str,float]|None:
+    """
+    Calcula indicadores clave de desempeño (KPIs).
+
+    Evalúa métricas de ventas o inventario comparando el
+    periodo actual contra el periodo previo de 30 días.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        DataFrame con información de ventas o inventario.
+    selected_element : str
+        Elemento principal seleccionado para el análisis.
+    element_column : str
+        Nombre de la columna que identifica los elementos.
+    period_start :
+        Fecha inicial del periodo actual.
+    include_outliers : bool or None
+        Indica si deben incluirse valores atípicos.
+    tab : str
+        Tipo de análisis. Puede ser:
+
+        - ``"ventas"``
+        - ``"inventario"``
+    branch : str, optional
+        Nombre de la sucursal utilizada para filtrar
+        información.
+
+    Returns
+    -------
+    dict of str to float or None
+        Diccionario con métricas calculadas y tasas
+        de crecimiento. Retorna ``None`` si no existen
+        datos suficientes para el análisis.
+
+    Notes
+    -----
+    El cálculo utiliza ``GraphFilters`` y compara
+    periodos consecutivos de 30 días.
+    """
     
     def sales_kpis(data:pd.DataFrame)->tuple[int,float,float]:
         df = data.copy()
@@ -130,7 +243,13 @@ def kpi_calculator(data:pd.DataFrame,
 
         
 
-        return {"sales_rate":sales_rate ,"profit_rate":profit_rate,"cost_rate":cost_rate,"current_sales":current_sales,"current_profit":current_profit,"current_cost":current_cost}
+        return {"sales_rate":sales_rate ,
+                "profit_rate":profit_rate,
+                "cost_rate":cost_rate,
+                "current_sales":current_sales,
+                "current_profit":current_profit,
+                "current_cost":current_cost}
+    
     if tab=='inventario':
         current_stock,current_supplied= inventory_kpis(data=filtered_current)
         prev_stock,prev_supplied = inventory_kpis(data=filtered_prev)
@@ -140,9 +259,41 @@ def kpi_calculator(data:pd.DataFrame,
             
 
         
-        return {"stock_rate":stock_rate,"supply_rate":supply_rate,"current_stock":current_stock,"current_supplied":current_supplied}     
+        return {"stock_rate":stock_rate,
+                "supply_rate":supply_rate,
+                "current_stock":current_stock,
+                "current_supplied":current_supplied}     
 
 def kpi_display(rates_dict:dict[str,float]|None,tab:str,title:str)->None:
+    """
+    Muestra indicadores KPI en la interfaz de Streamlit.
+
+    Renderiza métricas y porcentajes de crecimiento para
+    ventas o inventario utilizando componentes HTML y
+    columnas de Streamlit.
+
+    Parameters
+    ----------
+    rates_dict : dict of str to float or None
+        Diccionario con métricas calculadas por
+        ``kpi_calculator``.
+    tab : str
+        Tipo de análisis. Puede ser:
+
+        - ``"ventas"``
+        - ``"inventario"``
+    title : str
+        Título descriptivo asociado a los KPIs.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Los indicadores positivos se muestran en verde y
+    los negativos en rojo.
+    """
     if rates_dict is None:
          return None
     if tab=="ventas":
@@ -239,6 +390,37 @@ def display_element_info(data:pd.DataFrame,
                  analysis_lvl:str,
                  selected_element:str,
                  element_column:str)->None:
+    """
+    Muestra información descriptiva de un elemento analizado.
+
+    Presenta información tabular relacionada con productos
+    o categorías, incluyendo clientes frecuentes, costos
+    y precios.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        DataFrame con información comercial.
+    element_title : str
+        Título descriptivo del elemento seleccionado.
+    analysis_lvl : str
+        Nivel de análisis. Puede ser:
+
+        - ``"Productos"``
+        - ``"Categorías"``
+    selected_element : str
+        Elemento seleccionado para el análisis.
+    element_column : str
+        Nombre de la columna que identifica los elementos.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    La información se muestra mediante ``st.table``.
+    """
     def get_element_info(element_data:pd.DataFrame,element_column:str)->dict[str,str|float]:
         top_clients = list ( top_n(element_data,element_column,type="cliente")["clientId"] )
         clients_str=''
@@ -302,28 +484,61 @@ def histogram_plots(data:pd.DataFrame,
                         branch:str,
                         include_outliers :bool,
                         period_start,period_end):
-        c1, c2 = st.columns(2)
+    """
+    Genera histogramas comparativos de ventas.
 
-        with c1:
-            branch_histogram = sales_hist(data=data,
+    Construye histogramas para una sucursal específica
+    y para el contexto global utilizando datos filtrados
+    por periodo.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        DataFrame con datos de ventas.
+    element_column : str
+        Nombre de la columna que identifica los elementos.
+    main_element : str
+        Elemento principal seleccionado.
+    branch : str
+        Nombre de la sucursal seleccionada.
+    include_outliers : bool
+        Indica si deben incluirse valores atípicos.
+    period_start :
+        Fecha inicial del periodo de análisis.
+    period_end :
+        Fecha final del periodo de análisis.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Los histogramas son generados mediante ``sales_hist``
+    y renderizados usando ``st.pyplot``.
+    """
+    c1, c2 = st.columns(2)
+
+    with c1:
+        branch_histogram = sales_hist(data=data,
                             main_element=main_element,
                             element_column=element_column,
                             branch=branch,
                             include_outliers = include_outliers,
                             start_date=period_start,end_date=period_end)
-            print(type(branch_histogram))
-            st.markdown(f"**{branch}**")
-            st.pyplot(branch_histogram)
+            
+        st.markdown(f"**{branch}**")
+        st.pyplot(branch_histogram)
 
-        with c2:
-            global_histogram = sales_hist(data=data,
+    with c2:
+        global_histogram = sales_hist(data=data,
                             main_element=main_element,
                             element_column=element_column,
                             include_outliers = include_outliers,
                             start_date=period_start,end_date=period_end)
 
-            st.markdown("**Global**")
-            st.pyplot(global_histogram)
+        st.markdown("**Global**")
+        st.pyplot(global_histogram)
 
 def priority_and_map_plots(global_data:pd.DataFrame|None,
                                inventory:pd.DataFrame|None,
@@ -334,53 +549,94 @@ def priority_and_map_plots(global_data:pd.DataFrame|None,
                                include_outliers:bool|None,
                                branch:str,
                                analysis_lvl:str,
-                               tab:str):  
-        if tab=='ventas':
-            sales_priorities = abc_bar_chart(data=global_data,
+                               tab:str):
+    """
+    Genera gráficas de prioridades y mapas de calor.
+
+    Dependiendo del tipo de análisis, construye mapas
+    de ventas o inventario junto con visualizaciones
+    de prioridades ABC.
+
+    Parameters
+    ----------
+    global_data : pandas.DataFrame or None
+        DataFrame global de ventas.
+    inventory : pandas.DataFrame or None
+        DataFrame de inventario.
+    main_element : str
+        Elemento principal seleccionado.
+    element_column : str
+        Nombre de la columna que identifica los elementos.
+    period_start :
+        Fecha inicial del periodo de análisis.
+    period_end :
+        Fecha final del periodo de análisis.
+    include_outliers : bool or None
+        Indica si deben incluirse valores atípicos.
+    branch : str
+        Nombre de la sucursal seleccionada.
+    analysis_lvl : str
+        Nivel de análisis seleccionado.
+    tab : str
+        Tipo de análisis. Puede ser:
+
+        - ``"ventas"``
+        - ``"inventario"``
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Utiliza mapas de calor y gráficas ABC para representar
+    prioridades y comportamiento geográfico de ventas o
+    inventario.
+    """  
+    if tab=='ventas':
+        sales_priorities = abc_bar_chart(data=global_data,
                                              element_column=element_column,
                                              branch=branch,
                                              include_outliers=include_outliers,
                                              start_date=period_start,
                                              end_date=period_end)
 
-            col1, col2 = st.columns(2)
-            with col1:
-                    st.markdown(f"**Mapa de {tab}**")
-                    merged = prepare_sales_heatmap_data(
-                                                            data=global_data,
-                                                            main_element=main_element,
-                                                            element_column=element_column,
-                                                            start_date=period_start,
-                                                            end_date=period_end,
-                                                            include_outliers = include_outliers,
-                                                            tab= tab
+        col1, col2 = st.columns(2)
+        with col1:
+                st.markdown(f"**Mapa de {tab}**")
+                merged = prepare_sales_heatmap_data(data=global_data,
+                                                    main_element=main_element,
+                                                    element_column=element_column,
+                                                    start_date=period_start,
+                                                    end_date=period_end,
+                                                    include_outliers = include_outliers,
+                                                    tab= tab
                                                         )
-                    map_obj = render_sales_heat_map(merged=merged, 
+                map_obj = render_sales_heat_map(merged=merged, 
                                                     main_element=main_element,
                                                     tab=tab,
                                                     map_key=f"{tab} Mapa")
-                    if isinstance(map_obj,Figure):
+                if isinstance(map_obj,Figure):
                         st.pyplot(map_obj)
             
-            with col2:
-                st.markdown(f"**Prioridades de {analysis_lvl}**")
-                st.pyplot(sales_priorities)
+        with col2:
+            st.markdown(f"**Prioridades de {analysis_lvl}**")
+            st.pyplot(sales_priorities)
 
-        if tab=='inventario':
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(f"**Mapa de {tab}**")
-                merged = prepare_sales_heatmap_data(
-                                                                        data=inventory,
-                                                                        main_element=main_element,
-                                                                        element_column=element_column,
-                                                                        start_date=period_start,
-                                                                        end_date=period_end,
-                                                                        include_outliers = include_outliers,
-                                                                        tab= tab
+    if tab=='inventario':
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**Mapa de {tab}**")
+            merged = prepare_sales_heatmap_data(data=inventory,
+                                                main_element=main_element,
+                                                element_column=element_column,
+                                                start_date=period_start,
+                                                end_date=period_end,
+                                                include_outliers = include_outliers,
+                                                tab= tab
                                                                     )
         
-                map_obj= render_sales_heat_map(merged=merged, 
-                                               main_element=main_element,
-                                               tab=tab,
-                                               map_key=f"{tab} Mapa")
+            map_obj= render_sales_heat_map(merged=merged, 
+                                           main_element=main_element,
+                                           tab=tab,
+                                           map_key=f"{tab} Mapa")
