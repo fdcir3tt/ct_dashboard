@@ -24,6 +24,55 @@ def make_cached(func:Callable):
         return func(*args, **kwargs)
     return wrapper
 
+def load_sales_data()->dict[str,pd.DataFrame]:
+    
+    with st.spinner("Cargando datos de ventas..."):
+    
+        data_query = f"""SELECT v."productId",
+                                    v.quantity,
+                                    v.date,
+                                    v.price,
+                                    v.total,
+                                    v."clientId",
+                                    v.folio,
+                                    v.description,
+                                    v.cost,
+                                    v."storageId",
+                                    v."branchId",
+                                    v.branch,
+                                    c.category
+                             FROM marts.ventas AS v
+                             LEFT JOIN raw.categorias as c ON CAST(v."categoryId" AS numeric)::integer=c."categoryId"
+                             WHERE v."categoryId"<>'unknown' """
+
+        global_data = load_data(data_query)
+        global_data = add_states_column(global_data)
+        global_data = global_data.astype(dtype={"date":"date32[pyarrow]"})
+        global_data['income'] = global_data['price'] * global_data['quantity']
+        global_data = identify_outlier_sales(global_data,element_column='productId')
+
+
+        data = global_data.copy()
+
+        return {"global_data":global_data,"data":data}
+
+def load_inventory_data()->dict[str,pd.DataFrame]:
+    
+    with st.spinner("Cargando datos de inventario..."):
+        branch_storage = load_data("SELECT * FROM raw.almacenes")
+        inventory = load_data("""SELECT inv.*,
+                                            alm.branch,
+                                            ca.category
+                                     FROM etl.inventory AS inv
+                                     JOIN raw.almacenes AS alm ON inv."storageId"=alm."storageId"
+                                     JOIN raw.productos AS prod ON inv."productId"=prod."productId"
+                                     LEFT JOIN raw.categorias as ca ON CAST(prod."categoryId" AS numeric)::integer=ca."categoryId"
+                                     WHERE prod."categoryId"<>'unknown'
+                                  """)
+        inventory = add_states_column(inventory)
+
+        return {"branch_storage":branch_storage,"inventory":inventory}
+
 def left_section(data:pd.DataFrame,
                  period_start:Date,
                  period_end:Date,
@@ -53,8 +102,8 @@ def left_section(data:pd.DataFrame,
     def analysis_element_and_period_select(analysis_lvl:str,element_list:list[str],top_element:str,start_date:datetime.date,end_date:datetime.date,tab:str):
         col1,col2 = st.columns(2)
         with col1:
-            if analysis_lvl=="Productos":
-                main_element,element_title = main_element_filter(analysis_lvl,element_list,top_element,tab)
+            
+            main_element,element_title = main_element_filter(analysis_lvl,element_list,top_element,tab)
         with col2:
             st.markdown('Periodo')
             period_start,period_end = period_filter(start_date,end_date,tab)
@@ -208,13 +257,31 @@ def right_section(data:pd.DataFrame,
                                 analysis_lvl=analysis_lvl,
                                 tab=tab)   
                      
+def load_dates(tab:str)->tuple[date,date]:
+    today = datetime.date.today() 
+    start_date = st.session_state.get(f"Sucursal Inicio {tab}")
+    end_date = st.session_state.get(f"Sucursal Fin {tab}")
+
+    if start_date is None:
+        if today.day < 15:
+            period_start =  datetime.date(today.year, today.month -1 , 15) 
+        else:
+            period_start = datetime.date(today.year, today.month, 1)
+    else:
+        period_start = start_date
+
+    if end_date is None:
+        period_end = today 
+    else:
+        period_end = end_date
+
+    return period_start,period_end
 
 
 
 # ===========================================================
 #                       MAIN
 # ===========================================================
-
 
 def main():
     st.set_page_config(
@@ -226,9 +293,10 @@ def main():
 
     load_css("assets/styles.css")
 
-    funcs = [load_data,
-            identify_outlier_sales,
-            prepare_sales_heatmap_data
+    funcs = [load_sales_data,
+             load_inventory_data,
+             identify_outlier_sales,
+             prepare_sales_heatmap_data
             ]
 
     cache_wrappers ={}
@@ -256,73 +324,8 @@ def main():
 # ===========================================================
 #                       VALORES PREDETERMINADOS
 # ===========================================================
-    with st.spinner("Cargando valores predeterminados..."):
-        today = datetime.date.today() 
-        if today.day < 15:
-            period_start =  datetime.date(today.year, today.month -1 , 15) 
-            period_end = today 
-        else:
-            period_start = datetime.date(today.year, today.month, 1) 
-            period_end =  today 
-
-        with st.spinner("Cargando datos..."):
-            branch_storage = load_data("SELECT * FROM raw.almacenes")
-            inventory = load_data("""SELECT inv.*,
-                                            alm.branch,
-                                            ca.category
-                                     FROM etl.inventory AS inv
-                                     JOIN raw.almacenes AS alm ON inv."storageId"=alm."storageId"
-                                     JOIN raw.productos AS prod ON inv."productId"=prod."productId"
-                                     LEFT JOIN raw.categorias as ca ON CAST(prod."categoryId" AS numeric)::integer=ca."categoryId"
-                                     WHERE prod."categoryId"<>'unknown'   
-                                  """)
-            inventory = add_states_column(inventory)
-
-            
-            data_query = f"""SELECT v."productId",
-                                    v.quantity,
-                                    v.date,
-                                    v.price,
-                                    v.total,
-                                    v."clientId",
-                                    v.folio,
-                                    v.description,
-                                    v.cost,
-                                    v."storageId",
-                                    v."branchId",
-                                    v.branch,
-                                    c.category
-                             FROM marts.ventas AS v
-                             LEFT JOIN raw.categorias as c ON CAST(v."categoryId" AS numeric)::integer=c."categoryId"
-                             WHERE v."categoryId"<>'unknown'
-                             AND v.date BETWEEN '{period_start}' AND '{period_end}' """
-            global_data = load_data(data_query)
-            global_data = add_states_column(global_data)
-            global_data = global_data.astype(dtype={"date":"date32[pyarrow]"})
-            global_data['income'] = global_data['price'] * global_data['quantity']
-            global_data = cache_wrappers['identify_outlier_sales'](global_data,element_column='productId')
-
-
-            data = global_data.copy()
+    
                 
-        # Producto con cantidad de unidades más vendidas dentro de periodo
-        top_product,top_category = calculate_top_product_and_category(data=data,
-                                                                    period_start=period_start,
-                                                                    period_end=period_end)
-
-        product_list = list( data["productId"].unique() )
-        category_list = list( data["category"].unique() )
-        branch_list = list( data["branch"].unique() )
-
-
-        # Sucursal en donde se vende más seguido el producto más vendido
-        frequent_branch = calculate_frequent_branch(data=data,
-                                                    top_product=top_product)
-        frequent_branch_index = branch_list.index(frequent_branch)
-
-        if data.empty:
-            print('Dataset vacío')
-
 
 # ===========================================================
 #                       ANÁLISIS VENTAS
@@ -332,6 +335,31 @@ def main():
         left, right = st.columns([1.3, 3.7])
 
         with left:
+            period_start,period_end = load_dates(tab="ventas")
+            sales_data_dict = cache_wrappers["load_sales_data"]()
+            data = sales_data_dict["data"]
+            global_data = sales_data_dict["global_data"]
+            
+            with st.spinner("Cargando valores predeterminados..."):
+                # Producto con cantidad de unidades más vendidas dentro de periodo
+                
+                top_product,top_category = calculate_top_product_and_category(data=data,
+                                                                            period_start=period_start,
+                                                                            period_end=period_end)
+
+                product_list = list( data["productId"].unique() )
+                category_list = list( data["category"].unique() )
+                branch_list = list( data["branch"].unique() )
+
+
+                # Sucursal en donde se vende más seguido el producto más vendido
+                frequent_branch = calculate_frequent_branch(data=data,
+                                                            top_product=top_product)
+                frequent_branch_index = branch_list.index(frequent_branch)
+
+                if data.empty:
+                    print('Dataset vacío')
+
             analysis_lvl,branch,include_outliers,main_element,element_title,period_start,period_end,selected_elements,element_column = left_section(data=data,
                                                                                                                                                     period_start=period_start,
                                                                                                                                                     period_end=period_end,
@@ -368,10 +396,15 @@ def main():
         left, right = st.columns([1.2, 3])
 
     with left:
-
+        
+        inv_period_start,inv_period_end = load_dates(tab='inventario')
+        inv_data_dict = cache_wrappers["load_inventory_data"]()
+        inventory = inv_data_dict["inventory"]
+        branch_storage = inv_data_dict["branch_storage"]
+        
         inv_analysis_lvl,inv_branch,_,inv_main_element,element_title,inv_period_start,inv_period_end,inv_selected_elements,inv_element_column = left_section(    data=data,
-                                                                                                                                                                 period_start=period_start,
-                                                                                                                                                                 period_end=period_end,
+                                                                                                                                                                 period_start=inv_period_start,
+                                                                                                                                                                 period_end=inv_period_end,
                                                                                                                                                                  branch_list=branch_list,
                                                                                                                                                                  product_list=product_list,
                                                                                                                                                                  category_list=category_list,
@@ -393,7 +426,7 @@ def main():
                         period_end=inv_period_end,
                         analysis_lvl=inv_analysis_lvl,
                         tab='inventario')
-
+    
 
 
 if __name__ == "__main__":
