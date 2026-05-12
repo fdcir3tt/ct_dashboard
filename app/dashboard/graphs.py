@@ -11,7 +11,7 @@ import matplotlib as mpl
 import io
 import base64
 
-
+from datetime import date
 from dataclasses import dataclass
 from dashboard.utils import month_dict,Date
 from streamlit_folium import st_folium
@@ -22,8 +22,8 @@ warnings.filterwarnings('ignore')
 
 @dataclass
 class GraphFilterConfig:
-    start_date: pd.Timestamp
-    end_date: pd.Timestamp
+    start_date: date
+    end_date: date
     element_column: str | None = None
     selected_elements: list | None = None
     branch: str | None = None
@@ -35,7 +35,7 @@ class GraphFilters:
         self.cfg = config
 
     def apply(self, data: pd.DataFrame):
-
+        
         mask = (
             (data['date'] >= self.cfg.start_date) &
             (data['date'] <= self.cfg.end_date) 
@@ -100,14 +100,15 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     """
 
     # --- Asegurar que las fechas SON datetime ---
-    data["date"] = pd.to_datetime(data["date"], errors="coerce")
-    data["month"] = data["date"].dt.month
-    data["year"] = data["date"].dt.year
+    df = data.copy()
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["month"] = df["date"].dt.month
+    df["year"] = df["date"].dt.year
 
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
 
-    df = data.copy()
+    
     filters = GraphFilters(config= GraphFilterConfig(start_date=start_date,
                                                      end_date=end_date,
                                                      element_column=element_column,
@@ -126,7 +127,7 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     # Líneas interpoladas
     
     df["sales_day"]   = df.groupby([element_column, "date"])["quantity"].transform("sum")
-    df["sales_day"] = df["sales_day"].interpolate(method="linear")
+    
     
         
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -142,12 +143,17 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
             ax.plot(plot_df["date"], plot_df["sales_day"], label= id+" (no hay datos)",
                 marker="o", color=no_data_color)
             continue
-        ax.plot(plot_df["date"], plot_df["sales_day"], label= id,
-                marker="o", color=colors[i])
+        
         
     # === Recta de tendencia === #
 
     # Convertir fechas a valores numéricos (ordinales)
+        plot_df = plot_df[["date","sales_day"]].drop_duplicates()
+        plot_df["sales_day"] = plot_df["sales_day"].interpolate(method="linear")
+        plot_df = plot_df.sort_values(by="date").reset_index()
+
+        ax.plot(plot_df["date"], plot_df["sales_day"], label= id,
+                marker="o", color=colors[i])
         
         x = mdates.date2num(plot_df["date"])
         y = plot_df["sales_day"]
@@ -209,12 +215,13 @@ def period_inventory(data: pd.DataFrame,branch_storage:dict[str,list[str]], sele
     """
     
     # --- Asegurar que las fechas SON datetime ---
-    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    df = data.copy().reset_index(drop=True)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
 
-    df = data.copy().reset_index(drop=True)
+    
     filters = GraphFilters(config= GraphFilterConfig(start_date=start_date,
                                                      end_date=end_date,
                                                      element_column=element_column,
@@ -231,23 +238,25 @@ def period_inventory(data: pd.DataFrame,branch_storage:dict[str,list[str]], sele
     year = df["year"].iloc[0]
     
     if branch:
-        storages = branch_storage[branch]
+        if isinstance(branch_storage,dict):
+            storages = branch_storage[branch]
+        elif isinstance(branch_storage,pd.DataFrame):
+            storages = list(branch_storage[branch_storage["branch"]==branch]["storageId"].unique())
         mask = df['storageId'].isin(storages)
     else:
-        storages = []
-        for b in branch_storage.values():
-            storages+=b
+        if isinstance(branch_storage,dict):
+            storages = []
+            for b in branch_storage.values():
+                storages+=b
+
+        elif isinstance(branch_storage,pd.DataFrame):
+            storages = list(branch_storage["storageId"].unique())
 
         mask = df['storageId'].isin(storages)
 
     df=df[mask]
     df['total_stock']= df.groupby(['date',element_column])['stock'].transform('sum')
     
-
-    
-    
-    # Líneas interpoladas
-    df["total_stock"] = df["total_stock"].interpolate(method="linear")
     
         
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -263,12 +272,17 @@ def period_inventory(data: pd.DataFrame,branch_storage:dict[str,list[str]], sele
             ax.plot(plot_df["date"], plot_df["stock"], label= id+" (no hay datos)",
                 marker="o", color=no_data_color)
             continue
-        ax.plot(plot_df["date"], plot_df["total_stock"], label= id,
-                marker="o", color=colors[i])
+        
         
     # === Recta de tendencia === #
 
     # Convertir fechas a valores numéricos (ordinales)
+        plot_df = plot_df[["date","total_stock"]].drop_duplicates()
+        plot_df["stock"] = plot_df["total_stock"].interpolate(method="linear")
+        plot_df = plot_df.sort_values(by="date").reset_index()
+
+        ax.plot(plot_df["date"], plot_df["total_stock"], label= id,
+                marker="o", color=colors[i])
         
         x = mdates.date2num(plot_df["date"])
         y = plot_df["total_stock"]
@@ -355,7 +369,7 @@ def sales_hist(data: pd.DataFrame,main_element: str,
 
     plot_df = filters.apply(df)
     if plot_df.empty:
-        return filters.empty_plot(df)
+        return filters.empty_plot(plot_df)
 
     
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -400,8 +414,8 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,main_element: str,element_colu
 
     """
     
-    start_date = pd.to_datetime(start_date)
-    end_date = pd.to_datetime(end_date)
+    start_date = start_date
+    end_date = end_date
     df = data.copy()
     filters = GraphFilters(config= GraphFilterConfig(start_date=start_date,
                                                      end_date=end_date,
@@ -594,9 +608,9 @@ def abc_bar_chart(data:pd.DataFrame,element_column:str,start_date:Date,end_date:
     type_selected = element_column
     start_date = pd.to_datetime(start_date)
     end_date   = pd.to_datetime(end_date)
-
-    data["date"] = pd.to_datetime(data["date"], errors="coerce")
     df = data.copy()
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    
     filters = GraphFilters(config= GraphFilterConfig(start_date=start_date,
                                                      end_date=end_date,
                                                      branch=branch,
