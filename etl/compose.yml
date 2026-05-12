@@ -23,11 +23,13 @@ services:
     ports:
       - "5432:5432"
     volumes:
+      - postgres_data:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d
     env_file:
     - ./config/secrets/.env
     networks:
       - airflow
+      - dashboard-net
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 5s
@@ -75,3 +77,9 @@ services:
 networks:
   airflow:
     driver: bridge
+  dashboard-net:
+    external: true
+
+volumes:
+  postgres_data:
+    name: app_database
