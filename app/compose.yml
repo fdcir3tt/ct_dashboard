@@ -1,0 +1,23 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    container_name: dashboard
+    volumes:
+      - ./data:/app/data:Z
+      - ./log/:/app/log:Z
+    env_file:
+      - .env
+    ports:
+      - 8501:8501
+    networks:
+      - dashboard-net
+    mem_limit: 5g
+    memswap_limit: 7g
+
+
+networks:
+  dashboard-net:
+    external: true
