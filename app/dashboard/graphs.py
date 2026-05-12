@@ -127,7 +127,7 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     # Líneas interpoladas
     
     df["sales_day"]   = df.groupby([element_column, "date"])["quantity"].transform("sum")
-    df["sales_day"] = df["sales_day"].interpolate(method="linear")
+    
     
         
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -143,12 +143,17 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
             ax.plot(plot_df["date"], plot_df["sales_day"], label= id+" (no hay datos)",
                 marker="o", color=no_data_color)
             continue
-        ax.plot(plot_df["date"], plot_df["sales_day"], label= id,
-                marker="o", color=colors[i])
+        
         
     # === Recta de tendencia === #
 
     # Convertir fechas a valores numéricos (ordinales)
+        plot_df = plot_df[["date","sales_day"]].drop_duplicates()
+        plot_df["sales_day"] = plot_df["sales_day"].interpolate(method="linear")
+        plot_df = plot_df.sort_values(by="date").reset_index()
+
+        ax.plot(plot_df["date"], plot_df["sales_day"], label= id,
+                marker="o", color=colors[i])
         
         x = mdates.date2num(plot_df["date"])
         y = plot_df["sales_day"]
@@ -252,11 +257,6 @@ def period_inventory(data: pd.DataFrame,branch_storage:dict[str,list[str]], sele
     df=df[mask]
     df['total_stock']= df.groupby(['date',element_column])['stock'].transform('sum')
     
-
-    
-    
-    # Líneas interpoladas
-    df["total_stock"] = df["total_stock"].interpolate(method="linear")
     
         
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -272,12 +272,17 @@ def period_inventory(data: pd.DataFrame,branch_storage:dict[str,list[str]], sele
             ax.plot(plot_df["date"], plot_df["stock"], label= id+" (no hay datos)",
                 marker="o", color=no_data_color)
             continue
-        ax.plot(plot_df["date"], plot_df["total_stock"], label= id,
-                marker="o", color=colors[i])
+        
         
     # === Recta de tendencia === #
 
     # Convertir fechas a valores numéricos (ordinales)
+        plot_df = plot_df[["date","total_stock"]].drop_duplicates()
+        plot_df["stock"] = plot_df["total_stock"].interpolate(method="linear")
+        plot_df = plot_df.sort_values(by="date").reset_index()
+
+        ax.plot(plot_df["date"], plot_df["total_stock"], label= id,
+                marker="o", color=colors[i])
         
         x = mdates.date2num(plot_df["date"])
         y = plot_df["total_stock"]
