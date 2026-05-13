@@ -24,14 +24,14 @@ def extract()->dict[str,list[str,Any]]:
         print("Extrayendo categorías de producto...")
     # Categorías de producto 
         cursor = conn.cursor(MySQLdb.cursors.DictCursor)  # devuelve resultados como diccionarios
-        cursor.execute(f"""SELECT idCategoria as categoryId,
-                                  idPadre as parentId,
+        cursor.execute(f"""SELECT idCategoria as category_id,
+                                  idPadre as parent_id,
                                   nombre as category 
                            FROM {product_categories};""")
         product_category_rows = list(cursor.fetchall())
 
-        cursor.execute(f"""SELECT idCategoria as categoryId,
-                                  clave as productId
+        cursor.execute(f"""SELECT idCategoria as category_id,
+                                  clave as product_id
                         FROM {product_catalogue};""")
         product_catalogue_rows = list(cursor.fetchall())
 
@@ -47,7 +47,7 @@ def extract()->dict[str,list[str,Any]]:
         )
     with pyodbc.connect(connection_str) as conn :
         cursor = conn.cursor()
-        query = f""" SELECT {os.getenv("ID_COLUMN")} as clientId,
+        query = f""" SELECT {os.getenv("ID_COLUMN")} as client_id,
                             {os.getenv("CITY_COLUMN")} as city
                      FROM {os.getenv("CLIENTS_TABLE_NAME")}"""
         

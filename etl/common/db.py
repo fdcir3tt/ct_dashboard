@@ -83,15 +83,26 @@ def insert_df(conn, table_name: str, df: pd.DataFrame):
     conn.commit()
 
 
-def create_table(hook, schema: str, table_name: str, format: dict[str, str], if_not_exists=True):
+def create_table(hook, schema: str, table_name: str, format: dict[str, str], if_not_exists=True,foreign_keys:dict[str,str]=None):
 
     cols = ", ".join(
         f'"{col}" {dtype}' for col, dtype in format.items()
     )
 
+    constraints = []
+
+    if foreign_keys:
+        constraints.extend(
+            f'FOREIGN KEY ("{col}") REFERENCES {ref}'
+            for col, ref in foreign_keys.items()
+        )
+
+    all_defs = ", ".join([cols] + constraints)
+
     query = f"""
-        CREATE TABLE {"IF NOT EXISTS" if if_not_exists else ""} {schema}.{table_name} (
-            {cols}
+        CREATE TABLE {"IF NOT EXISTS" if if_not_exists else ""}
+        {schema}.{table_name} (
+            {all_defs}
         );
     """
 

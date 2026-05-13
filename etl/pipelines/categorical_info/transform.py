@@ -4,7 +4,7 @@ import pandas as pd
 from typing import Any
 from dotenv import load_dotenv
 from common.paths import ENV_DIR
-from common.data import save_data,load_data,delete_files,generate_tmp_path_strings
+from common.data import save_data,load_data,generate_tmp_path_strings
 
 env_path = ENV_DIR /".env"
 load_dotenv(env_path)
@@ -28,7 +28,7 @@ def transform(data:dict[str,list[dict[str,Any]]])->dict[str,pd.DataFrame]:
     
     print("Renombrando columnas...")
 
-    product_codes_df = (product_codes_df.rename(columns={product_code_col:'productId',
+    product_codes_df = (product_codes_df.rename(columns={product_code_col:'product_id',
                                                         product_desc_col:'description',
                                                         product_cost_col:'cost',
                                                         product_cost_coin_col:'buy_coin',
@@ -38,16 +38,21 @@ def transform(data:dict[str,list[dict[str,Any]]])->dict[str,pd.DataFrame]:
                                              'sucursal' :'str',
                                              'homoclave':'str'})
 
-                              .rename(columns={'nemonico' :'storageId',
-                                               'homoclave':'branchId',
+                              .rename(columns={'nemonico' :'storage_id',
+                                               'homoclave':'branch_id',
                                                'sucursal' :'branch'})
         )
     print("Uniendo dataframes necesarias...")
     # Merging
-    product_codes_df = product_codes_df.merge(product_catalogue_df,how="left",on="productId")
+    product_codes_df = product_codes_df.merge(product_catalogue_df,how="left",on="product_id")
     
-    product_codes_df["categoryId"] = product_codes_df["categoryId"].fillna("unknown").astype(dtype="str")
+    product_codes_df["category_id"] = product_codes_df["category_id"].fillna(99999).astype(dtype="int")
     
+    # Agregación
+    unknown_cat_df = pd.DataFrame([{"category_id":99999,"parent_id":0,"category":"desconocido"}])
+    category_df = pd.concat([category_df,unknown_cat_df])
+
+
     transformed_data["category_df"]      = category_df
     transformed_data["client_df"]        = client_df
     transformed_data["product_codes_df"] = product_codes_df
@@ -66,4 +71,4 @@ def run_transform(**context):
     
     print("Pasando datos a siguiente proceso...")
     context["ti"].xcom_push(key="path_strings",value=path_strings)
-    delete_files(extracted_path_strings)
+    
