@@ -2,11 +2,10 @@ import os
 import pandas as pd
 
 from typing import Any
-from pathlib import Path
 from dotenv import load_dotenv
 from common.db import connect_to_mongo_db,get_documents
 from common.dates import date,date_interval
-from common.data import save_data
+from common.data import save_data,generate_tmp_path_strings
 from common.paths import ENV_DIR
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
@@ -37,7 +36,7 @@ def extract()->dict[str,Any]:
                               "fecha":1,
                               "almacen":1,
                               "cliente":1,
-                              "descripcion":1}
+                              }
                        }          
         
     documents = get_documents(database,invoices_collection,consult_info["filters"],consult_info["fields"])
@@ -62,26 +61,13 @@ def extract()->dict[str,Any]:
         print("Tabla 'staging.tazas_clean' no encontrada, regresando DF vacío")
         exchange_rates = pd.DataFrame()
     
-    # branches
-    try:
-        branches = hook.get_pandas_df("SELECT * FROM raw.almacenes")
-    except Exception as e:
-        print("Tabla 'raw.almacenes' no encontrada, regresando DF vacío")
-        branches = pd.DataFrame()
-
-    # categories
-    try:
-        categories = hook.get_pandas_df("SELECT * FROM raw.categorias")
-    except Exception as e:
-        print("Tabla 'raw.categorias' no encontrada, regresando DF vacío")
-        categories = pd.DataFrame()
+    
 
 
     extracted_data["extracted_invoice_documents"] = documents
     extracted_data["products_info"] = products_info
     extracted_data["exchange_rates"] = exchange_rates
-    extracted_data["branches"] = branches
-    extracted_data["categories"] = categories
+   
 
 
     return extracted_data
@@ -89,12 +75,7 @@ def extract()->dict[str,Any]:
 
 def run_extract(**context):
     extracted_data = extract()
-    path_strings = ["/tmp/extracted_invoice_documents.json",
-                    "/tmp/products_info.parquet",
-                    "/tmp/exchange_rates.parquet",
-                    "/tmp/branches.parquet",
-                    "/tmp/categories.parquet"]
-    
+    path_strings = generate_tmp_path_strings(extracted_data)
     save_data(extracted_data,path_strings)
     context["ti"].xcom_push(key="path_strings", value=path_strings)
        
