@@ -43,6 +43,7 @@ def fill_exchange_rates(rates_dataframe: pd.DataFrame) -> pd.DataFrame:
 
 
 def transform(historic_df:pd.DataFrame,extracted_rates_df:pd.DataFrame)->pd.DataFrame:
+    print(historic_df.dtypes)
     historic_df["date"] = pd.to_datetime(historic_df["date"], utc=True)
     extracted_rates_df["date"] = pd.to_datetime(extracted_rates_df["date"], utc=True)
     
@@ -81,4 +82,4 @@ def run_transform(**context):
     
     context["ti"].xcom_push(key="clean_rates_path", value=clean_rates_path)
     
-    delete_files(path_strings)
+    

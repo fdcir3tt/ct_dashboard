@@ -21,6 +21,7 @@ def load(clean_rates_df:pd.DataFrame,conn_str:str="dashboard_app_db"):
     
 
 def run_load(**context):
+    path_strings = context["ti"].xcom_pull(task_ids="extract_past_rates", key="path_strings")
     
     print("Convirtiendo contexto a dataframes...")
     clean_rates_path = context["ti"].xcom_pull(task_ids="rates_merging", key="clean_rates_path")
@@ -29,4 +30,4 @@ def run_load(**context):
     print("Comenzando carga de datos...")
     load(clean_rates_df)
 
-    delete_files(clean_rates_path)
+    delete_files([clean_rates_path]+path_strings)
