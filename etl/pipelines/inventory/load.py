@@ -17,7 +17,7 @@ def load(inventory:pd.DataFrame,conn_str:str="dashboard_app_db"):
                                          "date"         :"DATE",
                                          "stock"        :"Integer",
                                          "storage_id"   :"VARCHAR"},foreign_keys={
-                                                                                  "storage_id":'raw.almacenes(storage_id)'})
+                                                                                  "storage_id":'raw.catalogo_almacenes(storage_id)'})
     print("Poblando tabla de inventario...")
     upsert_df(hook,"etl","inventario",inventory,["existence_id"])
 

@@ -19,40 +19,40 @@ def load(data:dict[str,pd.DataFrame],conn_str:str="dashboard_app_db"):
     
     # Categorías
     print("Creando tabla de categorias de productos...")
-    create_table(hook,"raw","categorias",{"category_id":"Integer PRIMARY KEY",
+    create_table(hook,"raw","catalogo_categorias",{"category_id":"Integer PRIMARY KEY",
                                           "parent_id"  :"Integer",
                                           "category"  :"VARCHAR"})
     print("Poblando tabla de categorias de productos...")
-    upsert_df(hook,"raw","categorias",category_df,["category_id"])
+    upsert_df(hook,"raw","catalogo_categorias",category_df,["category_id"])
 
     
     # Clientes
     print("Creando tabla de clientes...")
-    create_table(hook,"raw","clientes",{"client_id":"VARCHAR PRIMARY KEY",
+    create_table(hook,"raw","catalogo_clientes",{"client_id":"VARCHAR PRIMARY KEY",
                                         "city"    :"VARCHAR"})
     print("Poblando tabla de clientes...")
-    upsert_df(hook,"raw","clientes",client_df,["client_id"])
+    upsert_df(hook,"raw","catalogo_clientes",client_df,["client_id"])
 
     
     # Productos
     print("Creando tabla de productos...")
-    create_table(hook,"raw","productos",{"product_id"   :"VARCHAR PRIMARY KEY",
+    create_table(hook,"raw","catalogo_productos",{"product_id"   :"VARCHAR PRIMARY KEY",
                                          "category_id"  :"Integer",
                                          "description" :"TEXT",
                                          "cost"        :"REAL",
                                          "buy_coin"    :"Integer",
-                                         "sell_coin"   :"Integer"},foreign_keys={"category_id":'raw.categorias("category_id")'})
+                                         "sell_coin"   :"Integer"},foreign_keys={"category_id":'raw.catalogo_categorias("category_id")'})
     
     print("Poblando tabla de productos...")
-    upsert_df(hook,"raw","productos",product_codes_df,key_columns=["product_id"])
+    upsert_df(hook,"raw","catalogo_productos",product_codes_df,key_columns=["product_id"])
 
     # Almacenes
-    create_table(hook,"raw","almacenes",{"storage_id"   :"VARCHAR PRIMARY KEY",
+    create_table(hook,"raw","catalogo_almacenes",{"storage_id"   :"VARCHAR PRIMARY KEY",
                                          "branch_id"    :"VARCHAR",
                                          "branch"      :"VARCHAR"})
     
     print("Poblando tabla de almacenes...")
-    upsert_df(hook,"raw","almacenes",branches_df,key_columns=["storage_id"])
+    upsert_df(hook,"raw","catalogo_almacenes",branches_df,key_columns=["storage_id"])
 
 def run_load(**context):
     

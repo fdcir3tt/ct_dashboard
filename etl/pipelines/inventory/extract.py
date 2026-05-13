@@ -38,9 +38,9 @@ def extract(trace_mongo_uri:str,database_name:str,trace_existence_collection_nam
 
     hook = PostgresHook(postgres_conn_id=conn_str)
     try:
-        branches = hook.get_pandas_df("SELECT * FROM raw.almacenes")
+        branches = hook.get_pandas_df("SELECT * FROM raw.catalogo_almacenes")
     except Exception as e:
-        print("Tabla 'raw.almacenes' no encontrada, regresando DF vacío")
+        print("Tabla 'raw.catalogo_almacenes' no encontrada, regresando DF vacío")
         branches = pd.DataFrame()
     
     extracted_data["historical_existence_documents"]=historical_existence_documents

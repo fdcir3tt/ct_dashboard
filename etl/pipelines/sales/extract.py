@@ -48,9 +48,9 @@ def extract()->dict[str,Any]:
     # product_codes
     hook = PostgresHook(postgres_conn_id=conn_str)
     try:
-        products_info = hook.get_pandas_df("SELECT * FROM raw.productos")
+        products_info = hook.get_pandas_df("SELECT * FROM raw.catalogo_productos")
     except Exception as e:
-        print("Tabla 'raw.productos' no encontrada, regresando DF vacío")
+        print("Tabla 'raw.catalogo_productos' no encontrada, regresando DF vacío")
         products_info = pd.DataFrame()
     
 

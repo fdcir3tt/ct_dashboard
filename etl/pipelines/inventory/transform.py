@@ -6,7 +6,6 @@ from common.data import save_data,load_data
 from common.dates import time_period
 
 def make_storage_dict(branches:pd.DataFrame)->dict[str,list[str]]:
-    
     branches = branches[["storage_id","branch"]]
     branches = branches.set_index("storage_id")["branch"].to_dict()
 
@@ -71,7 +70,6 @@ def transform(historical_existence_documents:dict[str,Any],branches:pd.DataFrame
 def run_transform(**context):
     path_strings = context["ti"].xcom_pull(task_ids="extract_historical_data_and_branches", key="path_strings")
     extracted_data = load_data(path_strings)
-    
     historical_existence_documents = extracted_data["historical_existence_documents"]
     branches = extracted_data["branches"]
 

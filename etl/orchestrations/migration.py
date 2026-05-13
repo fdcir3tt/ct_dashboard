@@ -54,11 +54,11 @@ def load(categories:pd.DataFrame,raw_rates:pd.DataFrame,extracted_rates:pd.DataF
     print("Poblando tabla de conversiones USD->MXN de moneda limpias...")
     upsert_df(hook,"raw","tazas_historicas",raw_rates,["date"])
 
-    create_table(hook,"raw","categorias",{"category_id":"Integer PRIMARY KEY",
+    create_table(hook,"raw","catalogo_categorias",{"category_id":"Integer PRIMARY KEY",
                                             "parent_id"  :"Integer",
                                             "category"  :"VARCHAR"})
     print("Poblando tabla de categorias de productos...")
-    upsert_df(hook,"raw","categorias",categories,["category_id"])
+    upsert_df(hook,"raw","catalogo_categorias",categories,["category_id"])
 
     create_table(hook,"raw","tazas_extraidas",{"date"         :"DATE PRIMARY KEY",
                                                "exchange_rate":"NUMERIC",

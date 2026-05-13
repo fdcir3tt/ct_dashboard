@@ -19,8 +19,8 @@ def load(sales_invoices_df:pd.DataFrame,conn_str:str="dashboard_app_db"):
                                         'cost'             :"REAL",
                                         'client_id'        :"VARCHAR",
                                         'folio'            :"VARCHAR",
-                                        'sale_storage_id'  :"VARCHAR",},foreign_keys={"sale_storage_id":"raw.almacenes(storage_id)",
-                                                                                     "product_id":"raw.productos(product_id)"})
+                                        'sale_storage_id'  :"VARCHAR",},foreign_keys={"sale_storage_id":"raw.catalogo_almacenes(storage_id)",
+                                                                                     "product_id":"raw.catalogo_productos(product_id)"})
     print("Poblando tabla de ventas...")
     upsert_df(hook,"etl","ventas",sales_invoices_df,["sales_id"])
 

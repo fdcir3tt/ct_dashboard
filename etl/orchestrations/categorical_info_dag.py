@@ -18,7 +18,7 @@ with DAG(
     dag_id="categorical_info_pipeline",
     default_args=default_args,
     description="Pipeline información categórica ",
-    schedule_interval="0 6 1 */2 *",  # Bimensual a las 6am
+    schedule_interval="0 13 1 */2 *",  # Bimensual a las 6am
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["raw"],
