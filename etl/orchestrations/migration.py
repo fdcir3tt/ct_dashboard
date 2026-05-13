@@ -41,8 +41,8 @@ def transform(categories:pd.DataFrame,raw_rates:pd.DataFrame,extracted_rates:pd.
                             .astype({"exchange_rate":"float"})
 
                 )
-    categories = categories.rename(columns={"idCategoria":"categoryId",
-                                            "idPadre":"parentId",
+    categories = categories.rename(columns={"idCategoria":"category_id",
+                                            "idPadre":"parent_id",
                                             "nombre":"category"})
     extracted_rates["fallback"]=""
     return categories,raw_rates,extracted_rates
@@ -54,11 +54,11 @@ def load(categories:pd.DataFrame,raw_rates:pd.DataFrame,extracted_rates:pd.DataF
     print("Poblando tabla de conversiones USD->MXN de moneda limpias...")
     upsert_df(hook,"raw","tazas_historicas",raw_rates,["date"])
 
-    create_table(hook,"raw","categorias",{"categoryId":"Integer PRIMARY KEY",
-                                            "parentId"  :"Integer",
+    create_table(hook,"raw","categorias",{"category_id":"Integer PRIMARY KEY",
+                                            "parent_id"  :"Integer",
                                             "category"  :"VARCHAR"})
     print("Poblando tabla de categorias de productos...")
-    upsert_df(hook,"raw","categorias",categories,["categoryId"])
+    upsert_df(hook,"raw","categorias",categories,["category_id"])
 
     create_table(hook,"raw","tazas_extraidas",{"date"         :"DATE PRIMARY KEY",
                                                "exchange_rate":"NUMERIC",
