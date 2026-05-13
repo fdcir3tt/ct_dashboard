@@ -12,18 +12,20 @@ def load(inventory:pd.DataFrame,conn_str:str="dashboard_app_db"):
     print("Creando tabla de inventario...")
 
     # Categorías
-    create_table(hook,"etl","inventory",{"existenceId":"VARCHAR PRIMARY KEY",
-                                         "productId"  :"VARCHAR",
-                                         "date"       :"DATE",
-                                         "stock"      :"Integer",
-                                         "storageId"  :"VARCHAR"})
+    create_table(hook,"etl","inventario",{"existence_id":"VARCHAR PRIMARY KEY",
+                                         "product_id"   :"VARCHAR",
+                                         "date"         :"DATE",
+                                         "stock"        :"Integer",
+                                         "storage_id"   :"VARCHAR"},foreign_keys={
+                                                                                  "storage_id":'raw.almacenes(storage_id)'})
     print("Poblando tabla de inventario...")
-    upsert_df(hook,"etl","inventory",inventory,["existenceId"])
+    upsert_df(hook,"etl","inventario",inventory,["existence_id"])
 
     
 
 def run_load(**context):
-    
+    path_strings = context["ti"].xcom_pull(task_ids="extract_historical_data_and_branches", key="path_strings")
+
     print("Convirtiendo contexto a dataframes...")
     inventory_path = context["ti"].xcom_pull(task_ids="explode_and_rearrange_data", key="inventory_path")
     inventory = load_data(inventory_path)
@@ -31,4 +33,4 @@ def run_load(**context):
     print("Comenzando carga de datos...")
     load(inventory)
     
-    delete_files(inventory_path)
+    delete_files([inventory_path]+path_strings)

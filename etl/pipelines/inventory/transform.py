@@ -2,39 +2,38 @@ import hashlib
 import pandas as pd
 
 from typing import Any
-from pathlib import Path
-from common.data import save_data,load_data,delete_files
+from common.data import save_data,load_data
 from common.dates import time_period
 
 def make_storage_dict(branches:pd.DataFrame)->dict[str,list[str]]:
     
-    branches = branches[["storageId","branch"]]
-    branches = branches.set_index("storageId")["branch"].to_dict()
+    branches = branches[["storage_id","branch"]]
+    branches = branches.set_index("storage_id")["branch"].to_dict()
 
     branch_storage={}
-    for storageId,branch in branches.items():
+    for storage_id,branch in branches.items():
 
         # En caso de haber sucursales con más de un almacen
         if branch in branch_storage.keys():
-            branch_storage[branch].append(storageId)
+            branch_storage[branch].append(storage_id)
             continue
 
-        branch_storage[branch]=[storageId]
+        branch_storage[branch]=[storage_id]
 
     return branch_storage 
 
 def transform(historical_existence_documents:dict[str,Any],branches:pd.DataFrame)->pd.DataFrame:
         inventory = pd.DataFrame(data=historical_existence_documents)
-        inventory["productId"]= inventory["productoReferencia"].apply( lambda x:x['codigo'])
+        inventory["product_id"]= inventory["productoReferencia"].apply( lambda x:x['codigo'])
         inventory =( inventory.drop(columns=["activo",'productoReferencia','costo'])
                 .rename(columns={"fechaRegistro":"date",
                                  "almacenes":"existence"}))
         inventory["date"] = pd.to_datetime(inventory["date"])
         inventory["date"] = inventory['date'].dt.date
-        inventory['storageId'] = inventory['existence']
-        inventory = inventory.explode('storageId')
+        inventory['storage_id'] = inventory['existence']
+        inventory = inventory.explode('storage_id')
         inventory["stock"] = inventory.apply(
-                                                lambda r: r["existence"].get(r["storageId"], 0)
+                                                lambda r: r["existence"].get(r["storage_id"], 0)
                                                 if isinstance(r["existence"], dict)
                                                 else 0,
                                                 axis=1
@@ -50,21 +49,21 @@ def transform(historical_existence_documents:dict[str,Any],branches:pd.DataFrame
                           columns=["date"])
         period = period.assign(key=1)
         period["date"]=period["date"].dt.date
-        storages_inventory = pd.DataFrame({'storageId': storages})
+        storages_inventory = pd.DataFrame({'storage_id': storages})
         storages_inventory['key'] = 1
         period = period.merge(storages_inventory, on='key').drop('key', axis=1)    
-        period = period.explode('storageId')
+        period = period.explode('storage_id')
         
-        inventory = period.merge(right=inventory,how='left',on=['date','storageId'])
+        inventory = period.merge(right=inventory,how='left',on=['date','storage_id'])
         inventory['stock'] = inventory['stock'].fillna(value=0)
 
     
-        print(f"productId 'nans'{inventory["productId"].isna().sum()}")
+        print(f"product_id 'nans'{inventory["product_id"].isna().sum()}")
         inventory = inventory.dropna()
-        print(f"productId 'nans'{inventory["productId"].isna().sum()}")
-        inventory["existenceId"] = (
-                                    inventory["productId"].astype(str)
-                                    + "-" + inventory["storageId"].astype(str)
+        print(f"product_id 'nans'{inventory["product_id"].isna().sum()}")
+        inventory["existence_id"] = (
+                                    inventory["product_id"].astype(str)
+                                    + "-" + inventory["storage_id"].astype(str)
                                     + "-" + inventory["date"].astype(str)
                                 ).map(lambda x: hashlib.md5(x.encode()).hexdigest())
         return inventory
@@ -82,4 +81,4 @@ def run_transform(**context):
     save_data(transformed_data,inventory_path)
 
     context["ti"].xcom_push(key="inventory_path", value=inventory_path)
-    delete_files(path_strings)
+    
