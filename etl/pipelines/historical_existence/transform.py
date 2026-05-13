@@ -42,4 +42,4 @@ def run_transform(**context):
     transformed_data = transform(existences_docs)
 
     context["ti"].xcom_push(key="docs_to_insert_path", value=transformed_data)
-    delete_files(existences_docs_path)
+    

@@ -24,10 +24,12 @@ def load(documents:list[dict[str,Any]],database:pymongo.database.Database,collec
         database[collection_name].insert_many(chunk)
 
 def run_load(**context):
+    existences_docs_path = context["ti"].xcom_pull(task_ids="extract_existence_docs", key="product_existences_path")
+
     insert_documents_path = context["ti"].xcom_pull(task_ids="make_new_docs", key="docs_to_insert_path")
     insert_documents = load_data(insert_documents_path)
     
     hist_database = connect_to_mongo_db(hist_mongo_uri,hist_db_name)
     load(insert_documents,hist_database,table_name,batch_size)
     
-    delete_files(insert_documents_path)
+    delete_files([insert_documents_path,existences_docs_path])
