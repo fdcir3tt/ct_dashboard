@@ -90,7 +90,7 @@ def load(geometries: gpd.GeoDataFrame, conn_str: str):
         with conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS raw.geometrias (
-                    state TEXT,
+                    state TEXT PRIMARY KEY,
                     geometry geometry(MULTIPOLYGON, 4326)
                 );
             """)
