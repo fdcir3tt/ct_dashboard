@@ -1,5 +1,3 @@
-
-
 import os
 import pandas as pd
 
@@ -19,11 +17,11 @@ hist_mongo_uri = os.getenv("TRACE_MONGO_URI")
 hist_db_name = os.getenv("TRACE_EXISTENCE_DB_NAME")
 trace_existence_collection = os.getenv("TRACE_EXISTENCE_COLLECTION")
 
-def extract(trace_mongo_uri:str,database_name:str,trace_existence_collection_name:str)->dict[str,list[dict[str,Any]]|pd.DataFrame]:
+def extract(trace_mongo_uri:str,database_name:str,trace_existence_collection_name:str,period_lenght:int)->dict[str,list[dict[str,Any]]|pd.DataFrame]:
     extracted_data = {}
     hist_database = connect_to_mongo_db(trace_mongo_uri,database_name)
     
-    start_date,end_date =date_interval(date("today"),-30)    
+    start_date,end_date =date_interval(date("today"),-period_lenght)    
     
      
     consult_info = {"filters":{"fechaRegistro":{"$gte":start_date,
@@ -49,11 +47,11 @@ def extract(trace_mongo_uri:str,database_name:str,trace_existence_collection_nam
     return extracted_data
 
 def run_extract(**context):
-    extracted_data = extract(hist_mongo_uri,hist_db_name,trace_existence_collection)
+    extracted_data = extract(hist_mongo_uri,hist_db_name,trace_existence_collection,period_length=1)
     path_strings = generate_tmp_path_strings(extracted_data)
 
     save_data(extracted_data,path_strings)
     
 
-    context["ti"].xcom_push(key="path_strings", value= path_strings)
+    context["ti"].xcom_push(key="inv_path_strings", value= path_strings)
     

@@ -91,7 +91,7 @@ def transform(extracted_invoice_documents:dict[str,Any],products_info:pd.DataFra
 
 
 def run_transform(**context):
-    path_strings = context["ti"].xcom_pull(task_ids="extract_rates_branches_products_and_categories", key="path_strings")
+    path_strings = context["ti"].xcom_pull(task_ids="extract_rates_branches_products_and_categories", key="sales_path_strings")
     extracted_data = load_data(path_strings)
 
     extracted_invoice_documents = extracted_data["extracted_invoice_documents"]

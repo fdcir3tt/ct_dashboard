@@ -18,7 +18,7 @@ invoices_collection = os.getenv("INVOICES_COLLECTION")
 period_length= 30 # días
 conn_str = "dashboard_app_db"
 
-def extract()->dict[str,Any]:
+def extract(period_length:int)->dict[str,Any]:
     extracted_data = {}
     # invoices
     database = connect_to_mongo_db(mongo_uri,public_API)
@@ -74,8 +74,8 @@ def extract()->dict[str,Any]:
 
 
 def run_extract(**context):
-    extracted_data = extract()
+    extracted_data = extract(period_length)
     path_strings = generate_tmp_path_strings(extracted_data)
     save_data(extracted_data,path_strings)
-    context["ti"].xcom_push(key="path_strings", value=path_strings)
+    context["ti"].xcom_push(key="sales_path_strings", value=path_strings)
        

@@ -27,7 +27,7 @@ def transform(historical_existence_documents:dict[str,Any],branches:pd.DataFrame
         inventory =( inventory.drop(columns=["activo",'productoReferencia','costo'])
                 .rename(columns={"fechaRegistro":"date",
                                  "almacenes":"existence"}))
-        inventory["date"] = pd.to_datetime(inventory["date"])
+        inventory["date"] = pd.to_datetime(inventory["date"],errors="coerce", format="mixed")
         inventory["date"] = inventory['date'].dt.date
         inventory['storage_id'] = inventory['existence']
         inventory = inventory.explode('storage_id')
@@ -68,7 +68,7 @@ def transform(historical_existence_documents:dict[str,Any],branches:pd.DataFrame
         return inventory
 
 def run_transform(**context):
-    path_strings = context["ti"].xcom_pull(task_ids="extract_historical_data_and_branches", key="path_strings")
+    path_strings = context["ti"].xcom_pull(task_ids="extract_historical_data_and_branches", key="inv_path_strings")
     extracted_data = load_data(path_strings)
     historical_existence_documents = extracted_data["historical_existence_documents"]
     branches = extracted_data["branches"]

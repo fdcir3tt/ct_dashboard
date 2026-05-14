@@ -15,7 +15,7 @@ def load(inventory:pd.DataFrame,conn_str:str="dashboard_app_db"):
     create_table(hook,"etl","inventario",{"existence_id":"VARCHAR PRIMARY KEY",
                                          "product_id"   :"VARCHAR",
                                          "date"         :"DATE",
-                                         "stock"        :"Integer",
+                                         "stock"        :"BIGINT",
                                          "storage_id"   :"VARCHAR"},foreign_keys={
                                                                                   "storage_id":'raw.catalogo_almacenes(storage_id)'})
     print("Poblando tabla de inventario...")
@@ -24,7 +24,7 @@ def load(inventory:pd.DataFrame,conn_str:str="dashboard_app_db"):
     
 
 def run_load(**context):
-    path_strings = context["ti"].xcom_pull(task_ids="extract_historical_data_and_branches", key="path_strings")
+    path_strings = context["ti"].xcom_pull(task_ids="extract_historical_data_and_branches", key="inv_path_strings")
 
     print("Convirtiendo contexto a dataframes...")
     inventory_path = context["ti"].xcom_pull(task_ids="explode_and_rearrange_data", key="inventory_path")

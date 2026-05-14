@@ -28,7 +28,7 @@ def load(sales_invoices_df:pd.DataFrame,conn_str:str="dashboard_app_db"):
 def run_load(**context):
     
     print("Convirtiendo contexto a dataframes...")
-    path_strings = context["ti"].xcom_pull(task_ids="extract_rates_branches_products_and_categories", key="path_strings")
+    path_strings = context["ti"].xcom_pull(task_ids="extract_rates_branches_products_and_categories", key="sales_path_strings")
     sales_path = context["ti"].xcom_pull(task_ids="merge_and_normalize_coins", key="sales_invoices_path")
     
     sales_invoices_df = load_data(sales_path)

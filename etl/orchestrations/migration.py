@@ -7,20 +7,40 @@
 # codigos_productos -> raw.productos
 # historical_data -> raw.tazas_historicas # importante
 # usd_mxn_rates -> raw.tazas_extraidas #importante
-
+import os
 import pandas as pd
 
+from dotenv import load_dotenv
 from pathlib import Path
-from airflow import DAG
 from datetime import timedelta
-from common.paths import DATA_DIR
+
+from common.paths import DATA_DIR,ENV_DIR
+from common.data import generate_tmp_path_strings,save_data
 from common.db import create_table, upsert_df
+
+from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
+from pipelines.inventory.extract import extract as inventory_extract
+from pipelines.inventory.transform import run_transform as run_inventory_transform
+from pipelines.inventory.load import run_load as run_inventory_load
 
+from pipelines.sales.extract import extract as sales_extract
+from pipelines.sales.transform import run_transform as run_sales_transform
+from pipelines.sales.load import run_load as run_sales_load
+
+env_path = ENV_DIR /".env"
+load_dotenv(env_path)
 raw_data_path = DATA_DIR/"raw"
 conn_str = "dashboard_app_db"
+sales_period_length = 5*365 # 5 años
+inventory_period_length = 5*365 # 5 años
+hist_mongo_uri = os.getenv("TRACE_MONGO_URI")
+hist_db_name = os.getenv("TRACE_EXISTENCE_DB_NAME")
+trace_existence_collection = os.getenv("TRACE_EXISTENCE_COLLECTION")
+
+
 def extract(raw_data_directory:Path)->tuple[pd.DataFrame,pd.DataFrame]:
 
     categories = pd.read_parquet(raw_data_directory/"categorias.parquet",engine="pyarrow")
@@ -92,7 +112,19 @@ def run_load(**context):
     load(categories,raw_rates,extracted_rates,conn_str)
     
     
+def run_sales_extract(**context):
+    
+    extracted_data = sales_extract(sales_period_length)
+    path_strings = generate_tmp_path_strings(extracted_data)
+    save_data(extracted_data,path_strings)
+    context["ti"].xcom_push(key="sales_path_strings", value=path_strings)
+    
+def run_inventory_extract(**context):
+    extracted_data = inventory_extract(hist_mongo_uri,hist_db_name,trace_existence_collection,inventory_period_length)
+    path_strings = generate_tmp_path_strings(extracted_data)
 
+    save_data(extracted_data,path_strings)
+    context["ti"].xcom_push(key="inv_path_strings", value= path_strings)
 
 #  Configuración del DAG
 default_args = {
@@ -109,12 +141,20 @@ with DAG(
     description="Script de migración de datos parquet a tablas SQL",
     schedule=None,  # Manual
     catchup=False,
-    tags=["raw"],
+    tags=["raw","etl"],
 ) as dag:
 
     extract_task = PythonOperator(
         task_id="extract_historical_data",
         python_callable=run_extract,
+    )
+    extract_sales = PythonOperator(
+        task_id="extract_rates_branches_products_and_categories",
+        python_callable=run_sales_extract,
+    )
+    extract_inventory = PythonOperator(
+        task_id="extract_historical_data_and_branches",
+        python_callable=run_inventory_extract,
     )
 
     transform_task = PythonOperator(
@@ -122,10 +162,27 @@ with DAG(
         python_callable=run_transform,
     )
 
+    transform_sales = PythonOperator(
+        task_id="merge_and_normalize_coins",
+        python_callable=run_sales_transform,
+    )
+    transform_inventory= PythonOperator(
+        task_id="explode_and_rearrange_data",
+        python_callable=run_inventory_transform,
+    )
+
     load_task = PythonOperator(
         task_id="load_historic_data",
         python_callable=run_load,
     )
+    load_sales = PythonOperator(
+        task_id="load_sales",
+        python_callable=run_sales_load,
+    )
+    load_inventory = PythonOperator(
+        task_id="load_inventory",
+        python_callable=run_inventory_load,
+    )
 
     
-    extract_task >> transform_task >> load_task
+    extract_task>>[extract_sales,extract_inventory] >> transform_task>>[transform_sales,transform_inventory] >> load_task >>[load_sales,load_inventory]
