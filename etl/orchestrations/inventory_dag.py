@@ -18,7 +18,7 @@ with DAG(
     dag_id="inventory_pipeline",
     default_args=default_args,
     description="Pipeline de tabla de inventario de productos físicos",
-    schedule_interval="1 3 * * *",  # Diario a las 6am MST -7
+    schedule_interval="0 13 * * *",  # Diario a las 6am MST -7
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["etl"],
