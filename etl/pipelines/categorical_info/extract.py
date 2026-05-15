@@ -2,7 +2,7 @@ import os
 import MySQLdb 
 import pyodbc
 
-from typing import Any
+from typing import Any,Callable
 from dotenv import load_dotenv
 from common.paths import ENV_DIR
 from common.data import save_data,generate_tmp_path_strings
@@ -12,53 +12,93 @@ env_path = ENV_DIR /".env"
 load_dotenv(env_path)
 mongo_uri = os.getenv("API_MONGO_URI")
 public_API = os.getenv("API_MONGO_DB_NAME")
-product_categories = os.getenv("PRODUCT_CATEGORY_TABLE_NAME")
-product_catalogue = os.getenv("PRODUCT_CATALOGUE_TABLE_NAME")
-product_table_name = os.getenv("PRODUCT_TABLE_NAME")
-product_columns = os.getenv("PRODUCT_COLUMNS")
 
+data_ware_house_conn_info = {"driver":os.getenv("DATA_WAREHOUSE_DRIVER"),
+                             "server":os.getenv ("DATA_WAREHOUSE_IP"),
+                             "database":os.getenv("DATA_WAREHOUSE_DB_NAME"),
+                             "uid":os.getenv("DATA_WAREHOUSE_USER_ID"),
+                             "password":os.getenv("DATA_WAREHOUSE_USER_PWD")}
 
-def extract()->dict[str,list[str,Any]]:
-    extracted_data = {}
-    with MySQLdb.connect(host=os.getenv("CDB_IP"),user=os.getenv("CDB_UID"),password=os.getenv("CDB_PASSWORD"),database=os.getenv('CDB_NAME')) as conn:
-        print("Extrayendo categorías de producto...")
-    # Categorías de producto 
+product_info = {"categories" : os.getenv("PRODUCT_CATEGORY_TABLE_NAME"),
+                "catalogue" : os.getenv("PRODUCT_CATALOGUE_TABLE_NAME"),
+                "table_name" : os.getenv("PRODUCT_TABLE_NAME"),
+                "columns" : os.getenv("PRODUCT_COLUMNS")}
+
+category_db_conn_info = {"host":os.getenv("CDB_IP"),
+                         "user":os.getenv("CDB_UID"),
+                         "password":os.getenv("CDB_PASSWORD"),
+                         "database":os.getenv('CDB_NAME')}
+
+client_table_info ={ "id_column":os.getenv("ID_COLUMN"),
+                     "city_column":os.getenv("CITY_COLUMN"),
+                     "table_name":os.getenv("CLIENTS_TABLE_NAME")}
+
+branches_info = {"collection":os.getenv("BRANCHES_COLLECTION")}
+
+def extract_product_category_rows()->list[dict[str,str]]:
+    with MySQLdb.connect(host=category_db_conn_info["host"],
+                         user=category_db_conn_info["user"],
+                         password=category_db_conn_info["password"],
+                         database=category_db_conn_info["database"]) as conn:
+        
         cursor = conn.cursor(MySQLdb.cursors.DictCursor)  # devuelve resultados como diccionarios
         cursor.execute(f"""SELECT idCategoria as category_id,
                                   idPadre as parent_id,
                                   nombre as category 
-                           FROM {product_categories};""")
+                           FROM {product_info["categories"]};""")
         product_category_rows = list(cursor.fetchall())
+
+        return product_category_rows
+
+def extract_product_catalogue_rows()->list[dict[str,str]]:
+    with MySQLdb.connect(host=category_db_conn_info["host"],
+                         user=category_db_conn_info["user"],
+                         password=category_db_conn_info["password"],
+                         database=category_db_conn_info["database"]) as conn:
+        
+        cursor = conn.cursor(MySQLdb.cursors.DictCursor)  # devuelve resultados como diccionarios
+    
 
         cursor.execute(f"""SELECT idCategoria as category_id,
                                   clave as product_id
-                        FROM {product_catalogue};""")
+                        FROM {product_info["catalogue"]};""")
         product_catalogue_rows = list(cursor.fetchall())
 
-    
-    print("Extrayendo lista de clientes...")
-    # Clientes 
+        return product_catalogue_rows
+
+def extract_client_data()->list[dict[str,Any]]:
     connection_str = (
-            f'DRIVER={{{os.getenv("DATA_WAREHOUSE_DRIVER")}}};'
-            f'SERVER={os.getenv ("DATA_WAREHOUSE_IP") };'  
-            f'DATABASE={os.getenv("DATA_WAREHOUSE_DB_NAME")};'  
-            f'UID={os.getenv("DATA_WAREHOUSE_USER_ID")};'  
-            f'PWD={os.getenv("DATA_WAREHOUSE_USER_PWD")}'   
+            f'DRIVER={{{data_ware_house_conn_info["driver"]}}};'
+            f'SERVER={  data_ware_house_conn_info["server"]  };'  
+            f'DATABASE={data_ware_house_conn_info["database"]};'  
+            f'UID={     data_ware_house_conn_info["uid"]     };'  
+            f'PWD={     data_ware_house_conn_info["password"]}'   
         )
     with pyodbc.connect(connection_str) as conn :
         cursor = conn.cursor()
-        query = f""" SELECT {os.getenv("ID_COLUMN")} as client_id,
-                            {os.getenv("CITY_COLUMN")} as city
-                     FROM {os.getenv("CLIENTS_TABLE_NAME")}"""
+        query = f""" SELECT {client_table_info['id_column']} as client_id,
+                            {client_table_info["city_column"]} as city
+                     FROM   {client_table_info["table_name"]}"""
         
         cursor.execute(query)
 
         columns = [col[0] for col in cursor.description]
         client_list = [dict(zip(columns, row)) for row in cursor.fetchall()]
             
-        print("Extrayendo información de productos...")
-    # Códigos de productos
-        query = f""" SELECT {product_columns} FROM {product_table_name}
+    return client_list   
+
+def extract_product_codes_data()->list[dict[str,Any]]:
+    connection_str = (
+            f'DRIVER={{{data_ware_house_conn_info["driver"]}}};'
+            f'SERVER={  data_ware_house_conn_info["server"]  };'  
+            f'DATABASE={data_ware_house_conn_info["database"]};'  
+            f'UID={     data_ware_house_conn_info["uid"]     };'  
+            f'PWD={     data_ware_house_conn_info["password"]}'   
+        )
+    with pyodbc.connect(connection_str) as conn :
+        cursor = conn.cursor()
+        
+        query = f""" SELECT {product_info["columns"]} FROM {product_info["table_name"]}
             """
         cursor.execute(query)
         columns = [col[0] for col in cursor.description]
@@ -68,33 +108,36 @@ def extract()->dict[str,list[str,Any]]:
             doc["ART_COS"] = float(doc.get("ART_COS"))
             doc["ART_MCOM"] = int(doc.get("ART_MCOM"))
             doc["ART_MVEN"] = int(doc.get("ART_MVEN"))
-        
-        
+    return product_codes 
 
-    # Almacenes           
-        database = connect_to_mongo_db(mongo_uri,public_API)
+def extract_branch_docs():
+    database = connect_to_mongo_db(mongo_uri,public_API)
 
-        collection = os.getenv("BRANCHES_COLLECTION")
-        consult_info = {"filters":None,
+    collection = branches_info["collection"]
+    consult_info = {"filters":None,
                         "fields":{"_id":0,"nemonico":1,"sucursal":1,"homoclave":1} 
                        }    
-        branch_docs = get_documents(database,collection,consult_info["filters"],consult_info["fields"])
-
-        
-        
-        extracted_data["product_catalogue_rows"]= product_catalogue_rows
-        extracted_data["product_category_rows"] = product_category_rows
-        extracted_data["client_list"]= client_list
-        extracted_data["product_codes"] = product_codes
-        extracted_data["branch_docs"] = branch_docs
+    branch_docs = get_documents(database,collection,consult_info["filters"],consult_info["fields"])
+    return branch_docs
     
-    return extracted_data
-    
-def run_extract(**context):
-    extracted_data = extract()
-    path_strings = generate_tmp_path_strings(extracted_data)
 
-    save_data(extracted_data,path_strings)
-
-    context["ti"].xcom_push(key="path_strings", value=path_strings)
+def run_extract(extract_fn:Callable,**context):
+    extracted_data = extract_fn()
+    file_name = extract_fn.__name__.split("extract_")[1]
+    path_string = generate_tmp_path_strings({file_name:extracted_data})[0]
     
+
+
+    save_data(extracted_data,path_string)
+    key = "path_string"
+    context["ti"].xcom_push(key=key, value=path_string)
+    
+def gather_extracted_paths(**context):
+    upstream_task_ids = context["ti"].task.upstream_task_ids
+    gathered_paths = []
+
+    for task_id in upstream_task_ids:
+        value = context["ti"].xcom_pull(task_ids=task_id,key="path_string")
+        gathered_paths.append(value)
+    context["ti"].xcom_push(key="path_strings",  value=gathered_paths)
+

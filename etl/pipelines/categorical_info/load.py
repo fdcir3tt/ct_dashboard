@@ -1,67 +1,57 @@
 import pandas as pd
 
+from typing import Callable
 from common.db import upsert_df,create_table
 from common.data import load_data,delete_files
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
-
-
-def load(data:dict[str,pd.DataFrame],conn_str:str="dashboard_app_db"):
-    
-    category_df      = data["category_df"]
-    client_df        = data["client_df"]
-    product_codes_df = data["product_codes_df"]
-    branches_df      = data["branches_df"]
-
-
-    hook   = PostgresHook(postgres_conn_id=conn_str)
-    
-    
-    # Categorías
+def load_categories_df(hook:PostgresHook,category_df:pd.DataFrame)->None:
     print("Creando tabla de categorias de productos...")
     create_table(hook,"raw","catalogo_categorias",{"category_id":"Integer PRIMARY KEY",
-                                          "parent_id"  :"Integer",
-                                          "category"  :"VARCHAR"})
+                                                   "parent_id"  :"Integer",
+                                                   "category"   :"VARCHAR"})
     print("Poblando tabla de categorias de productos...")
     upsert_df(hook,"raw","catalogo_categorias",category_df,["category_id"])
 
-    
-    # Clientes
+def load_clients_df(hook:PostgresHook,clients_df:pd.DataFrame)->None:
     print("Creando tabla de clientes...")
     create_table(hook,"raw","catalogo_clientes",{"client_id":"VARCHAR PRIMARY KEY",
-                                        "city"    :"VARCHAR"})
+                                                 "city"    :"VARCHAR"})
     print("Poblando tabla de clientes...")
-    upsert_df(hook,"raw","catalogo_clientes",client_df,["client_id"])
+    upsert_df(hook,"raw","catalogo_clientes",clients_df,["client_id"])
 
-    
-    # Productos
+def load_product_codes_df(hook:PostgresHook,product_codes_df:pd.DataFrame)->None:
     print("Creando tabla de productos...")
     create_table(hook,"raw","catalogo_productos",{"product_id"   :"VARCHAR PRIMARY KEY",
-                                         "category_id"  :"Integer",
-                                         "description" :"TEXT",
-                                         "cost"        :"REAL",
-                                         "buy_coin"    :"Integer",
-                                         "sell_coin"   :"Integer"},foreign_keys={"category_id":'raw.catalogo_categorias("category_id")'})
-    
+                                                  "category_id"  :"Integer",
+                                                  "description" :"TEXT",
+                                                  "cost"        :"REAL",
+                                                  "buy_coin"    :"Integer",
+                                                  "sell_coin"   :"Integer"},foreign_keys={"category_id":'raw.catalogo_categorias("category_id")'})
+            
     print("Poblando tabla de productos...")
     upsert_df(hook,"raw","catalogo_productos",product_codes_df,key_columns=["product_id"])
 
-    # Almacenes
+def load_branches_df(hook:PostgresHook,branches_df:pd.DataFrame)->None:
     create_table(hook,"raw","catalogo_almacenes",{"storage_id"   :"VARCHAR PRIMARY KEY",
-                                         "branch_id"    :"VARCHAR",
-                                         "branch"      :"VARCHAR"})
-    
+                                                  "branch_id"    :"VARCHAR",
+                                                  "branch"       :"VARCHAR",
+                                                  "state"        :"VARCHAR"})
     print("Poblando tabla de almacenes...")
     upsert_df(hook,"raw","catalogo_almacenes",branches_df,key_columns=["storage_id"])
-
-def run_load(**context):
     
-    print("Convirtiendo contexto a dataframes...")
-    extracted_path_strings = context["ti"].xcom_pull(task_ids="extract_categories_and_products", key="path_strings")
-    transformed_path_strings = context["ti"].xcom_pull(task_ids="rename_and_merge_columns", key="path_strings")
-    transformed_data = load_data(transformed_path_strings)
-    
-    print("Comenzando carga de datos...")
-    load(transformed_data)
 
+def run_load(hook:PostgresHook,load_fn:Callable,**context):
+    
+    extracted_path_strings = context["ti"].xcom_pull(task_ids="gather_transformed_paths", key="path_strings")
+    transformed_data = load_data(extracted_path_strings)
+    
+    transformed_data_name = load_fn.__name__.split("load_")[1]
+    transformed_df = transformed_data[transformed_data_name]
+    
+    load_fn(hook,transformed_df)
+
+def delete_temp_files(**context):
+    extracted_path_strings = context["ti"].xcom_pull(task_ids="gather_extracted_paths", key="path_strings")
+    transformed_path_strings = context["ti"].xcom_pull(task_ids="gather_transformed_paths", key="path_strings")
     delete_files(extracted_path_strings+transformed_path_strings)
