@@ -2,10 +2,12 @@ import os
 import pandas as pd
 import json 
 
-from typing import Any,Callable
+from typing import Callable
 from dotenv import load_dotenv
 from common.paths import ENV_DIR
 from common.data import save_data,load_data,generate_tmp_path_strings
+
+from airflow.exceptions import AirflowSkipException
 
 env_path = ENV_DIR /".env"
 load_dotenv(env_path)
@@ -64,15 +66,23 @@ def transform_branch_docs(branches_df:pd.DataFrame)->pd.DataFrame:
 def run_transform(transform_fn:Callable,**context):
     extracted_path_strings = context["ti"].xcom_pull(task_ids="gather_extracted_paths", key="path_strings")
     extracted_data = load_data(extracted_path_strings)
-    print(extracted_data.keys())
+    
     
     extracted_data_name = transform_fn.__name__.split("transform_")[1]
-
+    
     if extracted_data_name=="product_codes":
+        not_extracted = ("product_catalogue_rows" not in extracted_data.keys() ) and ("product_codes_data" not in extracted_data.keys())
+        if not_extracted:
+            raise AirflowSkipException(f"Skipping task,missing data:{extracted_data_name.replace("_"," ")} ")
+
         product_catalogue_df = pd.DataFrame(extracted_data["product_catalogue_rows"])
         product_codes_df = pd.DataFrame(extracted_data["product_codes_data"])
         transformed_data = transform_fn(product_catalogue_df,product_codes_df)
     else:
+        not_extracted = extracted_data_name not in extracted_data.keys()
+        if not_extracted:
+            raise AirflowSkipException(f"Skipping task,missing data:{extracted_data_name.replace("_"," ")} ")
+
         extracted_df = pd.DataFrame(extracted_data[extracted_data_name])
         transformed_data = transform_fn(extracted_df)
     
@@ -88,5 +98,7 @@ def gather_transformed_paths(**context):
 
     for task_id in upstream_task_ids:
         value = context["ti"].xcom_pull(task_ids=task_id,key="path_string")
+        if value is None:
+            continue
         gathered_paths.append(value)
     context["ti"].xcom_push(key="path_strings",  value=gathered_paths)

@@ -1,6 +1,7 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.utils.trigger_rule import TriggerRule
 
 from datetime import datetime, timedelta
 
@@ -76,6 +77,7 @@ with DAG(
     gather_extracted_paths_task = PythonOperator(
         task_id="gather_extracted_paths",
         python_callable= gather_extracted_paths,
+        trigger_rule=TriggerRule.ALL_DONE
     )
     
 
@@ -92,6 +94,7 @@ with DAG(
     gather_transformed_paths_task = PythonOperator(
         task_id="gather_transformed_paths",
         python_callable= gather_transformed_paths,
+        trigger_rule=TriggerRule.ALL_DONE
     )
     hook = PostgresHook(postgres_conn_id=conn_str)
     load_tasks =[]
@@ -107,6 +110,7 @@ with DAG(
     delete_tmp_files =PythonOperator(
         task_id="delete_temp_files",
         python_callable=delete_temp_files,
+        trigger_rule=TriggerRule.ALL_DONE
     )
     
     extract_tasks >> gather_extracted_paths_task >> transform_tasks >> gather_transformed_paths_task >> load_tasks >> delete_tmp_files

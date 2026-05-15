@@ -8,6 +8,8 @@ from common.paths import ENV_DIR
 from common.data import save_data,generate_tmp_path_strings
 from common.db import connect_to_mongo_db,get_documents
 
+from airflow.exceptions import AirflowSkipException
+
 env_path = ENV_DIR /".env"
 load_dotenv(env_path)
 mongo_uri = os.getenv("API_MONGO_URI")
@@ -36,35 +38,42 @@ client_table_info ={ "id_column":os.getenv("ID_COLUMN"),
 branches_info = {"collection":os.getenv("BRANCHES_COLLECTION")}
 
 def extract_product_category_rows()->list[dict[str,str]]:
-    with MySQLdb.connect(host=category_db_conn_info["host"],
-                         user=category_db_conn_info["user"],
-                         password=category_db_conn_info["password"],
-                         database=category_db_conn_info["database"]) as conn:
-        
-        cursor = conn.cursor(MySQLdb.cursors.DictCursor)  # devuelve resultados como diccionarios
-        cursor.execute(f"""SELECT idCategoria as category_id,
-                                  idPadre as parent_id,
-                                  nombre as category 
-                           FROM {product_info["categories"]};""")
-        product_category_rows = list(cursor.fetchall())
-
-        return product_category_rows
+    try:
+        with MySQLdb.connect(host=category_db_conn_info["host"],
+                            user=category_db_conn_info["user"],
+                            password=category_db_conn_info["password"],
+                            database=category_db_conn_info["database"]) as conn:
+            
+            cursor = conn.cursor(MySQLdb.cursors.DictCursor)  # devuelve resultados como diccionarios
+            cursor.execute(f"""SELECT idCategoria as category_id,
+                                    idPadre as parent_id,
+                                    nombre as category 
+                            FROM {product_info["categories"]};""")
+            product_category_rows = list(cursor.fetchall())
+    except Exception as e:
+        print(f"Error al extraer información de categorías de producto:{e}")
+        product_category_rows = []
+    return product_category_rows
 
 def extract_product_catalogue_rows()->list[dict[str,str]]:
-    with MySQLdb.connect(host=category_db_conn_info["host"],
-                         user=category_db_conn_info["user"],
-                         password=category_db_conn_info["password"],
-                         database=category_db_conn_info["database"]) as conn:
+    try :
+        with MySQLdb.connect(host=category_db_conn_info["host"],
+                            user=category_db_conn_info["user"],
+                            password=category_db_conn_info["password"],
+                            database=category_db_conn_info["database"]) as conn:
+            
+            cursor = conn.cursor(MySQLdb.cursors.DictCursor)  # devuelve resultados como diccionarios
         
-        cursor = conn.cursor(MySQLdb.cursors.DictCursor)  # devuelve resultados como diccionarios
-    
 
-        cursor.execute(f"""SELECT idCategoria as category_id,
-                                  clave as product_id
-                        FROM {product_info["catalogue"]};""")
-        product_catalogue_rows = list(cursor.fetchall())
+            cursor.execute(f"""SELECT idCategoria as category_id,
+                                    clave as product_id
+                            FROM {product_info["catalogue"]};""")
+            product_catalogue_rows = list(cursor.fetchall())
+    except Exception as e:
+        print(f"Error al extraer información de productos:{e}")
+        product_catalogue_rows = []
 
-        return product_catalogue_rows
+    return product_catalogue_rows
 
 def extract_client_data()->list[dict[str,Any]]:
     connection_str = (
@@ -110,12 +119,12 @@ def extract_product_codes_data()->list[dict[str,Any]]:
             doc["ART_MVEN"] = int(doc.get("ART_MVEN"))
     return product_codes 
 
-def extract_branch_docs():
+def extract_branch_docs()->list[dict[str,Any]]:
     database = connect_to_mongo_db(mongo_uri,public_API)
 
     collection = branches_info["collection"]
     consult_info = {"filters":None,
-                        "fields":{"_id":0,"nemonico":1,"sucursal":1,"homoclave":1} 
+                    "fields":{"_id":0,"nemonico":1,"sucursal":1,"homoclave":1} 
                        }    
     branch_docs = get_documents(database,collection,consult_info["filters"],consult_info["fields"])
     return branch_docs
@@ -123,10 +132,13 @@ def extract_branch_docs():
 
 def run_extract(extract_fn:Callable,**context):
     extracted_data = extract_fn()
+    
     file_name = extract_fn.__name__.split("extract_")[1]
     path_string = generate_tmp_path_strings({file_name:extracted_data})[0]
     
-
+    is_empty = len(extracted_data)==0
+    if is_empty:
+        raise AirflowSkipException(f"Skipping task,failed to extract:{file_name.replace("_"," ")} ")
 
     save_data(extracted_data,path_string)
     key = "path_string"
@@ -138,6 +150,8 @@ def gather_extracted_paths(**context):
 
     for task_id in upstream_task_ids:
         value = context["ti"].xcom_pull(task_ids=task_id,key="path_string")
+        if value is None:
+            continue
         gathered_paths.append(value)
     context["ti"].xcom_push(key="path_strings",  value=gathered_paths)
 

@@ -4,6 +4,7 @@ from typing import Callable
 from common.db import upsert_df,create_table
 from common.data import load_data,delete_files
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.exceptions import AirflowSkipException
 
 def load_categories_df(hook:PostgresHook,category_df:pd.DataFrame)->None:
     print("Creando tabla de categorias de productos...")
@@ -47,11 +48,15 @@ def run_load(hook:PostgresHook,load_fn:Callable,**context):
     transformed_data = load_data(extracted_path_strings)
     
     transformed_data_name = load_fn.__name__.split("load_")[1]
+    not_transformed = transformed_data_name not in transformed_data.keys()
+    if not_transformed:
+            raise AirflowSkipException(f"Skipping task,missing transformed data:{transformed_data_name.replace("_"," ")} ")
+
     transformed_df = transformed_data[transformed_data_name]
     
     load_fn(hook,transformed_df)
 
 def delete_temp_files(**context):
-    extracted_path_strings = context["ti"].xcom_pull(task_ids="gather_extracted_paths", key="path_strings")
+    extracted_path_strings   = context["ti"].xcom_pull(task_ids="gather_extracted_paths", key="path_strings")
     transformed_path_strings = context["ti"].xcom_pull(task_ids="gather_transformed_paths", key="path_strings")
     delete_files(extracted_path_strings+transformed_path_strings)
