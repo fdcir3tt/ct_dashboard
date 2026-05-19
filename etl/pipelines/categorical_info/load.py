@@ -10,7 +10,9 @@ load_conditions = {"categories_df"   :"skip" ,
                    "product_codes_df":"skip",
                    "branches_df"     :"stop" }
 
-@register()
+tag = "categorical_info"
+
+@register(tag)
 def load_categories_df(conn_str:str,transformed_data:dict[str,pd.DataFrame])->None:
     category_df = transformed_data["categories_df"]
     hook = PostgresHook(postgres_conn_id=conn_str)
@@ -20,8 +22,7 @@ def load_categories_df(conn_str:str,transformed_data:dict[str,pd.DataFrame])->No
                                                    "category"   :"VARCHAR"})
     print("Poblando tabla de categorias de productos...")
     upsert_df(hook,"raw","catalogo_categorias",category_df,["category_id"])
-
-@register()
+@register(tag)
 def load_clients_df(conn_str:str,transformed_data:dict[str,pd.DataFrame])->None:
     clients_df = transformed_data["clients_df"]
     hook = PostgresHook(postgres_conn_id=conn_str)
@@ -31,13 +32,13 @@ def load_clients_df(conn_str:str,transformed_data:dict[str,pd.DataFrame])->None:
     print("Poblando tabla de clientes...")
     upsert_df(hook,"raw","catalogo_clientes",clients_df,["client_id"])
 
-@register()
+@register(tag)
 def load_product_codes_df(conn_str:str,transformed_data:dict[str,pd.DataFrame])->None:
     product_codes_df = transformed_data["product_codes"]
     hook = PostgresHook(postgres_conn_id=conn_str)
     print("Creando tabla de productos...")
-    create_table(hook,"raw","catalogo_productos",{"product_id"   :"VARCHAR PRIMARY KEY",
-                                                  "category_id"  :"Integer",
+    create_table(hook,"raw","catalogo_productos",{"product_id"  :"VARCHAR PRIMARY KEY",
+                                                  "category_id" :"Integer",
                                                   "description" :"TEXT",
                                                   "cost"        :"REAL",
                                                   "buy_coin"    :"Integer",
@@ -46,7 +47,7 @@ def load_product_codes_df(conn_str:str,transformed_data:dict[str,pd.DataFrame])-
     print("Poblando tabla de productos...")
     upsert_df(hook,"raw","catalogo_productos",product_codes_df,key_columns=["product_id"])
 
-@register()
+@register(tag)
 def load_branches_df(conn_str:str,transformed_data:dict[str,pd.DataFrame])->None:
     branches_df = transformed_data["branches_df"]
     hook = PostgresHook(postgres_conn_id=conn_str)

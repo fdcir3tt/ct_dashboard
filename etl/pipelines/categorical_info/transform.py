@@ -24,8 +24,8 @@ save_dict = {       "product_category_rows":"categories_df"   ,
                     "branch_docs"          :"branches_df"     ,
                  }
 
-
-@register()
+tag = "categorical_info"
+@register(tag)
 def transform_product_codes_data(extracted_data:dict[str,pd.DataFrame],**kwargs)->pd.DataFrame:
     
     if ("product_catalogue_rows" not in extracted_data.keys()):
@@ -47,18 +47,18 @@ def transform_product_codes_data(extracted_data:dict[str,pd.DataFrame],**kwargs)
     
     return product_codes_df
 
-@register()
+@register(tag)
 def transform_product_category_rows(extracted_data:dict[str,pd.DataFrame],**kwargs)->pd.DataFrame:
     category_df = pd.DataFrame(extracted_data["product_category_rows"])
     unknown_cat_df = pd.DataFrame([{"category_id":99999,"parent_id":0,"category":"desconocido"}])
     category_df = pd.concat([category_df,unknown_cat_df])
     return category_df
 
-@register()
+@register(tag)
 def transform_clients_data(extracted_data:dict[str,pd.DataFrame])->pd.DataFrame:
     clients_df = pd.DataFrame(extracted_data["clients_data"])
     return clients_df
-@register()
+@register(tag)
 def transform_branch_docs(extracted_data:dict[str,pd.DataFrame],**kwargs)->pd.DataFrame:
     branches_df = pd.DataFrame(extracted_data["branch_docs"])
     branches_df = (branches_df.astype(dtype={'nemonico' :'str',

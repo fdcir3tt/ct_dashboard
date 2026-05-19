@@ -42,8 +42,8 @@ client_table_info ={ "id_column":os.getenv("ID_COLUMN"),
                      "table_name":os.getenv("CLIENTS_TABLE_NAME")}
 
 branches_info = {"collection":os.getenv("BRANCHES_COLLECTION")}
-
-@register()
+tag = "categorical_info"
+@register(tag)
 def extract_product_category_rows(**kwargs)->list[dict[str,str]]:
     try:
         with MySQLdb.connect(host=category_db_conn_info["host"],
@@ -62,7 +62,7 @@ def extract_product_category_rows(**kwargs)->list[dict[str,str]]:
         product_category_rows = []
     return product_category_rows
 
-@register()
+@register(tag)
 def extract_product_catalogue_rows(**kwargs)->list[dict[str,str]]:
     try :
         with MySQLdb.connect(host=category_db_conn_info["host"],
@@ -83,7 +83,7 @@ def extract_product_catalogue_rows(**kwargs)->list[dict[str,str]]:
 
     return product_catalogue_rows
 
-@register()
+@register(tag)
 def extract_clients_data(**kwargs)->list[dict[str,Any]]:
     connection_str = (
             f'DRIVER={{{data_ware_house_conn_info["driver"]}}};'
@@ -105,7 +105,7 @@ def extract_clients_data(**kwargs)->list[dict[str,Any]]:
             
     return client_list   
 
-@register()
+@register(tag)
 def extract_product_codes_data(**kwargs)->list[dict[str,Any]]:
     connection_str = (
             f'DRIVER={{{data_ware_house_conn_info["driver"]}}};'
@@ -129,7 +129,7 @@ def extract_product_codes_data(**kwargs)->list[dict[str,Any]]:
             doc["ART_MVEN"] = int(doc.get("ART_MVEN"))
     return product_codes 
 
-@register()
+@register(tag)
 def extract_branch_docs(**kwargs)->list[dict[str,Any]]:
     database = connect_to_mongo_db(mongo_uri,public_API)
 

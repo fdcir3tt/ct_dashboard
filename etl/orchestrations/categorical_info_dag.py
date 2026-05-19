@@ -1,3 +1,8 @@
+import inspect
+import pipelines.categorical_info.extract as extract
+import pipelines.categorical_info.transform as transform 
+import pipelines.categorical_info.load as load
+
 from airflow import DAG
 from common.data import ETL_pipeline
 
@@ -9,23 +14,18 @@ from pipelines.categorical_info.load import load_conditions
 conn_str = "dashboard_app_db"
 conditions_dict = {"extracted_data_is_empty"  :extracted_conditions,
                    "transformed_data_is_empty":load_conditions}
-# Extract functions:
-extract_fns = ["extract_product_category_rows",\
-               "extract_product_catalogue_rows","extract_product_codes_data",\
-               "extract_clients_data",\
-               "extract_branch_docs" ]
+tag = "categorical_info"
 
-# Transform functions:
-transform_fns = ["transform_product_codes_data",\
-                 "transform_product_category_rows",\
-                 "transform_clients_data",\
-                 "transform_branch_docs"]
+extract_fns   = inspect.getmembers(extract  , inspect.isfunction)
+transform_fns = inspect.getmembers(transform, inspect.isfunction)
+load_fns      = inspect.getmembers(load     , inspect.isfunction)
 
-# Load functions:
-load_fns = ["load_categories_df",\
-            "load_clients_df",\
-            "load_product_codes_df",\
-            "load_branches_df"]
+
+extract_fn_names   = [f"{tag}.{name}" for name,_ in extract_fns   if name.startswith("extract") ] 
+transform_fn_names = [f"{tag}.{name}" for name,_ in transform_fns if name.startswith("transform") ] 
+load_fn_names      = [f"{tag}.{name}" for name,_ in load_fns      if name.startswith("load") ] 
+
+
 
 
 
@@ -48,7 +48,7 @@ with DAG(
     tags=["raw"],
 ) as dag:
     
-    sales_pipeline = ETL_pipeline(extract_fns,transform_fns,load_fns,conn_str,save_dict,conditions_dict)
+    sales_pipeline = ETL_pipeline(extract_fn_names,transform_fn_names,load_fn_names,conn_str,save_dict,conditions_dict)
 
     extract_tasks                 = sales_pipeline.make_extraction_tasks()
     gather_extracted_paths_task   = sales_pipeline.make_gather_paths_task("gather_extracted_paths")
