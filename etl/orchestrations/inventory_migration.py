@@ -1,45 +1,36 @@
-# Tables:
+import inspect
+import pipelines.inventory.extract as extract
+import pipelines.inventory.transform as transform 
+import pipelines.inventory.load as load
 
-# branches    -> raw.almacenes
-# conversion_usd_mxn  -> staging.tazas_clean
-# facturas_ventas -> marts.ventas 
-# categorias -> raw.categorias # importante 
-# codigos_productos -> raw.productos
-# historical_data -> raw.tazas_historicas # importante
-# usd_mxn_rates -> raw.tazas_extraidas #importante
-import os
 
-from dotenv import load_dotenv
 from datetime import timedelta
-
-from common.paths import ENV_DIR
 from common.data import generate_tmp_path_strings,save_data
-
+from common.data import ETL_pipeline
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
 
-from pipelines.inventory.extract import extract as inventory_extract
-from pipelines.inventory.transform import run_transform as run_inventory_transform
-from pipelines.inventory.load import run_load as run_inventory_load
+from pipelines.inventory.extract import extracted_conditions,extract_historical_existence_documents as inventory_extract
+from pipelines.inventory.transform import save_dict
+from pipelines.inventory.load import load_conditions
 
 
-
-env_path = ENV_DIR /".env"
-load_dotenv(env_path)
 conn_str = "dashboard_app_db"
-inventory_period_length = 5*365 # 5 años
-hist_mongo_uri = os.getenv("TRACE_MONGO_URI")
-hist_db_name = os.getenv("TRACE_EXISTENCE_DB_NAME")
-trace_existence_collection = os.getenv("TRACE_EXISTENCE_COLLECTION")
+inventory_period_length = 2*365 # 2 años
+tag = "inventory"
+conditions_dict = {"period_length"            :inventory_period_length,
+                   "extracted_data_is_empty"  :extracted_conditions,
+                   "transformed_data_is_empty":load_conditions}
+extract_fns   = inspect.getmembers(extract  , inspect.isfunction)
+transform_fns = inspect.getmembers(transform, inspect.isfunction)
+load_fns      = inspect.getmembers(load     , inspect.isfunction)
 
-def run_inventory_extract(**context):
-    extracted_data = inventory_extract(hist_mongo_uri,hist_db_name,trace_existence_collection,inventory_period_length)
-    path_strings = generate_tmp_path_strings(extracted_data)
+extract_fn_names   = [f"{tag}.{name}" for name,_ in extract_fns   if name.startswith("extract") ] 
+transform_fn_names = [f"{tag}.{name}" for name,_ in transform_fns if name.startswith("transform") ] 
+load_fn_names      = [f"{tag}.{name}" for name,_ in load_fns      if name.startswith("load") ] 
 
-    save_data(extracted_data,path_strings)
-    context["ti"].xcom_push(key="inv_path_strings", value= path_strings)
 
 #  Configuración del DAG
 default_args = {
@@ -59,23 +50,17 @@ with DAG(
     tags=["etl","marts"],
 ) as dag:
 
-    extract_inventory = PythonOperator(
-        task_id="extract_historical_data_and_branches",
-        python_callable=run_inventory_extract,
-    )
+    inventory_pipeline = ETL_pipeline(extract_fn_names,transform_fn_names,load_fn_names,conn_str,save_dict,conditions_dict)
+
+    extract_tasks                 = inventory_pipeline.make_extraction_tasks()
+    gather_extracted_paths_task   = inventory_pipeline.make_gather_paths_task("gather_extracted_paths")
+    transform_tasks               = inventory_pipeline.make_transform_tasks()
+    gather_transformed_paths_task = inventory_pipeline.make_gather_paths_task("gather_transformed_paths")
+    load_tasks                    = inventory_pipeline.make_load_tasks()
+    delete_tmp_files_task         = inventory_pipeline.make_delete_tmp_files_task()
 
     
-    transform_inventory= PythonOperator(
-        task_id="explode_and_rearrange_data",
-        python_callable=run_inventory_transform,
-    )
-
-   
     
-    load_inventory = PythonOperator(
-        task_id="load_inventory",
-        python_callable=run_inventory_load,
-    )
 
     
-    extract_inventory >>transform_inventory>>load_inventory
+    extract_tasks >> gather_extracted_paths_task >> transform_tasks >> gather_transformed_paths_task >> load_tasks >> delete_tmp_files_task 
