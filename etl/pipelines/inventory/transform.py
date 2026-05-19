@@ -1,9 +1,13 @@
-import hashlib
 import pandas as pd
 
 from typing import Any
-from common.data import save_data,load_data
+from common.registry import register
 from common.dates import time_period
+from airflow.exceptions import AirflowFailException
+
+
+save_dict = {"historical_existence_documents":"inventory_df"}
+tag = "inventory"
 
 def make_storage_dict(branches:pd.DataFrame)->dict[str,list[str]]:
     branches = branches[["storage_id","branch"]]
@@ -21,18 +25,30 @@ def make_storage_dict(branches:pd.DataFrame)->dict[str,list[str]]:
 
     return branch_storage 
 
-def transform(historical_existence_documents:dict[str,Any],branches:pd.DataFrame)->pd.DataFrame:
+@register(tag)
+def transform_historical_existence_documents(extracted_data:dict[str,pd.DataFrame|list[dict[str,Any]]],**kwargs)->pd.DataFrame:
+        input_data =["historical_existence_documents","branches"]
+        for name in input_data:
+            if (name not in extracted_data.keys()):
+                raise AirflowFailException(f"Task failed,no data to transform:'{name}' ")
+        historical_existence_documents = extracted_data["historical_existence_documents"]
+        branches                       = extracted_data["branches"]
+
+        # Columnas
         inventory = pd.DataFrame(data=historical_existence_documents)
         inventory["product_id"]= inventory["productoReferencia"].apply( lambda x:x['codigo'])
-        inventory =( inventory.drop(columns=["activo",'productoReferencia','costo'])
-                .rename(columns={"fechaRegistro":"date",
-                                 "almacenes":"existence"}))
+        inventory =( inventory.drop  (columns=["activo",'productoReferencia','costo'])
+                              .rename(columns={"fechaRegistro":"date",
+                                               "almacenes":"existence"})
+                    )
+        
         inventory["date"] = pd.to_datetime(inventory["date"],errors="coerce", format="mixed")
         inventory["date"] = inventory['date'].dt.date
         inventory['storage_id'] = inventory['existence']
+        
+        # Transformaciones
         inventory = inventory.explode('storage_id')
-        inventory["stock"] = inventory.apply(
-                                                lambda r: r["existence"].get(r["storage_id"], 0)
+        inventory["stock"] = inventory.apply(   lambda r: r["existence"].get(r["storage_id"], 0)
                                                 if isinstance(r["existence"], dict)
                                                 else 0,
                                                 axis=1
@@ -43,9 +59,10 @@ def transform(historical_existence_documents:dict[str,Any],branches:pd.DataFrame
         end_date = str(inventory['date'].max())
 
         
+        # Lógica de fechas
         storages = make_storage_dict(branches)
         period = pd.DataFrame(data=time_period(start_date=start_date,end_date=end_date ),
-                          columns=["date"])
+                              columns=["date"])
         period = period.assign(key=1)
         period["date"]=period["date"].dt.date
         storages_inventory = pd.DataFrame({'storage_id': storages})
@@ -60,23 +77,7 @@ def transform(historical_existence_documents:dict[str,Any],branches:pd.DataFrame
         print(f"product_id 'nans'{inventory["product_id"].isna().sum()}")
         inventory = inventory.dropna()
         print(f"product_id 'nans'{inventory["product_id"].isna().sum()}")
-        inventory["existence_id"] = (
-                                    inventory["product_id"].astype(str)
-                                    + "-" + inventory["storage_id"].astype(str)
-                                    + "-" + inventory["date"].astype(str)
-                                ).map(lambda x: hashlib.md5(x.encode()).hexdigest())
+        
         return inventory
 
-def run_transform(**context):
-    path_strings = context["ti"].xcom_pull(task_ids="extract_historical_data_and_branches", key="inv_path_strings")
-    extracted_data = load_data(path_strings)
-    historical_existence_documents = extracted_data["historical_existence_documents"]
-    branches = extracted_data["branches"]
 
-    transformed_data = transform(historical_existence_documents,branches)
- 
-    inventory_path ="/tmp/inventory.parquet"
-    save_data(transformed_data,inventory_path)
-
-    context["ti"].xcom_push(key="inventory_path", value=inventory_path)
-    
