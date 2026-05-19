@@ -48,13 +48,13 @@ with DAG(
     tags=["raw"],
 ) as dag:
     
-    sales_pipeline = ETL_pipeline(extract_fn_names,transform_fn_names,load_fn_names,conn_str,save_dict,conditions_dict)
+    categorical_info_pipeline = ETL_pipeline(extract_fn_names,transform_fn_names,load_fn_names,conn_str,save_dict,conditions_dict)
 
-    extract_tasks                 = sales_pipeline.make_extraction_tasks()
-    gather_extracted_paths_task   = sales_pipeline.make_gather_paths_task("gather_extracted_paths")
-    transform_tasks               = sales_pipeline.make_transform_tasks()
-    gather_transformed_paths_task = sales_pipeline.make_gather_paths_task("gather_transformed_paths")
-    load_tasks                    = sales_pipeline.make_load_tasks()
-    delete_tmp_files_task         = sales_pipeline.make_delete_tmp_files_task()
+    extract_tasks                 = categorical_info_pipeline.make_extraction_tasks()
+    gather_extracted_paths_task   = categorical_info_pipeline.make_gather_paths_task("gather_extracted_paths")
+    transform_tasks               = categorical_info_pipeline.make_transform_tasks()
+    gather_transformed_paths_task = categorical_info_pipeline.make_gather_paths_task("gather_transformed_paths")
+    load_tasks                    = categorical_info_pipeline.make_load_tasks()
+    delete_tmp_files_task         = categorical_info_pipeline.make_delete_tmp_files_task()
     
     extract_tasks >> gather_extracted_paths_task >> transform_tasks >> gather_transformed_paths_task >> load_tasks >> delete_tmp_files_task
