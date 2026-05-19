@@ -1,8 +1,11 @@
 import pandas as pd
-import hashlib
 
-from common.data import save_data,load_data
 from typing import Any
+from common.registry import register
+from airflow.exceptions import AirflowFailException
+
+save_dict = {"invoice_documents":"sales_invoices_df"}
+tag = "sales"
 
 def normalize_coins(df:pd.DataFrame)->pd.DataFrame:
     """
@@ -44,66 +47,58 @@ def sales_filters(df:pd.DataFrame)->pd.DataFrame:
     return df
 
 
-def transform(extracted_invoice_documents:dict[str,Any],products_info:pd.DataFrame,exchange_rates:pd.DataFrame)->pd.DataFrame:
+@register(tag)
+def transform_invoice_documents(extracted_data:dict[str,pd.DataFrame|list[dict[str,Any]]],**kwargs)->pd.DataFrame:
+    input_data =["invoice_documents","products_info","exchange_rates"]
+    for name in input_data:
+        if (name not in extracted_data.keys()):
+            raise AirflowFailException(f"Task failed,no data to transform:'{name}' ")
+    
+    extracted_invoice_documents = extracted_data["invoice_documents"]
+    exchange_rates              = extracted_data["exchange_rates"]
+    products_info               = extracted_data["products_info"]
+
+
     invoices = pd.DataFrame(extracted_invoice_documents)
     invoices = (invoices.rename(columns={"articulo" :"product_id",
-                                         "factura" :"folio",
-                                         "cantidad":"quantity",
-                                         "fecha" :"date",
-                                         "precio" :"price",
-                                         "cliente" :"client_id",
-                                         "almacen" :"sale_storage_id",
+                                         "factura"  :"folio",
+                                         "cantidad" :"quantity",
+                                         "fecha"    :"date",
+                                         "precio"   :"price",
+                                         "cliente"  :"client_id",
+                                         "almacen"  :"sale_storage_id",
                                          })
                         
-                        .astype(dtype={"product_id":"str",
-                                       "folio":"str",
-                                       "quantity":"int",
-                                       "client_id":"str",
-                                       "total":"float",
+                        .astype(dtype={"product_id" :"str",
+                                       "folio"      :"str",
+                                       "quantity"   :"int",
+                                       "client_id"  :"str",
+                                       "total"      :"float",
                                        })
                          )
 
     invoices["date"]=pd.to_datetime(invoices["date"])
     invoices["date"]=invoices["date"].dt.date
-    df = invoices.merge(products_info,
+    sales_invoices_df = invoices.merge(products_info,
                         how="inner",on="product_id")
-    df = df.drop(columns=["category_id"])
-    df = df.merge(exchange_rates,
+    sales_invoices_df = sales_invoices_df.drop(columns=["category_id"])
+    sales_invoices_df = sales_invoices_df.merge(exchange_rates,
                   how="inner",on="date")
     
-    df = normalize_coins(df)
+    sales_invoices_df = normalize_coins(sales_invoices_df)
 
-    df = sales_filters(df)
+    sales_invoices_df = sales_filters(sales_invoices_df)
 
-    df['date'] = df['date'].astype('datetime64[ns]')
+    sales_invoices_df['date'] = sales_invoices_df['date'].astype('datetime64[ns]')
 
-    df = df.drop_duplicates(subset=['folio','product_id','date','client_id'])
+    sales_invoices_df = sales_invoices_df.drop_duplicates(subset=['folio','product_id','date','client_id'])
     
-    df["sales_id"] = (
-    df[["folio", "product_id", "date", "client_id"]]
-    .fillna("")
-    .astype(str)
-    .apply(lambda row: "-".join(row.values), axis=1)
-    .map(lambda x: hashlib.md5(x.encode()).hexdigest())
-)   
-    df["date"] = df["date"].dt.date
-    return df
+      
+    sales_invoices_df["date"] = sales_invoices_df["date"].dt.date
+    
+    return sales_invoices_df
 
 
-def run_transform(**context):
-    path_strings = context["ti"].xcom_pull(task_ids="extract_rates_branches_products_and_categories", key="sales_path_strings")
-    extracted_data = load_data(path_strings)
 
-    extracted_invoice_documents = extracted_data["extracted_invoice_documents"]
-    products_info               = extracted_data["products_info"]
-    exchange_rates              = extracted_data["exchange_rates"]
-    
-    
-    transformed_data = transform(extracted_invoice_documents,products_info,exchange_rates)
-    
-    sales_path = "/tmp/sales.parquet" 
-    save_data(transformed_data,sales_path)
-    
-    context["ti"].xcom_push(key="sales_invoices_path", value=sales_path)
     
     
