@@ -1,47 +1,31 @@
 from airflow import DAG
-from airflow.operators.python import PythonOperator
-from airflow.providers.postgres.hooks.postgres import PostgresHook
-from airflow.utils.trigger_rule import TriggerRule
+from common.data import ETL_pipeline
 
 from datetime import datetime, timedelta
-
-
-from pipelines.categorical_info.extract import run_extract,gather_extracted_paths, \
-                                               extract_product_category_rows,\
-                                               extract_product_catalogue_rows,extract_product_codes_data,\
-                                               extract_client_data,\
-                                               extract_branch_docs
-
-from pipelines.categorical_info.transform import run_transform,gather_transformed_paths,\
-                                                 transform_product_codes,\
-                                                 transform_product_category_rows,\
-                                                 transform_client_data,\
-                                                 transform_branch_docs
-
-from pipelines.categorical_info.load import run_load,delete_temp_files,\
-                                            load_categories_df,\
-                                            load_clients_df,\
-                                            load_product_codes_df,\
-                                            load_branches_df
+from pipelines.categorical_info.extract import extracted_conditions
+from pipelines.categorical_info.transform import save_dict
+from pipelines.categorical_info.load import load_conditions
 
 conn_str = "dashboard_app_db"
+conditions_dict = {"extracted_data_is_empty"  :extracted_conditions,
+                   "transformed_data_is_empty":load_conditions}
 # Extract functions:
-extract_fns = [extract_product_category_rows,\
-               extract_product_catalogue_rows,extract_product_codes_data,\
-               extract_client_data,\
-               extract_branch_docs ]
+extract_fns = ["extract_product_category_rows",\
+               "extract_product_catalogue_rows","extract_product_codes_data",\
+               "extract_clients_data",\
+               "extract_branch_docs" ]
 
 # Transform functions:
-transform_fns = [transform_product_codes,\
-                 transform_product_category_rows,\
-                 transform_client_data,\
-                 transform_branch_docs]
+transform_fns = ["transform_product_codes_data",\
+                 "transform_product_category_rows",\
+                 "transform_clients_data",\
+                 "transform_branch_docs"]
 
 # Load functions:
-load_fns = [load_categories_df,\
-            load_clients_df,\
-            load_product_codes_df,\
-            load_branches_df]
+load_fns = ["load_categories_df",\
+            "load_clients_df",\
+            "load_product_codes_df",\
+            "load_branches_df"]
 
 
 
@@ -64,53 +48,13 @@ with DAG(
     tags=["raw"],
 ) as dag:
     
-    extract_tasks =[]
-    for function in extract_fns :
-       task = PythonOperator(
-        task_id=function.__name__,
-        op_args =[function],
-        python_callable=run_extract,
-    )
+    sales_pipeline = ETL_pipeline(extract_fns,transform_fns,load_fns,conn_str,save_dict,conditions_dict)
 
-       extract_tasks.append(task)
-       
-    gather_extracted_paths_task = PythonOperator(
-        task_id="gather_extracted_paths",
-        python_callable= gather_extracted_paths,
-        trigger_rule=TriggerRule.ALL_DONE
-    )
+    extract_tasks                 = sales_pipeline.make_extraction_tasks()
+    gather_extracted_paths_task   = sales_pipeline.make_gather_paths_task("gather_extracted_paths")
+    transform_tasks               = sales_pipeline.make_transform_tasks()
+    gather_transformed_paths_task = sales_pipeline.make_gather_paths_task("gather_transformed_paths")
+    load_tasks                    = sales_pipeline.make_load_tasks()
+    delete_tmp_files_task         = sales_pipeline.make_delete_tmp_files_task()
     
-
-    transform_tasks =[]
-    for function in transform_fns :
-       task = PythonOperator(
-        task_id=function.__name__,
-        op_args =[function],
-        python_callable=run_transform,
-    )
-
-       transform_tasks.append(task)
-
-    gather_transformed_paths_task = PythonOperator(
-        task_id="gather_transformed_paths",
-        python_callable= gather_transformed_paths,
-        trigger_rule=TriggerRule.ALL_DONE
-    )
-    hook = PostgresHook(postgres_conn_id=conn_str)
-    load_tasks =[]
-    for function in load_fns :
-       task = PythonOperator(
-        task_id=function.__name__,
-        op_args =[hook,function],
-        python_callable=run_load,
-    )
-
-       load_tasks.append(task)
-
-    delete_tmp_files =PythonOperator(
-        task_id="delete_temp_files",
-        python_callable=delete_temp_files,
-        trigger_rule=TriggerRule.ALL_DONE
-    )
-    
-    extract_tasks >> gather_extracted_paths_task >> transform_tasks >> gather_transformed_paths_task >> load_tasks >> delete_tmp_files
+    extract_tasks >> gather_extracted_paths_task >> transform_tasks >> gather_transformed_paths_task >> load_tasks >> delete_tmp_files_task

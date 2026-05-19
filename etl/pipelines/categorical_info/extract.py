@@ -2,18 +2,24 @@ import os
 import MySQLdb 
 import pyodbc
 
-from typing import Any,Callable
+from typing import Any
 from dotenv import load_dotenv
+from common.registry import register
 from common.paths import ENV_DIR
-from common.data import save_data,generate_tmp_path_strings
 from common.db import connect_to_mongo_db,get_documents
 
-from airflow.exceptions import AirflowSkipException
+
 
 env_path = ENV_DIR /".env"
 load_dotenv(env_path)
 mongo_uri = os.getenv("API_MONGO_URI")
 public_API = os.getenv("API_MONGO_DB_NAME")
+
+extracted_conditions = {"product_category_rows" :"skip",
+                        "product_catalogue_rows":"skip",
+                        "clients_data"          :"stop",
+                        "product_codes_data"    :"stop",
+                        "branch_docs"           :"stop" }
 
 data_ware_house_conn_info = {"driver":os.getenv("DATA_WAREHOUSE_DRIVER"),
                              "server":os.getenv ("DATA_WAREHOUSE_IP"),
@@ -37,7 +43,8 @@ client_table_info ={ "id_column":os.getenv("ID_COLUMN"),
 
 branches_info = {"collection":os.getenv("BRANCHES_COLLECTION")}
 
-def extract_product_category_rows()->list[dict[str,str]]:
+@register()
+def extract_product_category_rows(**kwargs)->list[dict[str,str]]:
     try:
         with MySQLdb.connect(host=category_db_conn_info["host"],
                             user=category_db_conn_info["user"],
@@ -55,7 +62,8 @@ def extract_product_category_rows()->list[dict[str,str]]:
         product_category_rows = []
     return product_category_rows
 
-def extract_product_catalogue_rows()->list[dict[str,str]]:
+@register()
+def extract_product_catalogue_rows(**kwargs)->list[dict[str,str]]:
     try :
         with MySQLdb.connect(host=category_db_conn_info["host"],
                             user=category_db_conn_info["user"],
@@ -75,7 +83,8 @@ def extract_product_catalogue_rows()->list[dict[str,str]]:
 
     return product_catalogue_rows
 
-def extract_client_data()->list[dict[str,Any]]:
+@register()
+def extract_clients_data(**kwargs)->list[dict[str,Any]]:
     connection_str = (
             f'DRIVER={{{data_ware_house_conn_info["driver"]}}};'
             f'SERVER={  data_ware_house_conn_info["server"]  };'  
@@ -96,7 +105,8 @@ def extract_client_data()->list[dict[str,Any]]:
             
     return client_list   
 
-def extract_product_codes_data()->list[dict[str,Any]]:
+@register()
+def extract_product_codes_data(**kwargs)->list[dict[str,Any]]:
     connection_str = (
             f'DRIVER={{{data_ware_house_conn_info["driver"]}}};'
             f'SERVER={  data_ware_house_conn_info["server"]  };'  
@@ -119,7 +129,8 @@ def extract_product_codes_data()->list[dict[str,Any]]:
             doc["ART_MVEN"] = int(doc.get("ART_MVEN"))
     return product_codes 
 
-def extract_branch_docs()->list[dict[str,Any]]:
+@register()
+def extract_branch_docs(**kwargs)->list[dict[str,Any]]:
     database = connect_to_mongo_db(mongo_uri,public_API)
 
     collection = branches_info["collection"]
@@ -130,28 +141,5 @@ def extract_branch_docs()->list[dict[str,Any]]:
     return branch_docs
     
 
-def run_extract(extract_fn:Callable,**context):
-    extracted_data = extract_fn()
-    
-    file_name = extract_fn.__name__.split("extract_")[1]
-    path_string = generate_tmp_path_strings({file_name:extracted_data})[0]
-    
-    is_empty = len(extracted_data)==0
-    if is_empty:
-        raise AirflowSkipException(f"Skipping task,failed to extract:{file_name.replace("_"," ")} ")
 
-    save_data(extracted_data,path_string)
-    key = "path_string"
-    context["ti"].xcom_push(key=key, value=path_string)
-    
-def gather_extracted_paths(**context):
-    upstream_task_ids = context["ti"].task.upstream_task_ids
-    gathered_paths = []
-
-    for task_id in upstream_task_ids:
-        value = context["ti"].xcom_pull(task_ids=task_id,key="path_string")
-        if value is None:
-            continue
-        gathered_paths.append(value)
-    context["ti"].xcom_push(key="path_strings",  value=gathered_paths)
 

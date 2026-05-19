@@ -2,12 +2,11 @@ import os
 import pandas as pd
 import json 
 
-from typing import Callable
+
 from dotenv import load_dotenv
 from common.paths import ENV_DIR
-from common.data import save_data,load_data,generate_tmp_path_strings
-
-from airflow.exceptions import AirflowSkipException
+from common.registry import register
+from airflow.exceptions import AirflowFailException
 
 env_path = ENV_DIR /".env"
 load_dotenv(env_path)
@@ -19,13 +18,25 @@ product_cost_col       = product_columns.split(',')[2]
 product_cost_coin_col  = product_columns.split(',')[3]
 product_price_coin_col = product_columns.split(',')[4]
 
-save_dict = {"product_category_rows":"categories_df",
-             "product_codes"        :"product_codes_df",
-             "client_data"          :"clients_df",
-             "branch_docs"          :"branches_df"}
+save_dict = {       "product_category_rows":"categories_df"   ,
+                    "product_codes_data"   :"product_codes_df",
+                    "clients_data"         :"clients_df"      ,
+                    "branch_docs"          :"branches_df"     ,
+                 }
 
-def transform_product_codes(product_catalogue_df:pd.DataFrame,product_codes_df:pd.DataFrame)->pd.DataFrame:
-    product_codes_df = (product_codes_df.rename(columns={product_code_col:'product_id',
+
+@register()
+def transform_product_codes_data(extracted_data:dict[str,pd.DataFrame],**kwargs)->pd.DataFrame:
+    
+    if ("product_catalogue_rows" not in extracted_data.keys()):
+        raise AirflowFailException(f"Task failed,no data to transform:'product_catalogue_rows' ")
+    if ("product_codes_data" not in extracted_data.keys()):
+        raise AirflowFailException(f"Task failed,no data to transform:'product_codes_data' ")
+    
+    product_catalogue_df = pd.DataFrame(extracted_data["product_catalogue_rows"])
+    product_codes_df     = pd.DataFrame(extracted_data["product_codes_data"])
+
+    product_codes_df     = (product_codes_df.rename(columns={product_code_col:'product_id',
                                                         product_desc_col:'description',
                                                         product_cost_col:'cost',
                                                         product_cost_coin_col:'buy_coin',
@@ -36,16 +47,20 @@ def transform_product_codes(product_catalogue_df:pd.DataFrame,product_codes_df:p
     
     return product_codes_df
 
-
-def transform_product_category_rows(category_df:pd.DataFrame)->pd.DataFrame:
+@register()
+def transform_product_category_rows(extracted_data:dict[str,pd.DataFrame],**kwargs)->pd.DataFrame:
+    category_df = pd.DataFrame(extracted_data["product_category_rows"])
     unknown_cat_df = pd.DataFrame([{"category_id":99999,"parent_id":0,"category":"desconocido"}])
     category_df = pd.concat([category_df,unknown_cat_df])
     return category_df
 
-def transform_client_data(clients_df:pd.DataFrame)->pd.DataFrame:
-     return clients_df
-
-def transform_branch_docs(branches_df:pd.DataFrame)->pd.DataFrame:
+@register()
+def transform_clients_data(extracted_data:dict[str,pd.DataFrame])->pd.DataFrame:
+    clients_df = pd.DataFrame(extracted_data["clients_data"])
+    return clients_df
+@register()
+def transform_branch_docs(extracted_data:dict[str,pd.DataFrame],**kwargs)->pd.DataFrame:
+    branches_df = pd.DataFrame(extracted_data["branch_docs"])
     branches_df = (branches_df.astype(dtype={'nemonico' :'str',
                                              'sucursal' :'str',
                                              'homoclave':'str'})
@@ -63,42 +78,4 @@ def transform_branch_docs(branches_df:pd.DataFrame)->pd.DataFrame:
      
 
 
-def run_transform(transform_fn:Callable,**context):
-    extracted_path_strings = context["ti"].xcom_pull(task_ids="gather_extracted_paths", key="path_strings")
-    extracted_data = load_data(extracted_path_strings)
-    
-    
-    extracted_data_name = transform_fn.__name__.split("transform_")[1]
-    
-    if extracted_data_name=="product_codes":
-        not_extracted = ("product_catalogue_rows" not in extracted_data.keys() ) and ("product_codes_data" not in extracted_data.keys())
-        if not_extracted:
-            raise AirflowSkipException(f"Skipping task,missing data:{extracted_data_name.replace("_"," ")} ")
 
-        product_catalogue_df = pd.DataFrame(extracted_data["product_catalogue_rows"])
-        product_codes_df = pd.DataFrame(extracted_data["product_codes_data"])
-        transformed_data = transform_fn(product_catalogue_df,product_codes_df)
-    else:
-        not_extracted = extracted_data_name not in extracted_data.keys()
-        if not_extracted:
-            raise AirflowSkipException(f"Skipping task,missing data:{extracted_data_name.replace("_"," ")} ")
-
-        extracted_df = pd.DataFrame(extracted_data[extracted_data_name])
-        transformed_data = transform_fn(extracted_df)
-    
-    path_string = generate_tmp_path_strings({save_dict[extracted_data_name]:transformed_data})[0]
-    
-    save_data(transformed_data,path_string)
-    
-    context["ti"].xcom_push(key="path_string",value=path_string)
-
-def gather_transformed_paths(**context):
-    upstream_task_ids = context["ti"].task.upstream_task_ids
-    gathered_paths = []
-
-    for task_id in upstream_task_ids:
-        value = context["ti"].xcom_pull(task_ids=task_id,key="path_string")
-        if value is None:
-            continue
-        gathered_paths.append(value)
-    context["ti"].xcom_push(key="path_strings",  value=gathered_paths)

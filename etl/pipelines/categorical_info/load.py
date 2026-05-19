@@ -1,12 +1,19 @@
 import pandas as pd
 
-from typing import Callable
 from common.db import upsert_df,create_table
-from common.data import load_data,delete_files
-from airflow.providers.postgres.hooks.postgres import PostgresHook
-from airflow.exceptions import AirflowSkipException
+from common.registry import register
 
-def load_categories_df(hook:PostgresHook,category_df:pd.DataFrame)->None:
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+
+load_conditions = {"categories_df"   :"skip" ,
+                   "clients_df"      :"stop" ,
+                   "product_codes_df":"skip",
+                   "branches_df"     :"stop" }
+
+@register()
+def load_categories_df(conn_str:str,transformed_data:dict[str,pd.DataFrame])->None:
+    category_df = transformed_data["categories_df"]
+    hook = PostgresHook(postgres_conn_id=conn_str)
     print("Creando tabla de categorias de productos...")
     create_table(hook,"raw","catalogo_categorias",{"category_id":"Integer PRIMARY KEY",
                                                    "parent_id"  :"Integer",
@@ -14,14 +21,20 @@ def load_categories_df(hook:PostgresHook,category_df:pd.DataFrame)->None:
     print("Poblando tabla de categorias de productos...")
     upsert_df(hook,"raw","catalogo_categorias",category_df,["category_id"])
 
-def load_clients_df(hook:PostgresHook,clients_df:pd.DataFrame)->None:
+@register()
+def load_clients_df(conn_str:str,transformed_data:dict[str,pd.DataFrame])->None:
+    clients_df = transformed_data["clients_df"]
+    hook = PostgresHook(postgres_conn_id=conn_str)
     print("Creando tabla de clientes...")
     create_table(hook,"raw","catalogo_clientes",{"client_id":"VARCHAR PRIMARY KEY",
                                                  "city"    :"VARCHAR"})
     print("Poblando tabla de clientes...")
     upsert_df(hook,"raw","catalogo_clientes",clients_df,["client_id"])
 
-def load_product_codes_df(hook:PostgresHook,product_codes_df:pd.DataFrame)->None:
+@register()
+def load_product_codes_df(conn_str:str,transformed_data:dict[str,pd.DataFrame])->None:
+    product_codes_df = transformed_data["product_codes"]
+    hook = PostgresHook(postgres_conn_id=conn_str)
     print("Creando tabla de productos...")
     create_table(hook,"raw","catalogo_productos",{"product_id"   :"VARCHAR PRIMARY KEY",
                                                   "category_id"  :"Integer",
@@ -33,7 +46,10 @@ def load_product_codes_df(hook:PostgresHook,product_codes_df:pd.DataFrame)->None
     print("Poblando tabla de productos...")
     upsert_df(hook,"raw","catalogo_productos",product_codes_df,key_columns=["product_id"])
 
-def load_branches_df(hook:PostgresHook,branches_df:pd.DataFrame)->None:
+@register()
+def load_branches_df(conn_str:str,transformed_data:dict[str,pd.DataFrame])->None:
+    branches_df = transformed_data["branches_df"]
+    hook = PostgresHook(postgres_conn_id=conn_str)
     create_table(hook,"raw","catalogo_almacenes",{"storage_id"   :"VARCHAR PRIMARY KEY",
                                                   "branch_id"    :"VARCHAR",
                                                   "branch"       :"VARCHAR",
@@ -42,21 +58,3 @@ def load_branches_df(hook:PostgresHook,branches_df:pd.DataFrame)->None:
     upsert_df(hook,"raw","catalogo_almacenes",branches_df,key_columns=["storage_id"])
     
 
-def run_load(hook:PostgresHook,load_fn:Callable,**context):
-    
-    extracted_path_strings = context["ti"].xcom_pull(task_ids="gather_transformed_paths", key="path_strings")
-    transformed_data = load_data(extracted_path_strings)
-    
-    transformed_data_name = load_fn.__name__.split("load_")[1]
-    not_transformed = transformed_data_name not in transformed_data.keys()
-    if not_transformed:
-            raise AirflowSkipException(f"Skipping task,missing transformed data:{transformed_data_name.replace("_"," ")} ")
-
-    transformed_df = transformed_data[transformed_data_name]
-    
-    load_fn(hook,transformed_df)
-
-def delete_temp_files(**context):
-    extracted_path_strings   = context["ti"].xcom_pull(task_ids="gather_extracted_paths", key="path_strings")
-    transformed_path_strings = context["ti"].xcom_pull(task_ids="gather_transformed_paths", key="path_strings")
-    delete_files(extracted_path_strings+transformed_path_strings)
