@@ -1,11 +1,13 @@
-import numpy as np
-import pandas as pd
 
+import pandas as pd
+from common.registry import register
 from common.dates import date
-from common.data import save_data,load_data,delete_files
+from airflow.exceptions import AirflowFailException
 
 start_date = date("2020-01-01")
 end_date = date("today")
+save_dict = { "historic_exchange_rates":"clean_rates_df"}
+tag = "currency_rates"
 
 
 def fill_exchange_rates(rates_dataframe: pd.DataFrame) -> pd.DataFrame:
@@ -42,8 +44,17 @@ def fill_exchange_rates(rates_dataframe: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def transform(historic_df:pd.DataFrame,extracted_rates_df:pd.DataFrame)->pd.DataFrame:
-    print(historic_df.dtypes)
+    
+@register(tag)
+def transform_historic_exchange_rates(extracted_data:dict[str,pd.DataFrame],**kwargs)->pd.DataFrame:
+    input_data =["historic_exchange_rates","extracted_rates"]
+    for name in input_data:
+        if (name not in extracted_data.keys()):
+            raise AirflowFailException(f"Task failed,no data to transform:'{name}' ")
+    historic_df = extracted_data["historic_exchange_rates"]
+    extracted_rates_df = extracted_data["extracted_rates"]
+
+
     historic_df["date"] = pd.to_datetime(historic_df["date"], utc=True)
     extracted_rates_df["date"] = pd.to_datetime(extracted_rates_df["date"], utc=True)
     
@@ -57,29 +68,12 @@ def transform(historic_df:pd.DataFrame,extracted_rates_df:pd.DataFrame)->pd.Data
                         .merge(historic_df, how="left", on="date")
                         .merge(extracted_rates_df.reset_index(),how="left",on="date",suffixes=("", "_fill"))
                     )
-    print(merged.head())
+    
     merged["exchange_rate"] = merged["exchange_rate"].fillna(merged["exchange_rate_fill"])
     merged = merged.drop(columns=["exchange_rate_fill"])
     
     filled_rates = fill_exchange_rates(rates_dataframe=merged)
     filled_rates = filled_rates.drop(columns=["index","fallback"])
     filled_rates["date"] = filled_rates["date"].dt.date
-    return filled_rates
-    
-    
-
-def run_transform(**context):
-    path_strings = context["ti"].xcom_pull(task_ids="extract_past_rates", key="path_strings")
-    extracted_data = load_data(path_strings)
-
-    raw_exchange_rates_df = extracted_data["extracted_rates"]
-    historic_rates_df     = extracted_data["historic_exchange_rates"]
-    
-    transformed_data = transform(historic_rates_df,raw_exchange_rates_df)
-    
-    clean_rates_path = "/tmp/clean_rates.parquet"
-    save_data(transformed_data,clean_rates_path)
-    
-    context["ti"].xcom_push(key="clean_rates_path", value=clean_rates_path)
-    
-    
+    clean_rates_df = filled_rates
+    return clean_rates_df
