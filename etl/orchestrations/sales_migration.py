@@ -1,29 +1,36 @@
-from dotenv import load_dotenv
-from datetime import timedelta
 
-from common.paths import DATA_DIR,ENV_DIR
-from common.data import generate_tmp_path_strings,save_data
+import inspect
+import pipelines.sales.extract as extract
+import pipelines.sales.transform as transform 
+import pipelines.sales.load as load
 
 from airflow import DAG
-from airflow.operators.python import PythonOperator
+from datetime import timedelta
 
-from pipelines.sales.extract import extract as sales_extract
-from pipelines.sales.transform import run_transform as run_sales_transform
-from pipelines.sales.load import run_load as run_sales_load
+from common.data import ETL_pipeline
+from pipelines.sales.extract import extracted_conditions
+from pipelines.sales.transform import save_dict
+from pipelines.sales.load import load_conditions
 
-env_path = ENV_DIR /".env"
-load_dotenv(env_path)
-raw_data_path = DATA_DIR/"raw"
+
+
 conn_str = "dashboard_app_db"
 sales_period_length = 5*365 # 5 años
+conditions_dict = { "period_length"            : sales_period_length,
+                    "extracted_data_is_empty"  :extracted_conditions,
+                   "transformed_data_is_empty" :load_conditions}
+tag = "sales"
 
-def run_sales_extract(**context):
-    
-    extracted_data = sales_extract(sales_period_length)
-    path_strings = generate_tmp_path_strings(extracted_data)
-    save_data(extracted_data,path_strings)
-    context["ti"].xcom_push(key="sales_path_strings", value=path_strings)
-    
+extract_fns   = inspect.getmembers(extract  , inspect.isfunction)
+transform_fns = inspect.getmembers(transform, inspect.isfunction)
+load_fns      = inspect.getmembers(load     , inspect.isfunction)
+
+
+extract_fn_names   = [f"{tag}.{name}" for name,_ in extract_fns   if name.startswith("extract") ] 
+transform_fn_names = [f"{tag}.{name}" for name,_ in transform_fns if name.startswith("transform") ] 
+load_fn_names      = [f"{tag}.{name}" for name,_ in load_fns      if name.startswith("load") ] 
+
+
 #  Configuración del DAG
 default_args = {
     "owner": "Federico",
@@ -41,24 +48,16 @@ with DAG(
     catchup=False,
     tags=["etl"],
 ) as dag:
+    sales_pipeline = ETL_pipeline(extract_fn_names,transform_fn_names,load_fn_names,conn_str,save_dict,conditions_dict)
 
+    extract_tasks                 = sales_pipeline.make_extraction_tasks()
+    gather_extracted_paths_task   = sales_pipeline.make_gather_paths_task("gather_extracted_paths")
+    transform_tasks               = sales_pipeline.make_transform_tasks()
+    gather_transformed_paths_task = sales_pipeline.make_gather_paths_task("gather_transformed_paths")
+    load_tasks                    = sales_pipeline.make_load_tasks()
+    delete_tmp_files_task         = sales_pipeline.make_delete_tmp_files_task()
     
-    extract_sales = PythonOperator(
-        task_id="extract_rates_branches_products_and_categories",
-        python_callable=run_sales_extract,
-    )
-   
-    transform_sales = PythonOperator(
-        task_id="merge_and_normalize_coins",
-        python_callable=run_sales_transform,
-    )
-    
-
-    load_sales = PythonOperator(
-        task_id="load_sales",
-        python_callable=run_sales_load,
-    )
    
 
     
-    extract_sales>> transform_sales>> load_sales 
+    extract_tasks >> gather_extracted_paths_task >> transform_tasks >> gather_transformed_paths_task >> load_tasks >> delete_tmp_files_task
