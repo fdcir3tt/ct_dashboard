@@ -213,13 +213,13 @@ def save_data(data:list[dict[str,Any]]|pd.DataFrame|dict[str,Any],path_strings:s
                 data[file_name].to_parquet(file_path,engine="pyarrow")
         
 
-def load_data(path_strings:str|list[str])->list[dict[str,Any]]|pd.DataFrame|dict[str,Any]:
+def load_data(path_strings:str|Path|list[str|Path])->list[dict[str,Any]]|pd.DataFrame|dict[str,Any]:
     """
     Carga datos desde archivos JSON o Parquet.
 
     Parameters
     ----------
-    path_strings : str | list[str]
+    path_strings : str | Path | list[str|Path]
         Ruta o lista de rutas.
 
     Returns
@@ -234,16 +234,32 @@ def load_data(path_strings:str|list[str])->list[dict[str,Any]]|pd.DataFrame|dict
                 data = load_records(file_path)
         if file_path.suffix == ".parquet":
                 data = pd.read_parquet(file_path,engine="pyarrow")
+        if file_path.suffix == ".csv":
+                data = pd.read_csv(file_path,sep=";")
+        return data
+    elif isinstance(path_strings,Path):
+        file_path = path_strings
+        if file_path.suffix == ".json":
+                data = load_records(file_path)
+        if file_path.suffix == ".parquet":
+                data = pd.read_parquet(file_path,engine="pyarrow")
+        if file_path.suffix == ".csv":
+                data = pd.read_csv(file_path,sep=";")
         return data
     # Varios archivos
     data = {}
     for path_str in path_strings:
-            file_path = Path(path_str)
+            if isinstance(path_str,Path):
+                file_path = path_str
+            else:
+                file_path = Path(path_str)
             file_name = str(file_path.stem)
             if file_path.suffix == ".json":
                 data[file_name] = load_records(file_path)
             if file_path.suffix == ".parquet":
                 data[file_name] = pd.read_parquet(file_path,engine="pyarrow")
+            if file_path.suffix == ".csv":
+                data[file_name] = pd.read_csv(file_path,sep=";")
     return data 
 
 def save_records(records:list[dict[str,Any]],file_path:Path)->None:
