@@ -10,6 +10,27 @@ from airflow.utils.trigger_rule import TriggerRule
 from airflow.exceptions import AirflowSkipException,AirflowFailException
 
 class ETL_pipeline():
+    """
+    Clase que construye un pipeline ETL (Extract, Transform, Load) basado en Airflow.
+
+    Permite generar dinámicamente tareas de extracción, transformación, carga
+    y limpieza de archivos temporales.
+
+    Parameters
+    ----------
+    extract_fns : list[str]
+        Lista de nombres de funciones de extracción registradas en FUNCTION_REGISTRY.
+    transform_fns : list[str]
+        Lista de nombres de funciones de transformación registradas.
+    load_fns : list[str]
+        Lista de nombres de funciones de carga registradas.
+    conn_str : str
+        String de conexión a la fuente/destino de datos.
+    save_dict : dict[str, str]
+        Mapeo de nombres de datasets a nombres de salida.
+    conditions_dict : dict[str, dict[str, str]]
+        Condiciones de control para skip/stop en cada etapa.
+    """
     def __init__(self,extract_fns:list[str],transform_fns:list[str],load_fns:list[str],conn_str:str,save_dict:dict[str,str],conditions_dict:dict[str,dict[str,str]]):
         self.extract_fns = extract_fns
         self.transform_fns = transform_fns
@@ -20,6 +41,23 @@ class ETL_pipeline():
         self.task_conditions_dict = conditions_dict
 
     def make_gather_paths_task(self,task_title:str)->PythonOperator:
+        """
+        Crea una tarea de Airflow que recopila rutas de archivos generados.
+
+        Parameters
+        ----------
+        task_title : str
+            Identificador de la tarea en Airflow.
+
+        Returns
+        -------
+        PythonOperator
+            Tarea configurada para ejecutar gather_paths.
+
+        Notes
+        -----
+        Usa trigger_rule=ALL_DONE para ejecutarse aunque fallen tareas previas.
+        """
 
         gather_paths_task = PythonOperator(
             task_id=task_title,
@@ -30,6 +68,14 @@ class ETL_pipeline():
         return gather_paths_task
     
     def make_extraction_tasks(self)->list[PythonOperator]:
+        """
+        Genera tareas de extracción para cada función registrada.
+
+        Returns
+        -------
+        list[PythonOperator]
+            Lista de tareas de extracción.
+        """
         extract_tasks =[]
         for function_name in self.extract_fns :
             task = PythonOperator(
@@ -43,6 +89,14 @@ class ETL_pipeline():
         return extract_tasks
     
     def make_transform_tasks(self)->list[PythonOperator]:
+        """
+        Genera tareas de transformación para cada función registrada.
+
+        Returns
+        -------
+        list[PythonOperator]
+            Lista de tareas de transformación.
+        """
         transform_tasks =[]
         for function_name in self.transform_fns :
             task = PythonOperator(
@@ -56,6 +110,14 @@ class ETL_pipeline():
         return transform_tasks
 
     def make_load_tasks(self)->list[PythonOperator]:
+        """
+        Genera tareas de carga para cada función registrada.
+
+        Returns
+        -------
+        list[PythonOperator]
+            Lista de tareas de carga.
+        """
         load_tasks =[]
         for function_name in self.load_fns :
             task = PythonOperator(
@@ -69,6 +131,14 @@ class ETL_pipeline():
         return load_tasks
 
     def make_delete_tmp_files_task(self)->None:
+        """
+        Crea una tarea de limpieza de archivos temporales.
+
+        Returns
+        -------
+        PythonOperator
+            Tarea que elimina archivos temporales generados en el pipeline.
+        """
         delete_tmp_files_task = PythonOperator(
             task_id="delete_tmp_files",
             op_args = [self.delete_dict],
@@ -77,8 +147,26 @@ class ETL_pipeline():
         )
         return delete_tmp_files_task
         
-
+# Auxiliar 
 def generate_tmp_path_strings(data_dict:dict[str,pd.DataFrame|list[dict[str,Any]]])->list[str]:
+    """
+    Genera rutas temporales en /tmp para datasets.
+
+    Parameters
+    ----------
+    data_dict : dict[str, DataFrame | list[dict]]
+        Diccionario con nombre de dataset y datos.
+
+    Returns
+    -------
+    list[str]
+        Lista de rutas generadas.
+
+    Notes
+    -----
+    - DataFrame -> .parquet
+    - list[dict] -> .json
+    """
     path_strings = []
     for file_name,data in data_dict.items():
         if isinstance(data,pd.DataFrame):
@@ -90,6 +178,21 @@ def generate_tmp_path_strings(data_dict:dict[str,pd.DataFrame|list[dict[str,Any]
     return path_strings
 
 def save_data(data:list[dict[str,Any]]|pd.DataFrame|dict[str,Any],path_strings:str|list[str])->None:
+    """
+    Guarda datos en disco en formato JSON o Parquet.
+
+    Parameters
+    ----------
+    data : list[dict] | DataFrame | dict[str, Any]
+        Datos a guardar.
+    path_strings : str | list[str]
+        Ruta o rutas destino.
+
+    Notes
+    -----
+    - Si es un solo archivo, guarda directamente.
+    - Si son múltiples, espera estructura dict por nombre.
+    """
     # Un archivo
     if isinstance(path_strings,str):
         file_path = Path(path_strings)
@@ -111,6 +214,19 @@ def save_data(data:list[dict[str,Any]]|pd.DataFrame|dict[str,Any],path_strings:s
         
 
 def load_data(path_strings:str|list[str])->list[dict[str,Any]]|pd.DataFrame|dict[str,Any]:
+    """
+    Carga datos desde archivos JSON o Parquet.
+
+    Parameters
+    ----------
+    path_strings : str | list[str]
+        Ruta o lista de rutas.
+
+    Returns
+    -------
+    list[dict] | DataFrame | dict[str, Any]
+        Datos cargados en memoria.
+    """
     # Un archivo
     if isinstance(path_strings,str):
         file_path = Path(path_strings)
@@ -131,15 +247,46 @@ def load_data(path_strings:str|list[str])->list[dict[str,Any]]|pd.DataFrame|dict
     return data 
 
 def save_records(records:list[dict[str,Any]],file_path:Path)->None:
+    """
+    Guarda registros en formato JSON.
+
+    Parameters
+    ----------
+    records : list[dict]
+        Lista de diccionarios a serializar.
+    file_path : Path
+        Ruta destino.
+    """
     with open(file_path, "w") as f:
         json.dump(records, f)
 
 def load_records(file_path:Path)->list[dict[str,Any]]:
+    """
+    Carga registros desde un archivo JSON.
+
+    Parameters
+    ----------
+    file_path : Path
+        Ruta del archivo.
+
+    Returns
+    -------
+    list[dict]
+        Registros cargados.
+    """
     with open(file_path) as f:
         records = json.load(f)
     return records
 
 def delete_files(file_paths:str|list[str]|Path|list[Path])->None:
+    """
+    Elimina uno o múltiples archivos del sistema.
+
+    Parameters
+    ----------
+    file_paths : str | list[str] | Path | list[Path]
+        Rutas de archivos a eliminar.
+    """
     if isinstance(file_paths, Path):
         file_paths.unlink()
         print(f"Archivo '{file_paths}' borrado correctamente!")
@@ -161,12 +308,46 @@ def delete_files(file_paths:str|list[str]|Path|list[Path])->None:
         print(f"Archivo '{path}' borrado correctamente!")        
 
 def data_is_empty(data:pd.DataFrame|list[dict[str,Any]])->bool:
+    """
+    Evalúa si un dataset está vacío.
+
+    Parameters
+    ----------
+    data : DataFrame | list[dict]
+        Datos a evaluar.
+
+    Returns
+    -------
+    bool
+        True si está vacío, False en caso contrario.
+    """
     if isinstance(data,pd.DataFrame):
         return data.empty
     elif isinstance(data,list):
         return len(data)==0
 
+# Airflow
+
 def extract(extract_fn_name:str,conn_str=None,**context):
+    """
+    Ejecuta una función de extracción registrada y guarda el resultado en /tmp.
+
+    Parameters
+    ----------
+    extract_fn_name : str
+        Nombre de la función en FUNCTION_REGISTRY.
+    conn_str : str, optional
+        String de conexión.
+    **context :
+        Contexto de Airflow (XCom, condiciones de control).
+
+    Raises
+    ------
+    AirflowSkipException
+        Si no hay datos y la política es "skip".
+    AirflowFailException
+        Si no hay datos y la política es "stop".
+    """
     extract_fn = FUNCTION_REGISTRY[extract_fn_name]
     extracted_data = extract_fn(conn_str=conn_str,**context)
     file_name = extract_fn_name.split("extract_")[1]
@@ -185,6 +366,25 @@ def extract(extract_fn_name:str,conn_str=None,**context):
 
 
 def transform(transform_fn_name:str,save_dict:dict[str,str],**context):
+    """
+    Aplica transformación a datos extraídos previamente.
+
+    Parameters
+    ----------
+    transform_fn_name : str
+        Nombre de la función de transformación.
+    save_dict : dict[str, str]
+        Mapeo de nombres de salida.
+    **context :
+        Contexto de Airflow.
+
+    Raises
+    ------
+    AirflowSkipException
+        Si no hay datos disponibles.
+    AirflowFailException
+        Si no hay datos y se debe detener el pipeline.
+    """
     extracted_path_strings = context["ti"].xcom_pull(task_ids="gather_extracted_paths", key="path_strings")
     extracted_data = load_data(extracted_path_strings)
     
@@ -208,6 +408,18 @@ def transform(transform_fn_name:str,save_dict:dict[str,str],**context):
     context["ti"].xcom_push(key="path_string",value=path_string)
 
 def load(load_fn_name:str,conn_str:str,**context):
+    """
+    Carga datos transformados hacia el destino final.
+
+    Parameters
+    ----------
+    load_fn_name : str
+        Nombre de la función de carga.
+    conn_str : str
+        String de conexión destino.
+    **context :
+        Contexto de Airflow.
+    """
     
     extracted_path_strings = context["ti"].xcom_pull(task_ids="gather_transformed_paths", key="path_strings")
     transformed_data = load_data(extracted_path_strings)
@@ -223,6 +435,16 @@ def load(load_fn_name:str,conn_str:str,**context):
     load_fn(conn_str,transformed_data)
 
 def delete_temp_files(delete_dict:dict[str,str],**context):
+    """
+    Elimina archivos temporales generados durante el pipeline.
+
+    Parameters
+    ----------
+    delete_dict : dict[str, str]
+        Mapeo de tareas a claves XCom.
+    **context :
+        Contexto de Airflow.
+    """
     temp_files_path_strings =[]
     for task_id,key in delete_dict.items():
         path_strings = context["ti"].xcom_pull(task_ids=task_id, key=key)
@@ -231,6 +453,19 @@ def delete_temp_files(delete_dict:dict[str,str],**context):
     delete_files(temp_files_path_strings)
     
 def gather_paths(**context):
+    """
+    Recolecta rutas de archivos generados por tareas upstream.
+
+    Parameters
+    ----------
+    **context :
+        Contexto de Airflow.
+
+    Returns
+    -------
+    None
+        Envía lista de rutas vía XCom.
+    """
     upstream_task_ids = context["ti"].task.upstream_task_ids
     gathered_paths = []
 
