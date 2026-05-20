@@ -213,7 +213,7 @@ def categories_filter(category_list:list[str],top_category:str,analysis_lvl:str,
                                            key=f"Sucursal Categorías Seleccionadas {tab}")
     return categories
 
-def main_element_filter(analysis_lvl:str,element_list:list[str],top_element:str,tab:str)->tuple[str,str]:
+def main_element_filter(analysis_lvl:str,element_list:list[str],default_element:str,tab:str)->str:
     """
     Obtiene el elemento principal seleccionado para el análisis.
 
@@ -249,11 +249,11 @@ def main_element_filter(analysis_lvl:str,element_list:list[str],top_element:str,
     --------
     >>> main_element_filter(
     ...     "Productos",
-    ...     ["Café", "Té"],
-    ...     "Café",
+    ...     ["ACC2", "XRX"],
+    ...     "ACC2",
     ...     "ventas"
     ... )
-    ('Café', '**producto:** Café')
+    ('ACC2', '**producto:** ACC2')
     """
     element_type_str = analysis_lvl[:-1].lower() 
     label = f'{element_type_str.title()} de análisis'
@@ -262,9 +262,9 @@ def main_element_filter(analysis_lvl:str,element_list:list[str],top_element:str,
     main_element = pick_main_element(label=label,
                                         options= element_list,
                                         key=key_str,
-                                        default=top_element)
+                                        default=default_element)
     element_title= f"**{element_type_str}:** {main_element}"
-    return main_element,element_title
+    return main_element
 
 def period_filter(start_date:date,end_date:date,tab:str)->tuple[date,date]:
     """
