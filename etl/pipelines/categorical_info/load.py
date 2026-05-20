@@ -34,7 +34,7 @@ def load_clients_df(conn_str:str,transformed_data:dict[str,pd.DataFrame])->None:
 
 @register(tag)
 def load_product_codes_df(conn_str:str,transformed_data:dict[str,pd.DataFrame])->None:
-    product_codes_df = transformed_data["product_codes"]
+    product_codes_df = transformed_data["product_codes_df"]
     hook = PostgresHook(postgres_conn_id=conn_str)
     print("Creando tabla de productos...")
     create_table(hook,"raw","catalogo_productos",{"product_id"  :"VARCHAR PRIMARY KEY",

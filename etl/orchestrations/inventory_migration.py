@@ -5,14 +5,12 @@ import pipelines.inventory.load as load
 
 
 from datetime import timedelta
-from common.data import generate_tmp_path_strings,save_data
 from common.data import ETL_pipeline
 
 from airflow import DAG
-from airflow.operators.python import PythonOperator
 
 
-from pipelines.inventory.extract import extracted_conditions,extract_historical_existence_documents as inventory_extract
+from pipelines.inventory.extract import extracted_conditions
 from pipelines.inventory.transform import save_dict
 from pipelines.inventory.load import load_conditions
 

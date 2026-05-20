@@ -63,7 +63,7 @@ with DAG(
         task_id = "create_sales_info_table" ,
         postgres_conn_id ="dashboard_app_db",
         sql = """CREATE TABLE IF NOT EXISTS marts.informacion_ventas(
-                                            sales_id        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                                            sales_id        Integer PRIMARY KEY,
                                             product_id      VARCHAR,
                                             quantity        BIGINT,
                                             date            DATE,
@@ -83,7 +83,28 @@ with DAG(
     insert_data = PostgresOperator(
         task_id = "insert_sales_info" ,
         postgres_conn_id ="dashboard_app_db",
-        sql = """INSERT INTO marts.informacion_ventas (
+        sql = """WITH source_data AS (
+                                    SELECT DISTINCT ON (ve.sales_id)
+                                        ve.sales_id,
+                                        ve.product_id,
+                                        ve.quantity,
+                                        ve.date,
+                                        ve.price,
+                                        ve.total,
+                                        ve.client_id,
+                                        ve.folio,
+                                        ve.description,
+                                        ve.cost,
+                                        ve.sale_storage_id,
+                                        ca.branch_id,
+                                        ca.branch,
+                                        cc.category
+                                    FROM etl.ventas AS ve
+                                    LEFT JOIN raw.catalogo_productos  cp ON cp.product_id = ve.product_id
+                                    LEFT JOIN raw.catalogo_categorias cc ON cp.category_id = cc.category_id
+                                    LEFT JOIN raw.catalogo_almacenes  ca ON ve.sale_storage_id = ca.storage_id
+                                )
+                INSERT INTO marts.informacion_ventas ( sales_id,
                                                         product_id,
                                                         quantity,
                                                         date,
@@ -98,23 +119,23 @@ with DAG(
                                                         branch,
                                                         category
                                                     )
-                 SELECT             ve.product_id,
-                                    ve.quantity,
-                                    ve.date,
-                                    ve.price,
-                                    ve.total,
-                                    ve.client_id,
-                                    ve.folio,
-                                    ve.description,
-                                    ve.cost,
-                                    ve.sale_storage_id,
-                                    ca.branch_id,
-                                    ca.branch,
-                                    cc.category
-                FROM etl.ventas AS ve
-                LEFT JOIN raw.catalogo_productos cp ON cp.product_id = ve.product_id
-                LEFT JOIN raw.catalogo_categorias cc ON cp.category_id=cc.category_id
-                LEFT JOIN raw.catalogo_almacenes ca ON ve.sale_storage_id = ca.storage_id;
+                SELECT *
+                FROM source_data
+                ON CONFLICT (sales_id)
+                DO UPDATE SET 
+                    product_id      = EXCLUDED.product_id,
+                    quantity        = EXCLUDED.quantity,
+                    date            = EXCLUDED.date,
+                    price           = EXCLUDED.price,
+                    total           = EXCLUDED.total,
+                    client_id       = EXCLUDED.client_id,
+                    folio           = EXCLUDED.folio,
+                    description     = EXCLUDED.description,
+                    cost            = EXCLUDED.cost,
+                    sale_storage_id = EXCLUDED.sale_storage_id,
+                    branch_id       = EXCLUDED.branch_id,
+                    branch          = EXCLUDED.branch,
+                    category        = EXCLUDED.category;
                              """
     )
 

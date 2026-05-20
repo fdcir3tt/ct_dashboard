@@ -61,7 +61,7 @@ with DAG(
         postgres_conn_id ="dashboard_app_db",
         trigger_rule=TriggerRule.ALL_DONE,
         sql = """CREATE TABLE IF NOT EXISTS marts.informacion_inventario(
-                                            inventory_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                                            inventory_id INTEGER PRIMARY KEY,
                                             product_id   VARCHAR,
                                             date         DATE,
                                             stock        BIGINT,
@@ -73,22 +73,39 @@ with DAG(
     insert_data = PostgresOperator(
         task_id = "insert_inventory_info" ,
         postgres_conn_id ="dashboard_app_db",
-        sql = """INSERT INTO marts.informacion_inventario(product_id ,
+        sql = """
+                WITH source_data AS (
+                                    SELECT DISTINCT ON (inv.inventory_id)
+                                            inv.product_id,
+                                            inv.date,
+                                            inv.stock,
+                                            inv.storage_id,
+                                            alm.branch,
+                                            ca.category
+                                        FROM etl.inventario inv
+                                        JOIN raw.catalogo_almacenes alm      ON inv.storage_id=alm.storage_id
+                                        JOIN raw.catalogo_productos prod     ON inv.product_id=prod.product_id
+                                        LEFT JOIN raw.catalogo_categorias ca ON prod.category_id=ca.category_id
+                                )
+        
+                INSERT INTO marts.informacion_inventario(inventory_id,
+                                                          product_id ,
                                                           date ,
                                                           stock,
                                                           storage_id ,
                                                           branch ,
                                                           category )
-                SELECT inv.product_id,
-                       inv.date,
-                       inv.stock,
-                       inv.storage_id,
-                       alm.branch,
-                       ca.category
-                FROM etl.inventario inv
-                JOIN raw.catalogo_almacenes alm      ON inv.storage_id=alm.storage_id
-                JOIN raw.catalogo_productos prod     ON inv.product_id=prod.product_id
-                LEFT JOIN raw.catalogo_categorias ca ON prod.category_id=ca.category_id;
+                SELECT *
+                FROM source_data
+                ON CONFLICT (inventory_id)
+                DO UPDATE SET 
+                    product_id      = EXCLUDED.product_id,
+                    date            = EXCLUDED.date,
+                    stock           = EXCLUDED.stock,
+                    storage_id      = EXCLUDED.storage_id,
+                    branch          = EXCLUDED.branch,
+                    category        = EXCLUDED.category;
+                ;
                                             """
     )
     

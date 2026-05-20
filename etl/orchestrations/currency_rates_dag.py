@@ -66,7 +66,7 @@ with DAG(
 
     trigger_sales_dag = TriggerDagRunOperator(
         task_id="trigger_sales_dag",
-        trigger_dag_id="currency_rates_pipeline",
+        trigger_dag_id="sales_pipeline",
     )
     
     extract_rates_task >> extract_tasks >> gather_extracted_paths_task >> transform_tasks >> gather_transformed_paths_task >> load_tasks >> delete_tmp_files_task >> trigger_sales_dag

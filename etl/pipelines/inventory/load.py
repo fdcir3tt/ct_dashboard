@@ -15,13 +15,13 @@ def load_inventory_df(conn_str:str,transformed_data:dict[str,pd.DataFrame]):
     print("Creando tabla de inventario...")
 
     # Categorías
-    create_table(hook,"etl","inventario",{"existence_id":"INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY",
-                                         "product_id"   :"VARCHAR",
-                                         "date"         :"DATE",
-                                         "stock"        :"BIGINT",
-                                         "storage_id"   :"VARCHAR"},foreign_keys={
+    create_table(hook,"etl","inventario",{"inventory_id" :"INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY",
+                                          "product_id"   :"VARCHAR",
+                                          "date"         :"DATE",
+                                          "stock"        :"BIGINT",
+                                          "storage_id"   :"VARCHAR"},foreign_keys={
                                                                                   "storage_id":'raw.catalogo_almacenes(storage_id)'})
     print("Poblando tabla de inventario...")
-    upsert_df(hook,"etl","inventario",inventory_df,["existence_id"])
+    upsert_df(hook,"etl","inventario",inventory_df,["inventory_id"])
 
     
