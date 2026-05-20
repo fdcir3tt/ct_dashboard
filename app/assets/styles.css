@@ -144,6 +144,21 @@ html, body, [class*="css"] {
     border-radius: 6px;
     font-size: 0.75rem;
 }
+[data-testid="stMultiSelect"] input {
+    color: #1e3a8a !important;
+    font-weight: 500;
+}
+
+/* Placeholder (texto de ayuda) */
+[data-testid="stMultiSelect"] input::placeholder {
+    color: #64748b !important;
+    opacity: 1;
+}
+
+/* Asegura buena visibilidad del texto en el dropdown también */
+[data-testid="stMultiSelect"] * {
+    caret-color: #2563eb;
+}
 
 /* Hover */
 [data-testid="stMultiSelect"] div[data-baseweb="select"]:hover > div {
