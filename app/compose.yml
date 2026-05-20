@@ -6,6 +6,8 @@ services:
     restart: unless-stopped
     container_name: dashboard
     volumes:
+      - ./dashboard.py:/app/dashboard.py
+      - ./assets:/app/assets
       - ./data:/app/data:Z
       - ./log/:/app/log:Z
     env_file:
