@@ -422,7 +422,7 @@ def display_element_info(data:pd.DataFrame,
     La información se muestra mediante ``st.table``.
     """
     def get_element_info(element_data:pd.DataFrame,element_column:str)->dict[str,str|float]:
-        top_clients = list ( top_n(element_data,element_column,type="cliente")["clientId"] )
+        top_clients = list ( top_n(element_data,element_column,type="cliente")["client_id"] )
         clients_str=''
         for client in top_clients:
             clients_str+=client+','

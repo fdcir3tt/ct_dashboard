@@ -1,11 +1,9 @@
-import pandas as pd
-import yaml
-import datetime
 import json
+import datetime
+import pandas as pd
 
-from pymongo.database import Database,Collection
-from typing import Callable ,Dict 
-from logging import Logger 
+
+
 
 Date = datetime.datetime
 Document =  dict[str, any]
@@ -49,17 +47,17 @@ def top_n(data:pd.DataFrame,element_column:str,type:str="producto",criteria:str=
 
     Parametros:
     - data: pandas.DataFrame, Datos de facturas de venta
-    - element_column: str , Nombre de columna clasificadora de elementos. Es decir 'productId' para productos o 'category' para categoría de producto
+    - element_column: str , Nombre de columna clasificadora de elementos. Es decir 'product_id' para productos o 'category' para categoría de producto
     - type: str, Tipo de elemento que se quiere extraer.
     - criteria: str , Criterio en base cual se compararán los elementos. Ya sea ventas diarias, mensuales etc.
     - n: int, Cantidad de elementos seleccionados de los mejores.
     Regresa:
     - top_n: pandas.DataFrame, Datos de los mejores 'n' elementos en base el criterio específicado.
     """
-    type_dict= {"producto":"productId",
+    type_dict= {"producto":"product_id",
                 "categoria":"category",
                 "branch":"branch",
-                "cliente":"clientId"}
+                "cliente":"client_id"}
 
     criteria_dict={"ventas_diarias":"sales_day",
                    "ventas_mensuales":"sales_month",
@@ -147,7 +145,7 @@ def calculate_top_product_and_category(data:pd.DataFrame,
     if df[is_in_period].empty:
         top_product= (
             data
-            .groupby("productId")["quantity"]
+            .groupby("product_id")["quantity"]
             .sum()
             .idxmax()
         )
@@ -161,7 +159,7 @@ def calculate_top_product_and_category(data:pd.DataFrame,
     else:     
         top_product= (
             data[is_in_period]
-            .groupby("productId")["quantity"]
+            .groupby("product_id")["quantity"]
             .sum()
             .idxmax()
         )
@@ -174,7 +172,7 @@ def calculate_top_product_and_category(data:pd.DataFrame,
         return top_product,top_category
     
 def calculate_frequent_branch(data:pd.DataFrame,top_product:str)->str:
-    is_top_product= data["productId"]==top_product
+    is_top_product= data["product_id"]==top_product
     frequent_branch= (
         data[is_top_product]
         .groupby("branch")["date"]

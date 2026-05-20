@@ -2,7 +2,6 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 import folium
-import branca.colormap as cm
 import warnings
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -86,7 +85,7 @@ def period_sales(data: pd.DataFrame, selected_elements: list[str] ,element_colum
     Parametros:
     - data: pandas.DataFrame, Datos de facturas de venta 
     - selected_elements: list[str] , Elementos seleccionados a visualizar en gráfica .(ej. Productos o Categorías de producto)
-    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'productId' para productos o 'category' para categoría de producto
+    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'product_id' para productos o 'category' para categoría de producto
     - start_date: Date, Fecha inicio de periodo de análisis
     - end_date: Date, Fecha fin de periodo de análisis
     - include_outliers: bool, Booleano para afirmar la inclusión de ventas atípicas en el análisis
@@ -202,7 +201,7 @@ def period_inventory(data: pd.DataFrame,branch_storage:dict[str,list[str]], sele
     - data: pandas.DataFrame, Datos de facturas de venta 
     - branch_storage: dict[str,list[str]], Diccionario que contiene los almacenes asociados a cada sucursal.
     - selected_elements: list[str] , Elementos seleccionados a visualizar en gráfica .(ej. Productos o Categorías de producto)
-    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'productId' para productos o 'category' para categoría de producto
+    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'product_id' para productos o 'category' para categoría de producto
     - start_date: Date, Fecha inicio de periodo de análisis
     - end_date: Date, Fecha fin de periodo de análisis
     - branch: str, Nombre de sucursal en cual se quiere hacer análisis. Si es análisis global, no se incluye.
@@ -336,7 +335,7 @@ def sales_hist(data: pd.DataFrame,main_element: str,
     Parametros:
     - data: pandas.DataFrame, Datos de facturas de venta     
     - main_element: str , Elemento seleccionado a visualizar en gráfica .(ej. Producto o Categoría de producto)
-    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'productId' para productos o 'category' para categoría de producto
+    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'product_id' para productos o 'category' para categoría de producto
     - start_date: Date, Fecha inicio de periodo de análisis
     - end_date: Date, Fecha fin de periodo de análisis
     - include_outliers: bool, Booleano para afirmar la inclusión de ventas atípicas en el análisis
@@ -400,7 +399,7 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,main_element: str,element_colu
     Parametros:
     - data: pandas.DataFrame, Datos de facturas de venta o datos de inventario    
     - main_element: str , Elemento seleccionado a visualizar en gráfica .(ej. Producto o Categoría de producto)
-    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'productId' para productos o 'category' para categoría de producto
+    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'product_id' para productos o 'category' para categoría de producto
     - start_date: Date, Fecha inicio de periodo de análisis
     - end_date: Date, Fecha fin de periodo de análisis
     - tab: str, Indica si se trabajara con datos de inventario o de ventas
@@ -582,7 +581,7 @@ def abc_bar_chart(data:pd.DataFrame,element_column:str,start_date:Date,end_date:
 
     Parametros:
     - data: pandas.DataFrame, Datos de facturas de venta     
-    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'productId' para productos o 'category' para categoría de producto
+    - element_column: str, Nombre de columna clasificadora de elementos. Es decir 'product_id' para productos o 'category' para categoría de producto
     - start_date: Date, Fecha inicio de periodo de análisis
     - end_date: Date, Fecha fin de periodo de análisis
     - include_outliers: bool, Booleano para afirmar la inclusión de ventas atípicas en el análisis
