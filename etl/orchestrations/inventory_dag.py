@@ -76,6 +76,7 @@ with DAG(
         sql = """
                 WITH source_data AS (
                                     SELECT DISTINCT ON (inv.inventory_id)
+                                            inv.inventory_id,
                                             inv.product_id,
                                             inv.date,
                                             inv.stock,
