@@ -24,54 +24,54 @@ def make_cached(func:Callable):
         return func(*args, **kwargs)
     return wrapper
 
-def load_sales_data()->dict[str,pd.DataFrame]:
+@st.cache_data(ttl=300,show_spinner=False)
+def load_sales_data(start_date:datetime.date,end_date:datetime.date)->dict[str,pd.DataFrame]:
     
-    with st.spinner("Cargando datos de ventas..."):
+    data_query =  """SELECT product_id,
+                                quantity,
+                                date,
+                                price,
+                                total,
+                                client_id,
+                                folio,
+                                description,
+                                cost,
+                                sale_storage_id,
+                                branch_id,
+                                branch,
+                                category 
+                         FROM marts.informacion_ventas
+                         WHERE date BETWEEN %s AND %s"""
+              
+    global_data = load_data(data_query,params=(start_date,end_date))
+    global_data = add_states_column(global_data)
+    global_data = global_data.astype(dtype={"date":"date32[pyarrow]"})
+    global_data['income'] = global_data['price'] * global_data['quantity']
+    global_data = identify_outlier_sales(global_data,element_column='product_id')
+
+
+    data = global_data.copy()
+
+    return {"global_data":global_data,"data":data}
+
+@st.cache_data(ttl=300,show_spinner=False)
+def load_inventory_data(start_date:datetime.date,end_date:datetime.date)->dict[str,pd.DataFrame]:
     
-        data_query = f"""SELECT v."productId",
-                                    v.quantity,
-                                    v.date,
-                                    v.price,
-                                    v.total,
-                                    v."clientId",
-                                    v.folio,
-                                    v.description,
-                                    v.cost,
-                                    v."storageId",
-                                    v."branchId",
-                                    v.branch,
-                                    c.category
-                             FROM marts.ventas AS v
-                             LEFT JOIN raw.categorias as c ON CAST(v."categoryId" AS numeric)::integer=c."categoryId"
-                             WHERE v."categoryId"<>'unknown' """
-
-        global_data = load_data(data_query)
-        global_data = add_states_column(global_data)
-        global_data = global_data.astype(dtype={"date":"date32[pyarrow]"})
-        global_data['income'] = global_data['price'] * global_data['quantity']
-        global_data = identify_outlier_sales(global_data,element_column='productId')
-
-
-        data = global_data.copy()
-
-        return {"global_data":global_data,"data":data}
-
-def load_inventory_data()->dict[str,pd.DataFrame]:
     
-    with st.spinner("Cargando datos de inventario..."):
-        branch_storage = load_data("SELECT * FROM raw.almacenes")
-        inventory = load_data("""SELECT inv.*,
-                                            alm.branch,
-                                            ca.category
-                                     FROM etl.inventory AS inv
-                                     JOIN raw.almacenes AS alm ON inv."storageId"=alm."storageId"
-                                     JOIN raw.productos AS prod ON inv."productId"=prod."productId"
-                                     LEFT JOIN raw.categorias as ca ON CAST(prod."categoryId" AS numeric)::integer=ca."categoryId"
-                                     WHERE prod."categoryId"<>'unknown'
-                                  """)
-        inventory = add_states_column(inventory)
+    branch_storage = load_data("SELECT * FROM raw.catalogo_almacenes")
+    query = """SELECT product_id,
+                          date,
+                          stock,
+                          storage_id,
+                          branch,
+                          category 
+                   FROM marts.informacion_inventario
+                   WHERE date BETWEEN %s AND %s"""
+        
+    inventory = load_data(query,params=(start_date,end_date))
+    inventory = add_states_column(inventory)
 
-        return {"branch_storage":branch_storage,"inventory":inventory}
+    return {"branch_storage":branch_storage,"inventory":inventory}
 
 def left_section(data:pd.DataFrame,
                  period_start:Date,
@@ -116,7 +116,7 @@ def left_section(data:pd.DataFrame,
         elements={"Productos":products,
                   "Categorías":categories}[analysis_lvl]
         
-        column={"Productos":"productId",
+        column={"Productos":"product_id",
                 "Categorías":"category"}[analysis_lvl]
         return elements,column
     
@@ -145,8 +145,8 @@ def left_section(data:pd.DataFrame,
     display_element_info(data=data,
                          element_title=element_title,
                          analysis_lvl=analysis_lvl,
-                 selected_element=main_element,
-                 element_column=element_column)
+                         selected_element=main_element,
+                         element_column=element_column)
 
         
         
@@ -336,7 +336,8 @@ def main():
 
         with left:
             period_start,period_end = load_dates(tab="ventas")
-            sales_data_dict = cache_wrappers["load_sales_data"]()
+            with st.spinner("Cargando datos de ventas..."):
+                sales_data_dict = load_sales_data(period_start,period_end)
             data = sales_data_dict["data"]
             global_data = sales_data_dict["global_data"]
             
@@ -347,7 +348,7 @@ def main():
                                                                             period_start=period_start,
                                                                             period_end=period_end)
 
-                product_list = list( data["productId"].unique() )
+                product_list = list( data["product_id"].unique() )
                 category_list = list( data["category"].unique() )
                 branch_list = list( data["branch"].unique() )
 
@@ -398,7 +399,8 @@ def main():
     with left:
         
         inv_period_start,inv_period_end = load_dates(tab='inventario')
-        inv_data_dict = cache_wrappers["load_inventory_data"]()
+        with st.spinner("Cargando datos de inventario..."):
+            inv_data_dict = load_inventory_data(inv_period_start,inv_period_end)
         inventory = inv_data_dict["inventory"]
         branch_storage = inv_data_dict["branch_storage"]
         
