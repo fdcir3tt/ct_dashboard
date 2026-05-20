@@ -179,14 +179,14 @@ html, body, [class*="css"] {
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 
-/* Selectbox label */
+/* Label */
 [data-testid="stSelectbox"] label {
     color: #1e3a8a !important;
     font-weight: 600;
     font-size: 0.85rem;
 }
 
-/* Selectbox input box */
+/* Base input box */
 [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
     background-color: #f8fafc !important;
     border: 1px solid #cbd5e1 !important;
@@ -194,12 +194,21 @@ html, body, [class*="css"] {
     min-height: 38px;
 }
 
-/* Selected value text - Multiple selectors to ensure it works */
-[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
-[data-testid="stSelectbox"] div[data-baseweb="select"] span,
-[data-testid="stSelectbox"] div[data-baseweb="select"] div {
-    color: #0b39b6 !important;
-    font-size: 0.875rem !important;
+/* Texto del valor seleccionado (lo importante) */
+[data-testid="stSelectbox"] * {
+    color: #0f172a !important;
+}
+
+/* Si el select es searchable (input interno) */
+[data-testid="stSelectbox"] input {
+    color: #0f172a !important;
+    caret-color: #2563eb;
+}
+
+/* Placeholder */
+[data-testid="stSelectbox"] input::placeholder {
+    color: #64748b !important;
+    opacity: 1;
 }
 
 /* Hover */
@@ -213,7 +222,7 @@ html, body, [class*="css"] {
     box-shadow: 0 0 0 1px #2563eb;
 }
 
-/* Dropdown arrow icon */
+/* Arrow */
 [data-testid="stSelectbox"] svg {
     fill: #64748b !important;
 }
