@@ -146,12 +146,12 @@ def right_section(data:pd.DataFrame,
                   tab:str,
                   **kwargs):
     
-    analysis_lvl                    = fetch_analysis_lvl(tab)
-    branch                          = fetch_branch(tab)
-    period_start,period_end         = load_dates(tab)
-    main_element                    = fetch_main_element(analysis_lvl,tab)
-    selected_elements,element_column=fetch_selected_elements(analysis_lvl,tab)
-    include_outliers = fetch_include_outliers(tab)
+    analysis_lvl                     = fetch_analysis_lvl(tab)
+    branch                           = fetch_branch(tab)
+    period_start,period_end          = load_dates(tab)
+    main_element                     = fetch_main_element(analysis_lvl,tab)
+    selected_elements,element_column = fetch_selected_elements(analysis_lvl,tab)
+    include_outliers                 = fetch_include_outliers(tab)
 
     if tab=='ventas':
         st.markdown("### Ventas Diarias")
@@ -245,13 +245,16 @@ def right_section(data:pd.DataFrame,
                                 analysis_lvl=analysis_lvl,
                                 tab=tab)   
                      
-def load_dates(tab:str)->tuple[date,date]:
+def load_dates(tab:str)->tuple[datetime.date,datetime.date]:
     today = datetime.date.today() 
     start_date,end_date = fetch_dates(tab)
 
     if start_date is None:
         if today.day < 15:
-            period_start =  datetime.date(today.year, today.month -1 , 15) 
+            if today.month == 1:
+                period_start =  datetime.date(today.year, 12 , 15) 
+            else:
+                period_start =  datetime.date(today.year, today.month -1 , 15) 
         else:
             period_start = datetime.date(today.year, today.month, 1)
     else:
@@ -367,42 +370,42 @@ def main():
 
         left, right = st.columns([1.2, 3])
 
-    with left:
-        
-
-        left_section(data=data,
-                         option_lists=option_list,
-                         default_values=default_values,
-                         tab='inventario')
+        with left:
+            option_list    = {"branches"  : branch_list,
+                            "categories": category_list,
+                            "products"  : product_list}
             
-        inv_period_start,inv_period_end = load_dates(tab='inventario')
-        inv_analysis_lvl = fetch_analysis_lvl(tab='inventario')
-        inv_selected_elements,inv_element_column = fetch_selected_elements(inv_analysis_lvl,tab='inventario')
-    
-        with st.spinner("Cargando datos de inventario..."):
-            inv_data_dict = load_inventory_data(inv_period_start,inv_period_end,element_column=inv_element_column,elements_selected=inv_selected_elements)
+            default_values = {"branch"  : frequent_branch,
+                            "category": top_category,
+                            "product" : top_product}
 
-        inventory = inv_data_dict["inventory"]
-        branch_storage = inv_data_dict["branch_storage"]
+            left_section(data=data,
+                            option_lists=option_list,
+                            default_values=default_values,
+                            tab='inventario')
+                
+            inv_period_start,inv_period_end = load_dates(tab='inventario')
+            inv_analysis_lvl = fetch_analysis_lvl(tab='inventario')
+            inv_selected_elements,inv_element_column = fetch_selected_elements(inv_analysis_lvl,tab='inventario')
         
-        option_list    = {"branches"  : branch_list,
-                          "categories": category_list,
-                          "products"  : product_list}
-        
-        default_values = {"branch"  : frequent_branch,
-                          "category": top_category,
-                          "product" : top_product}
+            with st.spinner("Cargando datos de inventario..."):
+                inv_data_dict = load_inventory_data(inv_period_start,inv_period_end,element_column=inv_element_column,elements_selected=inv_selected_elements)
 
-        if data.empty:
-                print('Dataset vacío')
-                     
+            inventory = inv_data_dict["inventory"]
+            branch_storage = inv_data_dict["branch_storage"]
+            
+            
+
+            if data.empty:
+                    print('Dataset vacío')
+                        
+            
+        with right:
+            right_section(data=inventory,
+                        branch_storage = branch_storage,
+                        global_data=global_data,
+                        tab='inventario')
         
-    with right:
-        right_section(data=inventory,
-                      branch_storage = branch_storage,
-                      global_data=global_data,
-                          tab='ventas')
-    
 
 
 if __name__ == "__main__":
