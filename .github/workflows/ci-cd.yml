@@ -23,8 +23,6 @@ jobs:
               - 'app/**'
             etl:
               - 'etl/**'
-            mlops:
-              - 'mlops/**'
 
   build-and-push:
     name: Build ${{ matrix.app }}
