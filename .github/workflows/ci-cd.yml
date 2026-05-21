@@ -1,35 +1,75 @@
-name: Build and Push Image
+name: Build & Publish Docker Images
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
-  build:
+  detect-changes:
+    name: Detectar apps modificadas
     runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detectar cambios por carpeta
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            app:
+              - 'app/**'
+            etl:
+              - 'etl/**'
+            mlops:
+              - 'mlops/**'
+
+  build-and-push:
+    name: Build ${{ matrix.app }}
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.apps != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.detect-changes.outputs.apps) }}
+
     permissions:
       contents: read
       packages: write
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v2
+      - name: Leer versión desde archivo VERSION
+        id: version
+        run: |
+          VERSION=$(cat ./${{ matrix.app }}/VERSION | tr -d '[:space:]')
+          echo "value=$VERSION" >> $GITHUB_OUTPUT
+          echo "App: ${{ matrix.app }} → Versión: $VERSION"
+          
+      - name: Log in a GitHub Container Registry
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Extraer metadatos (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.app }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.value }}
+            type=raw,value=${{ steps.version.outputs.value }}-${{ github.sha }}
+            type=raw,value=latest,enable=true
+
+      - name: Build y push
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./${{ matrix.app }}
+          file: ./${{ matrix.app }}/docker/Dockerfile
           push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:v1.0.0
-
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
