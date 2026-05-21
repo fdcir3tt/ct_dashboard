@@ -9,7 +9,7 @@ from dashboard.graphs import *
 from dashboard.plot_displays import sales_plots,inventory_plots,display_element_info,kpi_display,histogram_plots,priority_and_map_plots,kpi_calculator
 from dashboard.data import load_data
 from dashboard.filters import include_outliers_filter,analysis_lvl_filter,products_filter,categories_filter,branch_filter,main_element_filter,period_filter
-from dashboard.streamlit_utils import fetch_selected_elements,fetch_analysis_lvl,fetch_dates,fetch_main_element,fetch_branch
+from dashboard.streamlit_utils import fetch_selected_elements,fetch_analysis_lvl,fetch_dates,fetch_main_element,fetch_branch,fetch_include_outliers
 
 def load_css(file_name):
 
@@ -97,10 +97,10 @@ def load_sales_data(start_date:datetime.date,end_date:datetime.date)->dict[str,p
 
 @st.cache_data(ttl=300,show_spinner=False)
 def load_inventory_data(start_date:datetime.date,end_date:datetime.date,element_column:str,elements_selected:list[str])->dict[str,pd.DataFrame]:
-    
+    placeholders = ",".join(["%s"] * len(elements_selected))
     
     branch_storage = load_data("SELECT * FROM raw.catalogo_almacenes")
-    query = """SELECT product_id,
+    query = f"""SELECT product_id,
                           date,
                           stock,
                           storage_id,
@@ -108,9 +108,9 @@ def load_inventory_data(start_date:datetime.date,end_date:datetime.date,element_
                           category 
                    FROM marts.informacion_inventario
                    WHERE date BETWEEN %s AND %s
-                   AND %s IN %s """
-        
-    inventory = load_data(query,params=(start_date,end_date,element_column,elements_selected))
+                   AND {element_column} IN ({placeholders}) """
+    
+    inventory = load_data(query,params=(start_date,end_date,*elements_selected))
     inventory = add_states_column(inventory)
 
     return {"branch_storage":branch_storage,"inventory":inventory}
@@ -143,7 +143,6 @@ def left_section(data:pd.DataFrame,
 
 def right_section(data:pd.DataFrame,
                   global_data:pd.DataFrame,
-                  include_outliers :bool,
                   tab:str,
                   **kwargs):
     
@@ -152,6 +151,7 @@ def right_section(data:pd.DataFrame,
     period_start,period_end         = load_dates(tab)
     main_element                    = fetch_main_element(analysis_lvl,tab)
     selected_elements,element_column=fetch_selected_elements(analysis_lvl,tab)
+    include_outliers = fetch_include_outliers(tab)
 
     if tab=='ventas':
         st.markdown("### Ventas Diarias")
@@ -334,12 +334,13 @@ def main():
 
                 # Sucursal en donde se vende más seguido el producto más vendido
                 
-                option_list = {"branches"  :branch_list,
-                               "categories": category_list,
-                               "products"  : product_list}
-                default_values = {"branch":frequent_branch,
-                                  "category":top_category,
-                                  "product":top_product}
+                option_list    = {"branches"  : branch_list,
+                                  "categories": category_list,
+                                  "products"  : product_list}
+        
+                default_values = {"branch"  : frequent_branch,
+                                  "category": top_category,
+                                  "product" : top_product}
 
                 if data.empty:
                     print('Dataset vacío')
@@ -353,14 +354,6 @@ def main():
         with right:
             right_section(data=data,
                           global_data=global_data,
-                          main_element=main_element,
-                          selected_elements=selected_elements,
-                          element_column=element_column,
-                          branch=branch,
-                          include_outliers =include_outliers,
-                          period_start=period_start,
-                          period_end=period_end,
-                          analysis_lvl=analysis_lvl,
                           tab='ventas')
 
         
@@ -376,6 +369,11 @@ def main():
 
     with left:
         
+
+        left_section(data=data,
+                         option_lists=option_list,
+                         default_values=default_values,
+                         tab='inventario')
             
         inv_period_start,inv_period_end = load_dates(tab='inventario')
         inv_analysis_lvl = fetch_analysis_lvl(tab='inventario')
@@ -383,33 +381,27 @@ def main():
     
         with st.spinner("Cargando datos de inventario..."):
             inv_data_dict = load_inventory_data(inv_period_start,inv_period_end,element_column=inv_element_column,elements_selected=inv_selected_elements)
+
         inventory = inv_data_dict["inventory"]
         branch_storage = inv_data_dict["branch_storage"]
         
-        left_section(  data=inventory,
-                     period_start=inv_period_start,
-                    period_end=inv_period_end,
-                     branch_list=branch_list,
-                     product_list=product_list,
-                     category_list=category_list,
-                                                                                                                                                                 top_product=top_product,
-                                                                                                                                                                 top_category=top_category,
-                                                                                                                                                                 frequent_branch_index=frequent_branch_index,
-                                                                                                                                                                 tab='inventario')
+        option_list    = {"branches"  : branch_list,
+                          "categories": category_list,
+                          "products"  : product_list}
+        
+        default_values = {"branch"  : frequent_branch,
+                          "category": top_category,
+                          "product" : top_product}
+
+        if data.empty:
+                print('Dataset vacío')
+                     
         
     with right:
-        right_section(  data=inventory,
-                        branch_storage=branch_storage,
-                        global_data=global_data,
-                        main_element=inv_main_element,
-                        selected_elements=inv_selected_elements,
-                        element_column=inv_element_column,
-                        branch=inv_branch,
-                        include_outliers =include_outliers,
-                        period_start=inv_period_start,
-                        period_end=inv_period_end,
-                        analysis_lvl=inv_analysis_lvl,
-                        tab='inventario')
+        right_section(data=inventory,
+                      branch_storage = branch_storage,
+                      global_data=global_data,
+                          tab='ventas')
     
 
 

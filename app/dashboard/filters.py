@@ -1,7 +1,7 @@
 from datetime import date
 from dashboard.streamlit_utils import pick_branch,pick_elements,pick_main_element,pick_date
 
-def include_outliers_filter(tab:str)->bool|None:
+def include_outliers_filter(tab:str)->str|None:
     """
     Determina si se deben incluir ventas anómalas en el análisis.
 
@@ -34,17 +34,14 @@ def include_outliers_filter(tab:str)->bool|None:
     None
     """
     if tab=='ventas':
-            outliers= pick_main_element(label='Análisis con ventas anomalas incluídas',
+        outliers= pick_main_element(label='Análisis con ventas anomalas incluídas',
                                             options= ['Sí','No'],
                                             default='Sí',
                                             key=f'Incluir {tab} anómalas')
-            if outliers=='Sí':
-                include_outliers = True
-            else: 
-                include_outliers = False
-    else:
-        include_outliers = None 
-    return include_outliers
+    if tab=='inventario':
+        outliers=None
+            
+    return outliers
 
 def analysis_lvl_filter(tab:str)->str:
     """

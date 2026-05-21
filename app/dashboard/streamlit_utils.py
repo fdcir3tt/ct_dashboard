@@ -85,3 +85,13 @@ def fetch_branch(tab:str)->str:
     key_str =f'Sucursal seleccionada {tab}'
     branch = st.session_state.get(key=key_str)
     return branch
+
+def fetch_include_outliers(tab:str)->bool:
+    key_str=f'Incluir {tab} anómalas'
+    outliers = st.session_state.get(key=key_str)
+    if outliers=='Sí':
+        include_outliers = True
+    else:
+        include_outliers = False
+    
+    return include_outliers 
