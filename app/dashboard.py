@@ -2,10 +2,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 
-from functools import wraps
-from typing import List,Callable,Tuple,Dict
 from dashboard.utils import add_states_column,identify_outlier_sales,calculate_top_product_and_category,calculate_frequent_branch
-from dashboard.graphs import *
 from dashboard.plot_displays import sales_plots,inventory_plots,display_element_info,kpi_display,histogram_plots,priority_and_map_plots,kpi_calculator
 from dashboard.data import load_data
 from dashboard.filters import include_outliers_filter,analysis_lvl_filter,products_filter,categories_filter,branch_filter,main_element_filter,period_filter
@@ -16,13 +13,6 @@ def load_css(file_name):
     with open(file_name) as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-def make_cached(func:Callable):
-    """Crea versiones cacheadas de funciones"""
-    @st.cache_data(ttl=3600*12,show_spinner=False)
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-    return wrapper
 
 def filters(option_lists:dict[str,list[str]],default_values:dict[str,str],tab:str):
     branch_list   = option_lists["branches"]
@@ -41,12 +31,13 @@ def filters(option_lists:dict[str,list[str]],default_values:dict[str,str],tab:st
     with col2 :
         include_outliers_filter(tab) 
     
-    default_branch_index = branch_list.index(default_branch)
+    default_branch_index = ( branch_list.index(default_branch) if default_branch in branch_list else 0 )
 
     branch_filter(branch_list,default_branch_index,tab)
     categories = categories_filter(category_list,default_category,analysis_lvl,tab)   
     products = products_filter(product_list,default_product,analysis_lvl,tab)
-    
+    products = products or []
+
     if len(products)==0:
         element_list = categories
         default_element = default_category
@@ -100,6 +91,9 @@ def load_inventory_data(start_date:datetime.date,end_date:datetime.date,element_
     placeholders = ",".join(["%s"] * len(elements_selected))
     
     branch_storage = load_data("SELECT * FROM raw.catalogo_almacenes")
+    if not elements_selected:
+        return {"branch_storage": branch_storage,
+                "inventory": pd.DataFrame()}
     query = f"""SELECT product_id,
                           date,
                           stock,
@@ -283,13 +277,8 @@ def main():
 
     load_css("assets/styles.css")
 
-    funcs = [identify_outlier_sales,
-             prepare_sales_heatmap_data
-            ]
-
-    cache_wrappers ={}
-    for f in funcs:
-        cache_wrappers[f.__name__]= make_cached(f)
+    
+    
 
 
 # ===========================================================
@@ -323,7 +312,8 @@ def main():
             
             with st.spinner("Cargando valores predeterminados..."):
                 # Producto con cantidad de unidades más vendidas dentro de periodo
-                
+                if data.empty:
+                    print('Dataset vacío')
                 top_product,top_category = calculate_top_product_and_category(data=data,
                                                                             period_start=period_start,
                                                                             period_end=period_end)
@@ -345,8 +335,7 @@ def main():
                                   "category": top_category,
                                   "product" : top_product}
 
-                if data.empty:
-                    print('Dataset vacío')
+                
 
             left_section(data=data,
                          option_lists=option_list,
