@@ -6,9 +6,8 @@ import pipelines.inventory.load as load
 from datetime import datetime, timedelta
 from common.data import ETL_pipeline
 from airflow import DAG
-from airflow.operators.python import PythonOperator
+
 from airflow.providers.postgres.operators.postgres import PostgresOperator
-from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.utils.trigger_rule import TriggerRule
 
 from pipelines.inventory.extract import extracted_conditions
