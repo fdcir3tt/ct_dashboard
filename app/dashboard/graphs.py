@@ -240,8 +240,8 @@ def period_inventory(data: pd.DataFrame,branch_storage:dict[str,list[str]], sele
         if isinstance(branch_storage,dict):
             storages = branch_storage[branch]
         elif isinstance(branch_storage,pd.DataFrame):
-            storages = list(branch_storage[branch_storage["branch"]==branch]["storageId"].unique())
-        mask = df['storageId'].isin(storages)
+            storages = list(branch_storage[branch_storage["branch"]==branch]["storage_id"].unique())
+        mask = df['storage_id'].isin(storages)
     else:
         if isinstance(branch_storage,dict):
             storages = []
@@ -249,9 +249,9 @@ def period_inventory(data: pd.DataFrame,branch_storage:dict[str,list[str]], sele
                 storages+=b
 
         elif isinstance(branch_storage,pd.DataFrame):
-            storages = list(branch_storage["storageId"].unique())
+            storages = list(branch_storage["storage_id"].unique())
 
-        mask = df['storageId'].isin(storages)
+        mask = df['storage_id'].isin(storages)
 
     df=df[mask]
     df['total_stock']= df.groupby(['date',element_column])['stock'].transform('sum')

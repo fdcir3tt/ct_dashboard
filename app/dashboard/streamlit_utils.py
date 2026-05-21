@@ -67,8 +67,10 @@ def fetch_analysis_lvl(tab:str)->str:
    
 def fetch_selected_elements(analysis_lvl:str,tab:str)->tuple[list[str],str]:
     element_column={"Productos" :"product_id","Categorías":"category"}[analysis_lvl]
-       
-    key_str = f"Sucursal {analysis_lvl} Seleccionados {tab}"
+    if analysis_lvl=="Categorías":
+        key_str = f"Sucursal {analysis_lvl} Seleccionadas {tab}"
+    else:
+        key_str = f"Sucursal {analysis_lvl} Seleccionados {tab}"
     selected_elements = st.session_state.get(key=key_str)
 
     return selected_elements,element_column

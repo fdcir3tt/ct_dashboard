@@ -36,15 +36,15 @@ def filters(option_lists:dict[str,list[str]],default_values:dict[str,str],tab:st
     branch_filter(branch_list,default_branch_index,tab)
     categories = categories_filter(category_list,default_category,analysis_lvl,tab)   
     products = products_filter(product_list,default_product,analysis_lvl,tab)
-    products = products or []
+    
 
-    if len(products)==0:
+    if analysis_lvl=="Categorías":
         element_list = categories
         default_element = default_category
     else:
         element_list = products
         default_element = default_product
-
+    
     col3,col4 = st.columns(2)
     with col3:
             
@@ -335,13 +335,14 @@ def main():
                                   "category": top_category,
                                   "product" : top_product}
 
-                
-
+            
+            
             left_section(data=data,
                          option_lists=option_list,
                          default_values=default_values,
                          tab='ventas')
-                                                                                                                                                            
+            
+
         
         with right:
             right_section(data=data,

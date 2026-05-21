@@ -626,7 +626,7 @@ def priority_and_map_plots(global_data:pd.DataFrame|None,
     if tab=='inventario':
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown(f"**Mapa de {tab}**")
+            st.markdown(f"**Mapa de {tab} actual**")
             merged = prepare_sales_heatmap_data(data=inventory,
                                                 main_element=main_element,
                                                 element_column=element_column,
