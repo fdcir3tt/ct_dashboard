@@ -1,13 +1,17 @@
+import os
 import json
 import pandas as pd
 
 from pathlib import Path
 from typing import Any
 from common.registry import FUNCTION_REGISTRY
+from common.paths import DATA_DIR
 
 from airflow.operators.python import PythonOperator
 from airflow.utils.trigger_rule import TriggerRule
 from airflow.exceptions import AirflowSkipException,AirflowFailException
+
+
 
 class ETL_pipeline():
     """
@@ -168,12 +172,14 @@ def generate_tmp_path_strings(data_dict:dict[str,pd.DataFrame|list[dict[str,Any]
     - list[dict] -> .json
     """
     path_strings = []
+    tmp_dir = DATA_DIR/"tmp"
+
     for file_name,data in data_dict.items():
         if isinstance(data,pd.DataFrame):
             suffix=".parquet"
         if isinstance(data,list):
             suffix=".json"
-        path_str = f"/tmp/{file_name}{suffix}"
+        path_str = str(tmp_dir / f"{file_name}{suffix}")
         path_strings.append(path_str)
     return path_strings
 
@@ -196,6 +202,7 @@ def save_data(data:list[dict[str,Any]]|pd.DataFrame|dict[str,Any],path_strings:s
     # Un archivo
     if isinstance(path_strings,str):
         file_path = Path(path_strings)
+        os.makedirs(file_path.parent,exist_ok=True)
         if isinstance(data,list):
             save_records(data,file_path)
         if isinstance(data,pd.DataFrame):
@@ -205,6 +212,7 @@ def save_data(data:list[dict[str,Any]]|pd.DataFrame|dict[str,Any],path_strings:s
         for path_str in path_strings:
             file_path = Path(path_str)
             file_name = str(file_path.stem)
+            os.makedirs(file_path.parent,exist_ok=True)
             print(f"Guardando {file_name} ... ")
             if file_path.suffix==".json":
                 save_records(data[file_name],file_path)
@@ -290,8 +298,23 @@ def load_records(file_path:Path)->list[dict[str,Any]]:
     list[dict]
         Registros cargados.
     """
-    with open(file_path) as f:
-        records = json.load(f)
+    try:
+        with open(file_path) as f:
+            records = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"Invalid JSON in file: {file_path}")
+        print(f"Line: {e.lineno}, Column: {e.colno}, Char: {e.pos}")
+
+        with open(file_path, "r") as f:
+            content = f.read()
+
+        start = max(0, e.pos - 50)
+        end = min(len(content), e.pos + 50)
+
+        print("Context:")
+        print(content[start:end])
+        raise e
+
     return records
 
 def delete_files(file_paths:str|list[str]|Path|list[Path])->None:
@@ -415,7 +438,7 @@ def transform(transform_fn_name:str,save_dict:dict[str,str],**context):
             raise AirflowFailException(f"Task failed,no data to transform:'{extracted_data_name}' ")
         
     transform_fn = FUNCTION_REGISTRY[transform_fn_name]    
-    transformed_data = transform_fn(extracted_data)
+    transformed_data = transform_fn(extracted_data=extracted_data)
     
     path_string = generate_tmp_path_strings({save_dict[extracted_data_name]:transformed_data})[0]
     
@@ -448,7 +471,7 @@ def load(load_fn_name:str,conn_str:str,**context):
             if context["transformed_data_is_empty"][transformed_data_name]=="stop":
                 raise AirflowFailException(f"Task failed,no data to load:'{transformed_data_name}' ")
     load_fn = FUNCTION_REGISTRY[load_fn_name]
-    load_fn(conn_str,transformed_data)
+    load_fn(conn_str =conn_str,transformed_data=transformed_data)
 
 def delete_temp_files(delete_dict:dict[str,str],**context):
     """

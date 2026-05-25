@@ -1,6 +1,7 @@
 import os
 import datetime 
 
+from common.registry import register
 from pymongo.database import Collection
 from typing import Any
 from dotenv import load_dotenv
@@ -19,7 +20,9 @@ hist_db_name = os.getenv("TRACE_EXISTENCE_DB_NAME")
 
 existence_collection = os.getenv("EXISTENCE_COLLECTION")
 trace_existence_collection = os.getenv("TRACE_EXISTENCE_COLLECTION")
-
+tag = "historical_existence"
+extracted_conditions = {"existence_docs" :"stop",
+                         }
 
 def check_database_up_to_date(collection:Collection, date_field: str = 'createdAt') -> bool:
     """
@@ -53,7 +56,8 @@ def check_database_up_to_date(collection:Collection, date_field: str = 'createdA
     except Exception as e:
         raise Exception(f"Error checking database status: {str(e)}")
 
-def extract()->list[dict[str,Any]]|None:
+@register(tag)
+def extract_existence_docs(**kwargs)->list[dict[str,Any]]|None:
     hist_database = connect_to_mongo_db(hist_mongo_uri,hist_db_name)
     if check_database_up_to_date(hist_database["tbl_existenciasHistorial"]):
         print("Collección historial de existencias ya se encuentra actualizada!")
@@ -68,15 +72,6 @@ def extract()->list[dict[str,Any]]|None:
     print(f"Cantidad de docs extraídos:{len(documents)}")
     for doc in documents:
         doc["_id"] = str(doc.get("_id"))
+
+    print( documents[0])
     return documents
-
-def run_extract(**context):
-
-    extracted_data = extract()
-    is_up_to_date = extracted_data is None
-    
-    product_existences_path = "/tmp/product_existences.json"
-    save_data(extracted_data,product_existences_path)
-    
-    context["ti"].xcom_push(key="product_existences_path", value=product_existences_path)
-    context["ti"].xcom_push(key="up_to_date", value=is_up_to_date)

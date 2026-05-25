@@ -1,13 +1,35 @@
+import inspect
+import pipelines.historical_existence.extract as extract
+import pipelines.historical_existence.transform as transform 
+import pipelines.historical_existence.load as load
+
 from airflow import DAG
 from datetime import datetime, timedelta
+from common.data import ETL_pipeline
 
 from airflow.operators.python import PythonOperator
 from airflow.operators.python import ShortCircuitOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 
-from pipelines.historical_existence.extract import run_extract
-from pipelines.historical_existence.transform import run_transform
-from pipelines.historical_existence.load import run_load
+from pipelines.historical_existence.extract import extracted_conditions
+from pipelines.historical_existence.transform import save_dict
+from pipelines.historical_existence.load import load_conditions
+
+conn_str = ""
+conditions_dict = {"extracted_data_is_empty"  :extracted_conditions,
+                   "transformed_data_is_empty":load_conditions}
+tag = "historical_existence"
+
+extract_fns   = inspect.getmembers(extract  , inspect.isfunction)
+transform_fns = inspect.getmembers(transform, inspect.isfunction)
+load_fns      = inspect.getmembers(load     , inspect.isfunction)
+
+
+extract_fn_names   = [f"{tag}.{name}" for name,_ in extract_fns   if name.startswith("extract") ] 
+transform_fn_names = [f"{tag}.{name}" for name,_ in transform_fns if name.startswith("transform") ] 
+load_fn_names      = [f"{tag}.{name}" for name,_ in load_fns      if name.startswith("load") and (name!="load_dotenv") ] 
+
+
 
 #  Configuración del DAG
 default_args = {
@@ -19,10 +41,10 @@ default_args = {
 }
 
 def should_continue(**context):
-    up_to_date = context["ti"].xcom_pull(task_ids="extract",key="up_to_date")
-
-    
-    return up_to_date  
+    extracted_docs_path = context["ti"].xcom_pull(task_ids="gather_extracted_paths", key="path_strings")
+    extracted_docs_path = extracted_docs_path or []
+    has_documents = len(extracted_docs_path) > 0
+    return has_documents  
 
 
 with DAG(
@@ -36,27 +58,24 @@ with DAG(
 ) as dag:
 
     
+    historical_existence_pipeline = ETL_pipeline(extract_fn_names,transform_fn_names,load_fn_names,conn_str,save_dict,conditions_dict)
 
-    extract_task = PythonOperator(
-        task_id="extract_existence_docs",
-        python_callable=run_extract,
-    )
+    extract_tasks                 = historical_existence_pipeline.make_extraction_tasks()
+    gather_extracted_paths_task   = historical_existence_pipeline.make_gather_paths_task("gather_extracted_paths")
+    transform_tasks               = historical_existence_pipeline.make_transform_tasks()
+    gather_transformed_paths_task = historical_existence_pipeline.make_gather_paths_task("gather_transformed_paths")
+    load_tasks                    = historical_existence_pipeline.make_load_tasks()
+    delete_tmp_files_task         = historical_existence_pipeline.make_delete_tmp_files_task()
+    
+    
     check = ShortCircuitOperator(
         task_id="check_if_collection_up_to_date",
         python_callable=should_continue,
-    )
-    transform_task = PythonOperator(
-        task_id="make_new_docs",
-        python_callable=run_transform,
-    )
-
-    load_task = PythonOperator(
-        task_id="load_docs",
-        python_callable=run_load,
     )
 
     trigger_inventory_dag = TriggerDagRunOperator(
         task_id="trigger_inventory_dag",
         trigger_dag_id="inventory_pipeline",
     )
-    extract_task >> check >> transform_task >> load_task >> trigger_inventory_dag
+    
+    extract_tasks >> gather_extracted_paths_task >> check >> transform_tasks >> gather_transformed_paths_task >> load_tasks >> delete_tmp_files_task >> trigger_inventory_dag
