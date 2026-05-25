@@ -24,9 +24,10 @@ RUN curl -sSL https://install.python-poetry.org | python3 - \
     && poetry install --no-interaction --no-ansi --without dev,spark \
     && rm -rf $POETRY_HOME
     
+USER root
+COPY . /opt/airflow
 RUN chown -R airflow: /opt/airflow
 
 USER airflow
 RUN pip install asyncpg
-COPY . /opt/airflow
 
