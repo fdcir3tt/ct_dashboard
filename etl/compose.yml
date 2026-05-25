@@ -2,7 +2,7 @@ x-airflow-common: &airflow-common
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-    AIRFLOW__CORE__HOSTNAME_CALLABLE: socket.getfqdn
+    AIRFLOW__CORE__HOSTNAME_CALLABLE: "airflow.utils.net.get_host_ip_address"
     AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
     AIRFLOW__LOGGING__DAG_PROCESSOR_MANAGER_LOG_LOCATION: /dev/null
     PYTHONPATH: /opt/airflow
@@ -63,6 +63,7 @@ services:
     ports:
       - "8080:8080"
     command: webserver
+    hostname: airflow-webserver
 
   scheduler:
     image: ghcr.io/fdcir3tt/etl:latest
@@ -74,6 +75,9 @@ services:
       - postgres
     restart: on-failure
     command: scheduler
+    hostname: airflow-scheduler
+    expose:
+      - "8793" 
 
 networks:
   airflow:
