@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Any
 from common.registry import FUNCTION_REGISTRY
-from common.paths import DATA_DIR
+from common.paths import TMP_DIR
 
 from airflow.operators.python import PythonOperator
 from airflow.utils.trigger_rule import TriggerRule
@@ -172,7 +172,7 @@ def generate_tmp_path_strings(data_dict:dict[str,pd.DataFrame|list[dict[str,Any]
     - list[dict] -> .json
     """
     path_strings = []
-    tmp_dir = DATA_DIR/"tmp"
+    tmp_dir = TMP_DIR
 
     for file_name,data in data_dict.items():
         if isinstance(data,pd.DataFrame):

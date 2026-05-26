@@ -8,7 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from datetime import timedelta
 
-from common.paths import DATA_DIR,ENV_DIR
+from common.paths import TMP_DIR,ENV_DIR
 from psycopg2.extras import execute_values
 
 from airflow.operators.python import PythonOperator
@@ -22,7 +22,8 @@ load_dotenv(ENV_DIR)
 zip_url = "https://geodata.ucdavis.edu/gadm/gadm4.1/shp/gadm41_MEX_shp.zip"
 conn_str="dashboard_app_db"
 conn_uri = os.getenv("AIRFLOW__DATABASE__SQL_ALCHEMY_CONN")
-download_dir = DATA_DIR / "raw"
+tmp_dir = TMP_DIR
+download_dir = tmp_dir / "raw"
 zip_path = download_dir / "gadm41_MEX_shp.zip"
 extract_dir = download_dir / "gadm41_MEX_shp"
 
@@ -118,7 +119,7 @@ def run_extract(**context):
 def run_transform(**context):
     zip_path = Path(context["ti"].xcom_pull(task_ids="extract_shapefile_zip", key="zip_path")["zip_path"])
     transformed_data = transform(zip_path,extract_dir)
-    output_path = DATA_DIR/"geometries.parquet"
+    output_path = tmp_dir/"geometries.parquet"
     transformed_data.to_parquet(output_path, engine="pyarrow")
     return str(output_path)
 
