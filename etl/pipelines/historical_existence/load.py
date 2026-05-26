@@ -24,7 +24,7 @@ def load_inventory_docs(transformed_data:dict[str,list[dict[str,Any]]],**kwargs)
     documents = transformed_data.get("inventory_docs",[])
     hist_database = connect_to_mongo_db(hist_mongo_uri,hist_db_name) 
     for doc in documents:
-        doc["productoReferencia.existenciaId"] = ObjectId(doc.get("productoReferencia.existenciaId"))
+        doc["productoReferencia"]["existenciaId"] = ObjectId(doc.get("productoReferencia.existenciaId"))
         
         doc["fechaRegistro"]= datetime.datetime.fromisoformat(doc.get("fechaRegistro"))
     for i in range(0, len(documents), batch_size):
