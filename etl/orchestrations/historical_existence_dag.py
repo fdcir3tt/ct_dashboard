@@ -5,7 +5,7 @@ import pipelines.historical_existence.load as load
 
 from airflow import DAG
 from datetime import datetime, timedelta
-from common.data import ETL_pipeline
+from common.data import ETL_pipeline,load_data,data_is_empty
 
 from airflow.operators.python import PythonOperator
 from airflow.operators.python import ShortCircuitOperator
@@ -41,10 +41,18 @@ default_args = {
 }
 
 def should_continue(**context):
-    extracted_docs_path = context["ti"].xcom_pull(task_ids="gather_extracted_paths", key="path_strings")
-    extracted_docs_path = extracted_docs_path or []
-    has_documents = len(extracted_docs_path) > 0
-    return has_documents  
+    extracted_docs_path = context["ti"].xcom_pull(
+        task_ids="gather_extracted_paths",
+        key="path_strings"
+    ) or []
+
+    if not extracted_docs_path:
+        return False
+
+    file_path = extracted_docs_path[0]
+    extracted_docs = load_data(file_path)
+    print(extracted_docs[0])
+    return not data_is_empty(extracted_docs)
 
 
 with DAG(

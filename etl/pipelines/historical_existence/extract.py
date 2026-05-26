@@ -57,11 +57,11 @@ def check_database_up_to_date(collection:Collection, date_field: str = 'createdA
         raise Exception(f"Error checking database status: {str(e)}")
 
 @register(tag)
-def extract_existence_docs(**kwargs)->list[dict[str,Any]]|None:
+def extract_existence_docs(**kwargs)->list[dict[str,Any]]:
     hist_database = connect_to_mongo_db(hist_mongo_uri,hist_db_name)
-    if check_database_up_to_date(hist_database["tbl_existenciasHistorial"]):
+    if check_database_up_to_date(hist_database["tbl_existenciasHistorial"],date_field="fechaRegistro"):
         print("Collección historial de existencias ya se encuentra actualizada!")
-        return None
+        return []
 
     exist_database = connect_to_mongo_db(mongo_uri,public_API)
     consult_info = {"filters":{"almacenes.existencia": {"$gt": 0} },
@@ -73,5 +73,5 @@ def extract_existence_docs(**kwargs)->list[dict[str,Any]]|None:
     for doc in documents:
         doc["_id"] = str(doc.get("_id"))
 
-    print( documents[0])
+    
     return documents
