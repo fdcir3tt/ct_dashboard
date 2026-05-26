@@ -1,5 +1,7 @@
 x-airflow-common: &airflow-common
   environment:
+    AIRFLOW_UID: ${AIRFLOW_UID}
+    AIRFLOW_GID: ${AIRFLOW_GID}
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__HOSTNAME_CALLABLE: "airflow.utils.net.get_host_ip_address"
