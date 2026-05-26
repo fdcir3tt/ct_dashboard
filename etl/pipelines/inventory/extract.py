@@ -34,6 +34,7 @@ def extract_historical_existence_documents(trace_mongo_uri:str=hist_mongo_uri,da
         
     historical_existence_documents = get_documents(hist_database,trace_existence_collection_name,consult_info["filters"],consult_info["fields"])
     print(f"Cantidad de docs extraídos:{len(historical_existence_documents)}")
+    
     for doc in historical_existence_documents:
         doc["fechaRegistro"] = str(doc.get("fechaRegistro"))
     return historical_existence_documents

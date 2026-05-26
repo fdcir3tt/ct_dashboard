@@ -37,10 +37,12 @@ def transform_historical_existence_documents(extracted_data:dict[str,pd.DataFram
         # Columnas
         inventory = pd.DataFrame(data=historical_existence_documents)
         inventory["product_id"]= inventory["productoReferencia"].apply( lambda x:x['codigo'])
-        inventory =( inventory.drop  (columns=["activo",'productoReferencia','costo'])
+        inventory =( inventory.drop  (columns=["activo",'productoReferencia'])
                               .rename(columns={"fechaRegistro":"date",
                                                "almacenes":"existence"})
                     )
+        if 'costo' in inventory.columns:
+            inventory = inventory.drop(columns=['costo'])
         
         inventory["date"] = pd.to_datetime(inventory["date"],errors="coerce", format="mixed")
         inventory["date"] = inventory['date'].dt.date
