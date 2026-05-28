@@ -1,18 +1,17 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
+    image: ghcr.io/fdcir3tt/app
+    pull_policy: always
     restart: unless-stopped
     container_name: dashboard
     volumes:
       - ./dashboard:/app/dashboard
       - ./dashboard.py:/app/dashboard.py
       - ./assets:/app/assets
-      - ./data:/app/data:Z
-      - ./log/:/app/log:Z
+      - ./data:/app/data:z
+      - ./log/:/app/log:z
     env_file:
-      - .env
+      - ./.env
     ports:
       - 8501:8501
     networks:
