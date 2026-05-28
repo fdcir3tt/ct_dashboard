@@ -39,11 +39,12 @@ def pick_main_element(label: str,
 
 def pick_branch(label:str,
                 options:list,
+                default:str,
                 index:int,
                 key:str='selected branch')->str:
     
     if key not in st.session_state:
-        st.session_state[key] = index
+        st.session_state[key] = default
 
     return st.selectbox(label=label, 
                               options=options,

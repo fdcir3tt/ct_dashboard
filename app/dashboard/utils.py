@@ -137,34 +137,38 @@ def identify_outlier_sales(data: pd.DataFrame,
     return df
 
 def calculate_top_product_and_category(data:pd.DataFrame,
+                                       branch:str,
                                        period_start:Date,
                                        period_end:Date)->tuple[str,str]:
     df = data.copy()
     is_in_period = ( period_start <= df['date'] ) & ( df['date'] <= period_end )
+    in_branch = df['branch'] == branch
+
     
     if df[is_in_period].empty:
         top_product= (
-            data
+            data[in_branch]
             .groupby("product_id")["quantity"]
             .sum()
             .idxmax()
         )
         top_category= (
-        data
+        data[in_branch]
         .groupby("category")["quantity"]
         .sum()
         .idxmax()
     )   
         return top_product,top_category
     else:     
+        filtered_df = df[is_in_period & in_branch]
         top_product= (
-            data[is_in_period]
+            filtered_df
             .groupby("product_id")["quantity"]
             .sum()
             .idxmax()
         )
         top_category= (
-        data[is_in_period]
+        filtered_df
         .groupby("category")["quantity"]
         .sum()
         .idxmax()

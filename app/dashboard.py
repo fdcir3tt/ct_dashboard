@@ -315,27 +315,24 @@ def main():
                 if data.empty:
                     print('Dataset vacío')
                 top_product,top_category = calculate_top_product_and_category(data=data,
-                                                                            period_start=period_start,
-                                                                            period_end=period_end)
-                frequent_branch = calculate_frequent_branch(data=data,
-                                                            top_product=top_product)
+                                                                              branch="HERMOSILLO, SON.",
+                                                                              period_start=period_start,
+                                                                              period_end=period_end)
+                
                 
                 product_list = list( data["product_id"].unique() )
                 category_list = list( data["category"].unique() )
                 branch_list = list( data["branch"].unique() )
 
 
-                # Sucursal en donde se vende más seguido el producto más vendido
-                
                 option_list    = {"branches"  : branch_list,
                                   "categories": category_list,
                                   "products"  : product_list}
         
-                default_values = {"branch"  : frequent_branch,
+                default_values = {"branch"  : "HERMOSILLO, SON.",
                                   "category": top_category,
                                   "product" : top_product}
 
-            
             
             left_section(data=data,
                          option_lists=option_list,
@@ -365,7 +362,7 @@ def main():
                             "categories": category_list,
                             "products"  : product_list}
             
-            default_values = {"branch"  : frequent_branch,
+            default_values = {"branch"  : "HERMOSILLO, SON.",
                             "category": top_category,
                             "product" : top_product}
 
@@ -386,8 +383,7 @@ def main():
             
             
 
-            if data.empty:
-                    print('Dataset vacío')
+
                         
             
         with right:

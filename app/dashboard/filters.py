@@ -108,11 +108,13 @@ def branch_filter(branch_list:list[str],branch_index:int,tab:str)->str:
 
     Examples
     --------
-    >>> branch_filter(["Centro", "Norte"], 0, "ventas")
+    >>> branch_filter(["CD. OBREGON, SON.", "HERMOSILLO, SON."], 0, "ventas")
     'CD. OBREGON, SON.'
     """             
+    default = branch_list[branch_index]
     branch = pick_branch(label='Sucursal',
                              options=branch_list,
+                             default = default,
                              index=branch_index,
                              key=f'Sucursal seleccionada {tab}')
     return branch
