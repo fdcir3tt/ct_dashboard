@@ -635,7 +635,7 @@ def priority_and_map_plots(global_data:pd.DataFrame|None,
                                                 include_outliers = include_outliers,
                                                 tab= tab
                                                                     )
-        
+            
             map_obj= render_sales_heat_map(merged=merged, 
                                            main_element=main_element,
                                            tab=tab,

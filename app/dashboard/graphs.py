@@ -439,8 +439,9 @@ def prepare_sales_heatmap_data(data: pd.DataFrame,main_element: str,element_colu
         merged["quantity"] = merged["quantity"].fillna(0)
 
     if tab=='inventario':
-        mask = ( (df_filtered['date'] == pd.to_datetime(end_date) ))
+        mask = ( (df_filtered['date'] == end_date ))
         df_filtered = df_filtered[mask]
+
         total_inventory_per_state = (
             df_filtered.groupby("state")["stock"]
             .sum()
@@ -474,7 +475,7 @@ def render_sales_heat_map( merged:pd.DataFrame,
     - fig: matplotlib.figure.Figure, Figura en caso de que no hayan datos a visualizar
 
     """
-    if merged is None:
+    if merged.empty:
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.text(0.5, 0.5, "No hay datos disponibles",
                 ha="center", va="center", fontsize=14)
