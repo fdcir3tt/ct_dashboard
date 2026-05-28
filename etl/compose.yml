@@ -50,7 +50,7 @@ services:
     entrypoint: >
       bash -c "
       airflow db migrate &&
-      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email federico.cirett@ctin.com.mx
+      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email example@domain.com
       "
 
   webserver:
