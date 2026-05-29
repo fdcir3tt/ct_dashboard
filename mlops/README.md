@@ -1,4 +1,38 @@
 # MLOps de Entrenamiento y Monitoreo de Modelos 
+[![Python][python-shield]][python-url]
+[![Markdown][md-shield]][md-url]
+[![Git][git-shield]][git-url]
+[![Github][github-shield]][github-url]
+[![Jupyter Notebooks][jupyter-shield]][jupyter-url]
+[![MLflow][mlflow-shield]][mlflow-url]
+[![Pandas][pandas-shield]][pandas-url]
+
+
+
+
+[mlflow-shield]: https://img.shields.io/badge/MLflow-0194E2?style=for-the-badge&logo=mlflow&logoColor=white
+[mlflow-url]: https://mlflow.org/
+
+[pandas-shield]: https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white
+[pandas-url]: https://pandas.pydata.org/
+
+[python-shield]: https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54
+[python-url]: https://www.python.org/
+
+[md-shield]: https://img.shields.io/badge/Markdown-000?style=for-the-badge&logo=markdown
+[md-url]: https://www.markdownguide.org/
+
+[git-shield]: https://img.shields.io/badge/GIT-E44C30?style=for-the-badge&logo=git&logoColor=white
+[git-url]: https://git-scm.com/
+
+[github-shield]: https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white
+[github-url]: https://github.com/
+
+[jupyter-shield]: https://img.shields.io/badge/Jupyter-Notebook-orange?style=for-the-badge&logo=jupyter&logoColor=white
+[jupyter-url]: https://jupyter.org/
+
+[seaborn-shield]:https://img.shields.io/badge/Seaborn-0.13.2-blue?logo=python&logoColor=red
+[seaborn-url]:https://seaborn.pydata.org/
 
 
 Ecosistema de trabajo reproducible y monitoreable para entrenar, evaluar y actualizar modelos de manera sistemática. Facilita la mejora continua del rendimiento y permite detectar oportunamente problemas como degradación del modelo, cambios en la distribución de los datos o fallos en los procesos de ingestión.

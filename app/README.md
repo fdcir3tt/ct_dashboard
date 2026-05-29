@@ -1,4 +1,42 @@
 # Dashboard de Ventas e Inventario
+[![Python][python-shield]][python-url]
+[![Markdown][md-shield]][md-url]
+[![Git][git-shield]][git-url]
+[![Github][github-shield]][github-url]
+[![PostgreSQL][postgres-shield]][postgres-url]
+[![Pandas][pandas-shield]][pandas-url]
+[![Podman][podman-shield]][podman-url]
+
+[![Streamlit App][streamlit-shield]][streamlit-url]
+[![Seaborn][seaborn-shield]][seaborn-url]
+
+[postgres-shield]: https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white
+[postgres-url]: https://www.postgresql.org/
+
+[pandas-shield]: https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white
+[pandas-url]: https://pandas.pydata.org/
+
+[podman-shield]: https://img.shields.io/badge/Podman-892CA0?style=for-the-badge&logo=podman&logoColor=white
+[podman-url]: https://podman.io/
+
+[python-shield]: https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54
+[python-url]: https://www.python.org/
+
+[md-shield]: https://img.shields.io/badge/Markdown-000?style=for-the-badge&logo=markdown
+[md-url]: https://www.markdownguide.org/
+
+[git-shield]: https://img.shields.io/badge/GIT-E44C30?style=for-the-badge&logo=git&logoColor=white
+[git-url]: https://git-scm.com/
+
+[github-shield]: https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white
+[github-url]: https://github.com/
+
+
+[streamlit-shield]:https://img.shields.io/badge/-Streamlit-FF4B4B?style=flat&logo=streamlit&logoColor=white
+[streamlit-url]:https://streamlit.io/
+
+[seaborn-shield]:https://img.shields.io/badge/Seaborn-0.13.2-blue?logo=python&logoColor=red
+[seaborn-url]:https://seaborn.pydata.org/
 
 Aplicación web construida con Streamlit para el monitoreo continuo de ventas e inventario de productos. Su objetivo es centralizar las visualizaciones clave que apoyan la toma de decisiones en el surtimiento de productos.
 
