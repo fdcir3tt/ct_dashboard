@@ -17,17 +17,76 @@ from statsmodels.tsa.arima.model import ARIMA
 
 @dataclass
 class LossHistory:
+    """
+    Almacena el historial de la función de pérdida durante el entrenamiento.
+
+    Attributes
+    ----------
+    train_loss : Iterable or None
+        Secuencia de valores de pérdida registrados en cada época de
+        entrenamiento. Por defecto None.
+    test_loss : Iterable or None
+        Secuencia de valores de pérdida registrados en cada época de
+        validación o prueba. Por defecto None.
+    """
     train_loss:Iterable|None=None
     test_loss:Iterable|None=None
 
 class PyfuncWrapper(PythonModel):
+    """
+    Envuelve un modelo serializado con pickle para su uso dentro del
+    framework MLflow como PythonModel.
 
+    Carga el modelo desde un artefacto al inicializar el contexto y
+    expone métodos estándar de predicción, entrenamiento y ajuste
+    compatibles con la interfaz de MLflow.
+
+    Methods
+    -------
+    load_context(context)
+        Deserializa el modelo desde el artefacto registrado en MLflow.
+    predict(context, model_input)
+        Genera predicciones a partir del modelo cargado.
+    fit(data, config)
+        Delega el entrenamiento al modelo interno.
+    """
     def load_context(self, context):
+        """
+        Deserializa y carga el modelo desde el artefacto MLflow.
+
+        Parameters
+        ----------
+        context : mlflow.pyfunc.PythonModelContext
+            Contexto de MLflow que contiene la ruta del artefacto bajo la
+            clave `'model_path'`.
+
+        Returns
+        -------
+        None
+        """
         import pickle
         self.model = pickle.load(open(context.artifacts["model_path"], "rb"))
 
     def predict(self, context, model_input:np.ndarray)->np.ndarray:
+        """
+        Genera predicciones del modelo cargado a partir de la entrada dada.
 
+        Normaliza la entrada a `np.ndarray` independientemente de si se
+        recibe como `pd.DataFrame`, `pd.Series`, `np.ndarray` u otro tipo.
+
+        Parameters
+        ----------
+        context : mlflow.pyfunc.PythonModelContext
+            Contexto de MLflow (no utilizado directamente en este método).
+        model_input : array-like
+            Datos de entrada. Puede ser `pd.DataFrame`, `pd.Series`,
+            `np.ndarray` o cualquier tipo convertible a array.
+
+        Returns
+        -------
+        np.ndarray
+            Predicciones generadas por el modelo interno.
+        """
         # Manejo de entradas
         if isinstance(model_input, pd.DataFrame):
             x_input = model_input.values
@@ -41,9 +100,72 @@ class PyfuncWrapper(PythonModel):
         return self.model.predict(x_input)
     
     def fit(self,data:pd.DataFrame,config:ExperimentConfig)->None:
+        """
+        Delega el ajuste del modelo al modelo interno encapsulado.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Datos de entrenamiento.
+        config : ExperimentConfig
+            Configuración del experimento con parámetros de entrenamiento.
+
+        Returns
+        -------
+        None
+        """
         return self.model.fit(data,config)
         
 class ForecastModel(ABC):
+    """
+    Clase base abstracta para modelos de pronóstico de series de tiempo.
+
+    Define la interfaz común de entrenamiento, predicción, visualización
+    y registro de subclases. Mantiene un registro interno de modelos
+    disponibles mediante el decorador `register`.
+
+    Parameters
+    ----------
+    parameters : dict of str to Any
+        Hiperparámetros del modelo.
+    test_metrics : list of str, optional
+        Lista de métricas a evaluar durante la prueba. Valores válidos:
+        `'mae'`, `'mfe'`, `'rmse'`, `'da'`. Por defecto
+        `['mae', 'mfe', 'rmse', 'da']`.
+    seed : int or None, optional
+        Semilla para reproducibilidad. Por defecto None.
+    type : str or None, optional
+        Tipo o familia del modelo. Por defecto None.
+    name : str or None, optional
+        Nombre identificador del modelo. Por defecto None.
+
+    Attributes
+    ----------
+    _registry : dict of str to type
+        Registro de clase que mapea nombres a subclases de `ForecastModel`.
+    parameters : dict
+    test_metrics : list of str
+    seed : int or None
+    type : str or None
+    name : str or None
+
+    Methods
+    -------
+    register(name)
+        Decorador de clase para registrar subclases por nombre.
+    from_name(model_name, parameters, test_metrics)
+        Instancia un modelo registrado por su nombre.
+    train(x_train, y_train)
+        Entrena el modelo. Debe implementarse en subclases.
+    predict(x_test, y_test)
+        Genera predicciones. Debe implementarse en subclases.
+    plot_loss(loss_history, title, xlabel, ylabel)
+        Grafica el historial de pérdida de entrenamiento y prueba.
+    plot_prediction(y_pred, y_true, title, xlabel, ylabel)
+        Grafica la predicción frente a los valores reales.
+    test(x_test, y_test)
+        Evalúa el modelo y genera métricas y figura de predicción.
+    """
     _registry: dict[str, type["ForecastModel"]] = {}
 
     def __init__(self,parameters:dict[str,Any],test_metrics:list[str]=['mae','mfe','rmse','da'],seed:int|None=None,type:str|None=None,name:str|None=None):
@@ -55,7 +177,19 @@ class ForecastModel(ABC):
 
     @classmethod
     def register(cls, name: str):
-        """ Decorador para registrar modelos de esta clase automáticamente """
+        """
+        Decorador de clase para registrar subclases de ForecastModel por nombre.
+
+        Parameters
+        ----------
+        name : str
+            Nombre clave bajo el cual se registra la subclase en `_registry`.
+
+        Returns
+        -------
+        decorator : callable
+            Función decoradora que registra la clase y la retorna sin modificarla.
+        """
         def decorator(model_cls: type["ForecastModel"]):
             cls._registry[name] = model_cls
             return model_cls
@@ -63,7 +197,30 @@ class ForecastModel(ABC):
     
     @classmethod
     def from_name(cls,model_name: str,parameters: dict[str, float],test_metrics: list[str] = ['mae','rmse']) -> "ForecastModel":
-        """ Método para cargar modelo de esta clase por su nombre """
+        """
+        Instancia un modelo registrado a partir de su nombre.
+
+        Parameters
+        ----------
+        model_name : str
+            Nombre del modelo tal como fue registrado con `@ForecastModel.register`.
+        parameters : dict of str to float
+            Hiperparámetros a pasar al constructor del modelo.
+        test_metrics : list of str, optional
+            Métricas de evaluación a usar durante la prueba.
+            Por defecto `['mae', 'rmse']`.
+
+        Returns
+        -------
+        ForecastModel
+            Instancia del modelo correspondiente al nombre dado.
+
+        Raises
+        ------
+        ValueError
+            Si `model_name` no corresponde a ningún modelo registrado en
+            `_registry`.
+        """
         model_cls = cls._registry.get(model_name)
         if model_cls is None:
             raise ValueError(
@@ -76,31 +233,44 @@ class ForecastModel(ABC):
     @abstractmethod
     def train(self,x_train:np.ndarray,y_train:np.ndarray)->tuple[LossHistory,Figure]|None:
         """
-        Entrena modelo y regresa el historial de la función de perdida y su figura correspondiente
-        Requiere ser implementado por subclases.
+        Entrena el modelo con los datos proporcionados.
 
-        Parametros:
-        - x_train: array-like, Datos de entrada en cual se quieren realizar el entrenamiento del modelo.
-        - y_train: array-like, Datos de entrada en cual se quieren realizar el entrenamiento del modelo.
-        
-        Regresa:
-        - loss_history: LossHistory object, objeto que tiene almacenado el historial de perdida tanto de entrenamiento como de prueba 
-        - loss_fig: matplotlib Figure object, Gráfica de perdida de entrenamiento y prueba
+        Debe ser implementado por cada subclase concreta.
+
+        Parameters
+        ----------
+        x_train : np.ndarray
+            Datos de entrada para el entrenamiento.
+        y_train : np.ndarray
+            Valores objetivo para el entrenamiento.
+
+        Returns
+        -------
+        tuple of (LossHistory, matplotlib.figure.Figure) or None
+            `LossHistory` con el historial de pérdida de entrenamiento y
+            prueba, y la figura correspondiente. Puede retornar None si el
+            modelo no tiene proceso de entrenamiento iterativo.
         """
         pass
 
     @abstractmethod
     def predict(self,x_test:np.ndarray,y_test:np.ndarray )->np.ndarray:
         """
-        Predicciones del modelo 
-        Requiere ser implementado por subclases.
+        Genera predicciones sobre los datos de prueba.
 
-        Parametros:
-        - x_test: array-like, Datos de entrada en cual se quieren realizar predicciones.
-        - y_test: array-like, Datos de entrada, valores reales .
+        Debe ser implementado por cada subclase concreta.
 
-        Regresa:
-        - y_pred: array-like , Predicciones del modelo 
+        Parameters
+        ----------
+        x_test : np.ndarray
+            Datos de entrada sobre los cuales se realizan las predicciones.
+        y_test : np.ndarray
+            Valores reales del período de prueba.
+
+        Returns
+        -------
+        np.ndarray
+            Predicciones generadas por el modelo.
         """
         pass
 
@@ -109,16 +279,24 @@ class ForecastModel(ABC):
 
     def plot_loss(self,loss_history:LossHistory, title:str="Loss", xlabel:str="Epochs", ylabel:str="Loss")->Figure:
         """
-        Gráfica de perdida de entrenamiento y prueba
-        
-        Parametros:
-        - loss_history: LossHistory object, objeto que tiene almacenado el historial de perdida tanto de entrenamiento como de prueba
-        - title: str, Título de gráfico
-        - xlabel: str, Etiqueta de eje horizontal
-        - ylabel: str, Etiqueta de eje vertical
-        
-        Regresa:
-        - fig: matplotlib Figure object
+        Genera una gráfica del historial de pérdida de entrenamiento y prueba.
+
+        Parameters
+        ----------
+        loss_history : LossHistory
+            Objeto con los historiales `train_loss` y `test_loss` a graficar.
+        title : str, optional
+            Título de la gráfica. Por defecto `'Loss'`.
+        xlabel : str, optional
+            Etiqueta del eje horizontal. Por defecto `'Epochs'`.
+        ylabel : str, optional
+            Etiqueta del eje vertical. Por defecto `'Loss'`.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Figura con las curvas de pérdida de entrenamiento y, si existe,
+            de prueba.
         """
         fig, ax = plt.subplots(figsize=(10,5))
         ax.plot(loss_history.train_loss, label="Train", color = 'blue')
@@ -136,18 +314,25 @@ class ForecastModel(ABC):
         
     def plot_prediction(self,y_pred:np.ndarray,y_true:np.ndarray, title:str="Predicción vs Real", xlabel:str="Tiempo (días)", ylabel:str="Ventas")->Figure:
         """
-        Gráfica de predicción de modelo y datos reales.
-            
-        Parametros:
-        - y_true: array-like, Valores reales
-        - y_pred: array-like, Valores predecidos
-        - title: str, Título de gráfico
-        - xlabel: str, Etiqueta de eje horizontal
-        - ylabel: str,  Etiqueta de eje vertical
+        Genera una gráfica de contraste entre los valores predichos y los reales.
 
-        Regresa:
-        - test_fig: matplotlib Figure object, Gráfica de contraste entre predicción y datos reales
+        Parameters
+        ----------
+        y_pred : np.ndarray
+            Valores predichos por el modelo.
+        y_true : np.ndarray
+            Valores reales observados.
+        title : str, optional
+            Título de la gráfica. Por defecto `'Predicción vs Real'`.
+        xlabel : str, optional
+            Etiqueta del eje horizontal. Por defecto `'Tiempo (días)'`.
+        ylabel : str, optional
+            Etiqueta del eje vertical. Por defecto `'Ventas'`.
 
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Figura con las series de valores reales y predichos superpuestas.
         """
         fig, ax = plt.subplots(figsize=(10,5))
         ax.plot(y_true, label="Real", marker='o')
@@ -163,15 +348,26 @@ class ForecastModel(ABC):
     
     def test(self,x_test:np.ndarray,y_test:np.ndarray)->tuple[Figure,Metrics]:
         """
-        Gráfica de predicción de modelo y datos reales.
-            
-        Parametros:
-        - x_test: array-like, Valores reales
-        - y_test: array-like, Valores predecidos
+        Evalúa el modelo sobre el conjunto de prueba y genera métricas y figura.
 
-        Regresa:
-        - test_fig: matplotlib Figure object, Gráfica de contraste entre predicción y datos reales
-        - metrics: Metrics , Métricas resultado de la prueba
+        Realiza las predicciones con `predict`, calcula las métricas
+        configuradas en `self.test_metrics` y genera la gráfica de
+        predicción con el rango de fechas del período evaluado como título.
+
+        Parameters
+        ----------
+        x_test : np.ndarray
+            Fechas o índices temporales del conjunto de prueba.
+        y_test : np.ndarray
+            Valores reales del conjunto de prueba.
+
+        Returns
+        -------
+        test_fig : matplotlib.figure.Figure
+            Figura de contraste entre predicciones y valores reales.
+        metrics : Metrics
+            Objeto con los valores calculados para cada métrica en
+            `self.test_metrics`.
         """
         y_pred = self.predict(x_test)
         y_true = y_test   
@@ -186,14 +382,21 @@ class ForecastModel(ABC):
 
 def load_model(model_name:str,config:ExperimentConfig|dict[str,Any])->ForecastModel:
     """
-    Carga el modelo específicado
+    Instancia el modelo de pronóstico especificado con la configuración dada.
 
-    Parametros:
-    - model_name: str, Nombre del tipo de modelo siendo utilizado
-    - config: ExperimentConfig , Configuración del experimento
-    
-    Regresa:
-    - model: ForecastModel, Modelo de regresión temporal
+    Parameters
+    ----------
+    model_name : str
+        Nombre del modelo registrado en `ForecastModel._registry`.
+    config : ExperimentConfig or dict of str to Any
+        Configuración del experimento. Se usan los campos `parameters`
+        y `metrics` para instanciar el modelo.
+
+    Returns
+    -------
+    ForecastModel
+        Instancia del modelo solicitado con los parámetros e métricas
+        extraídos de `config`.
     """
     parameters = (config.parameters)
     metrics = (config.metrics)
@@ -205,7 +408,82 @@ def load_model(model_name:str,config:ExperimentConfig|dict[str,Any])->ForecastMo
 
 @ForecastModel.register("Heuristic")
 class HeuristicModel(ForecastModel):
-    
+    """
+    Modelo heurístico de pronóstico de ventas mensuales basado en el
+    índice de flujo de ventas.
+
+    Clasifica el comportamiento reciente de las ventas en un índice de
+    tres caracteres (e.g. `'BSS'`, `'EES'`) formado por la combinación
+    de `'B'` (bajó), `'E'` (empató) y `'S'` (subió), y aplica reglas
+    deterministas sobre el cuatrimestre actual para estimar la venta del
+    mes en curso y los meses futuros.
+
+    Parameters
+    ----------
+    parameters : dict of str to Any
+        Hiperparámetros del modelo. Debe contener la clave `'l'` que
+        representa el factor de escala para la estimación mensual.
+    test_metrics : list of str, optional
+        Métricas de evaluación. Por defecto `['mae', 'mfe', 'rmse', 'da']`.
+    seed : int or None, optional
+        Semilla para reproducibilidad en generación de datos sintéticos.
+    type : str or None, optional
+        Tipo del modelo.
+    name : str or None, optional
+        Nombre del modelo.
+
+    Attributes
+    ----------
+    sales_period : pd.DataFrame
+        Tabla con ventas mensuales del período de entrenamiento.
+    month_estimate : int
+        Estimación de ventas del mes actual basada en el factor `l`.
+    sales_idx : str
+        Índice de flujo de ventas de tres caracteres.
+    client_sales : pd.DataFrame
+        Ventas mensuales realizadas por clientes registrados.
+    current_day : int
+        Día más reciente del período de entrenamiento.
+    current_month : int
+        Mes más reciente del período de entrenamiento.
+    current_year : int
+        Año más reciente del período de entrenamiento.
+    remaining_days : int
+        Días restantes del mes en curso al momento del último dato.
+    current_quatrimester : list of int
+        Últimos 4 meses del período analizado.
+    s_n : list of float
+        Valores individuales de los cinco estimadores `s1`–`s5`.
+    idx_sum : float
+        Suma total de los cinco estimadores.
+    avg_n_month_sales : float
+        Promedio de registros de venta por mes.
+    avg_n_month_client_sales : float
+        Promedio de registros de venta por mes de clientes.
+
+    Methods
+    -------
+    get_sales_flow_index(dataset)
+        Calcula el índice de flujo de ventas y el cuatrimestre actual.
+    get_client_sales(dataset)
+        Calcula las ventas mensuales de clientes registrados.
+    get_remaining_days(latest_date)
+        Calcula los días restantes del mes en curso.
+    get_month_sales(quatrimester_idx)
+        Retorna las ventas del mes indicado en el cuatrimestre actual.
+    get_index_sum()
+        Calcula los estimadores `s1`–`s5` y su suma total.
+    fit(dataset, config)
+        Ajusta el modelo calculando todas las variables fundamentales.
+    train(x_train, y_train)
+        Sin implementación activa para este modelo.
+    predict_next_month_sale()
+        Predice las ventas del próximo mes.
+    generate_sales_data(n_samples, start_date, end_date, client_sales)
+        Genera datos sintéticos de ventas.
+    predict(x_input)
+        Genera predicciones para el rango de fechas proporcionado.
+    """
     def index(self,difference:int)->str:
             if difference<0:
                 return "B"
@@ -215,16 +493,28 @@ class HeuristicModel(ForecastModel):
                 return "S"
     def get_sales_flow_index(self,dataset:pd.DataFrame)->None:
         """
-        Recibe el dataset del producto de analisis ( al menos 6 meses) y obtiene 
-        el índice del flujo de ventas.
+        Calcula el índice de flujo de ventas y el cuatrimestre actual.
 
-        Parametros:
-        - dataset: pandas.DataFrame, Dataset del producto conteniendo la información de ventas en al menos 6 meses
+        Analiza los últimos cuatro meses del dataset para construir un
+        índice de tres caracteres que describe la tendencia de las ventas
+        (`'S'` subió, `'E'` empató, `'B'` bajó). Guarda los resultados
+        como atributos del modelo.
 
-        Regresa:
-        - current_quatrimester: list[int], Lista de los últimos 4 meses del dataset analizado
-        - sales_idx: str, Indice del flujo de ventas,consiste en tres siglas que describen el cambio del flujo de ventas.
-                          S = Subió, E= Empató, B = Bajó
+        Parameters
+        ----------
+        dataset : pd.DataFrame
+            Datos de ventas del producto con al menos 6 meses de historia.
+            Debe contener las columnas `date`, `month`, `year` y
+            `monthly_quantity`.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        Modifica los atributos `self.month_estimate`, `self.current_quatrimester`
+        y `self.sales_idx` directamente sobre la instancia.
         """
         df = dataset.copy()
         max_date = df["date"].max()
@@ -246,13 +536,27 @@ class HeuristicModel(ForecastModel):
 
     def get_client_sales(self,dataset:pd.DataFrame)->None:
         """
-        Recibe los datos de ventas del producto y regresa la cantidad de ventas realizadas por clientes.
+        Calcula las ventas mensuales realizadas por clientes registrados.
 
-        Parametros:
-        - dataset: pandas.DataFrame, Tabla de ventas de producto en periodo de al menos 6 meses.
+        Cruza el dataset de ventas con la lista de clientes obtenida de
+        `get_client_list()` y agrega las unidades vendidas por mes. Si no
+        hay coincidencias, inicializa las ventas de cliente en cero.
+        Guarda los resultados como atributos del modelo.
 
-        Regresa:
-        - client_sales: pandas.DataFrame , Tabla de la cantidad de unidades vendidas a clientes.
+        Parameters
+        ----------
+        dataset : pd.DataFrame
+            Datos de ventas del producto. Debe contener las columnas
+            `clientId`, `year`, `month` y `quantity`.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        Modifica los atributos `self.client_sales` y
+        `self.avg_n_month_client_sales` directamente sobre la instancia.
         """
         clients = get_client_list()
         client_sales = dataset.merge(clients,how="inner",on="clientId")
@@ -268,17 +572,22 @@ class HeuristicModel(ForecastModel):
             
     def get_remaining_days(self,latest_date:pd.Timestamp)->None:
         """
-        Cálcula los días restantes del último mes del periodo y los guarda cómo propiedades 
-        del modelo.
+        Calcula los días restantes del mes en curso a partir de la fecha más reciente.
 
-        Parametros:
-        - latest_date: pandas.Timestamp, Fecha del día más actual del periodo analizado
+        Parameters
+        ----------
+        latest_date : pd.Timestamp
+            Fecha más actual del período analizado.
 
-        Regresa:
-        - current_day: int, Día del periodo analizado
-        - current_month: int, Mes del periodo analizado
-        - current_year: int, Año del periodo analizado
-        - remaining_days: int, Cantidad de días restantes del último mes
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        Modifica los atributos `self.current_day`, `self.current_month`,
+        `self.current_year` y `self.remaining_days` directamente sobre
+        la instancia.
         """
 
         self.current_day = latest_date.day
@@ -297,15 +606,22 @@ class HeuristicModel(ForecastModel):
 
     def get_index_sum(self)->None:
         """
-        Cálcula los valores de estimado ('s1','s2','s3','s4','s5') en base el índice de flujo de ventas y 
-        regresa la suma total.
+        Calcula los cinco estimadores heurísticos y su suma total.
 
-        Parametros:
-        - : None,
+        Evalúa las funciones internas `s1` a `s5`, cada una responsable de
+        un subconjunto de patrones del índice de flujo de ventas, y almacena
+        sus resultados como atributos del modelo.
 
-        Regresa:
-        - s_n: list[float], Lista de valores de ('s1','s2','s3','s4','s5')
-        - idx_sum:float, Suma total de ('s1','s2','s3','s4','s5')
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        Modifica los atributos `self.s_n` (lista con los valores de cada
+        estimador) y `self.idx_sum` (suma total) directamente sobre la
+        instancia. Cada función interna `s1`–`s5` cubre un conjunto
+        disjunto de valores del índice `self.sales_idx`.
         """
         def s1():
             sales_period = self.sales_period
@@ -959,20 +1275,35 @@ class HeuristicModel(ForecastModel):
         self.idx_sum = s1()+s2()+s3()+s4()+s5()
 
     def fit(self,dataset:pd.DataFrame,config:ExperimentConfig|dict[str,Any]|None=None)->None:
-        """ 
-        Cálcula las variables fundamentales para realizar predicciones de la venta mensual
-        
-        Parametros:
-        - dataset: pandas.DataFrame , Datos con información relacionada a cada venta realizada dentro del periodo
+        """
+        Ajusta el modelo calculando todas las variables fundamentales para
+        el pronóstico.
 
-        Regresa:
-        - sales_period: pandas.DataFrame, Tabla con registro de ventas por periodo
-        - month_estimate: int, Estimación burda de ventas del final del més.
-        - sales_idx: str, Indice clasificador del flujo de ventas. Ejemplo: B-B-S
-        - client_sales: pandas.DataFrame, Tabla con registro de ventas por periodo realizadas por clientes
-        - current_day: int , Día más actual del periodo de entrenamiento
-        - remaining_days: int , Número de días que hacen falta para terminar més de ventas
+        Si se proporciona `config`, filtra el dataset al período de
+        entrenamiento especificado. Luego calcula el índice de flujo de
+        ventas, las ventas de clientes, los días restantes del mes y los
+        estimadores heurísticos.
 
+        Parameters
+        ----------
+        dataset : pd.DataFrame
+            Datos de ventas del producto. Debe contener las columnas `date`,
+            `year`, `month` y `quantity`.
+        config : ExperimentConfig or dict of str to Any or None, optional
+            Configuración del experimento con parámetros de filtrado temporal
+            (`training_data_start_date`, `training_data_end_date`,
+            `frequency`, `horizon`, `training_window`). Si es None, se
+            utiliza el dataset completo sin filtrar. Por defecto None.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        Establece los atributos `sales_period`, `month_estimate`,
+        `sales_idx`, `client_sales`, `current_day`, `current_month`,
+        `current_year`, `remaining_days`, `s_n` e `idx_sum`.
         """
         
         if config is not None:
@@ -1024,8 +1355,19 @@ class HeuristicModel(ForecastModel):
     
     def predict_next_month_sale(self)->int|None:
         """
-        Predicciones del modelo.
-        Toma los datos de ventas del mes y predice la venta mensual partiendo de las ventas a mitad del periodo
+        Predice las ventas del siguiente mes a partir del estado actual del modelo.
+
+        Calcula una estimación en tres etapas: estimación ideal basada en
+        `idx_sum`, estimación ajustada proporcionalmente a los días
+        restantes del mes, y estimación definitiva con correcciones de
+        borde para valores pequeños o negativos.
+
+        Returns
+        -------
+        int or None
+            Cantidad estimada de unidades a vender en el próximo mes.
+            Retorna `0` si no se cumplen las condiciones mínimas de venta
+            o si los días restantes son cero.
         """
         
 
@@ -1065,17 +1407,26 @@ class HeuristicModel(ForecastModel):
     
     def generate_sales_data(self,n_samples:int,start_date:Date,end_date:Date,client_sales:bool=False)->pd.DataFrame:
         """
-        Genera datos sintéticos en base a distribución observada por datos de ventas
+        Genera datos sintéticos de ventas remuestreando la distribución observada.
 
-        Parametros:
-        - n_samples: int, Cantidad de valores que se quieren generar
-        - start_date: Date, Fecha inicio de periodo de registros
-        - end_date: Date, Fecha fin de periodo registros
-        - client_sales: bool, Determina si se quieren generar ventas normales o ventas de cliente
+        Parameters
+        ----------
+        n_samples : int
+            Número de registros de venta a generar.
+        start_date : Date
+            Fecha de inicio del período de los registros generados.
+        end_date : Date
+            Fecha de fin del período de los registros generados.
+        client_sales : bool, optional
+            Si es True, remuestrea desde `self.client_sales_distribution`.
+            Si es False, remuestrea desde `self.distribution`. Por defecto False.
 
-        Regresa: 
-        - df: pandas.DataFrame, Datos generados 
-
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame con columnas `date`, `quantity`, `month`, `year` y
+            `monthly_quantity`, con fechas asignadas aleatoriamente dentro
+            del período especificado.
         """
         if self.seed is not None:
             random.seed(self.seed)
@@ -1184,8 +1535,86 @@ class HeuristicModel(ForecastModel):
 
 @ForecastModel.register("ARIMA")
 class ARIMAModel(ForecastModel):
+    """
+    Modelo ARIMA para pronóstico de series de tiempo de ventas.
 
+    Ajusta un modelo ARIMA(p, d, q) sobre los datos de entrenamiento
+    escalados (media cero, varianza unitaria) y genera predicciones
+    hacia adelante con intervalos de confianza.
+
+    Parameters
+    ----------
+    parameters : dict of str to Any
+        Hiperparámetros del modelo. Debe contener las claves `'p'`, `'d'`
+        y `'q'` correspondientes al orden del modelo ARIMA.
+    test_metrics : list of str, optional
+        Métricas de evaluación. Por defecto `['mae', 'mfe', 'rmse', 'da']`.
+    seed : int or None, optional
+        Semilla para reproducibilidad. Por defecto None.
+    type : str or None, optional
+        Tipo del modelo. Por defecto None.
+    name : str or None, optional
+        Nombre del modelo. Por defecto None.
+
+    Attributes
+    ----------
+    known_data : pd.Series
+        Serie temporal de entrenamiento indexada por fechas.
+    mean : float
+        Media de los datos de entrenamiento usada para escalar.
+    std : float
+        Desviación estándar de los datos de entrenamiento usada para escalar.
+    fitted_model : statsmodels ARIMAResults
+        Modelo ARIMA ajustado.
+    confidence_int_lower_series : pd.Series
+        Límite inferior del intervalo de confianza de las predicciones.
+    confidence_int_upper_series : pd.Series
+        Límite superior del intervalo de confianza de las predicciones.
+
+    Methods
+    -------
+    fit(dataset, config)
+        Ajusta el modelo ARIMA sobre los datos de entrenamiento.
+    predict(x_input)
+        Genera predicciones para el rango de fechas proporcionado.
+    train(x_train, y_train)
+        Sin implementación activa para este modelo.
+    plot_prediction(y_pred, y_true, title, xlabel, ylabel)
+        Grafica predicción con intervalo de confianza.
+    save(path)
+        Serializa el modelo a disco con pickle.
+    load(path)
+        Deserializa un modelo desde disco.
+    """
     def fit(self,dataset:pd.DataFrame,config:ExperimentConfig|None=None)->None:
+        """
+        Ajusta el modelo ARIMA sobre los datos de entrenamiento.
+
+        Prepara la serie temporal según la frecuencia configurada (diaria,
+        semanal o mensual), escala los datos y ajusta el modelo ARIMA con
+        los órdenes `p`, `d`, `q` definidos en `self.parameters`.
+
+        Parameters
+        ----------
+        dataset : pd.DataFrame
+            Datos de ventas del producto. Debe contener las columnas `date`,
+            `quantity`, `year`, `month` y opcionalmente `week`.
+        config : ExperimentConfig or None, optional
+            Configuración del experimento con los campos `frequency`,
+            `training_window`, `horizon`, `training_data_start_date` y
+            `training_data_end_date`. Si es None, usa valores por defecto
+            de desarrollo. Por defecto None.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        Si el dataset no tiene suficientes registros para cubrir
+        `training_window + horizon`, imprime un aviso y retorna None
+        sin ajustar el modelo.
+        """
         p = self.parameters.get('p')
         d = self.parameters.get('d')
         q = self.parameters.get('q')
@@ -1258,6 +1687,31 @@ class ARIMAModel(ForecastModel):
         self.model = self.fitted_model
 
     def predict(self,x_input:np.ndarray)->np.ndarray:
+        """
+        Genera predicciones para el rango de fechas proporcionado.
+
+        Reutiliza los valores conocidos de entrenamiento para fechas dentro
+        de `known_data` y genera pronósticos hacia adelante con el modelo
+        ajustado para las fechas restantes. Revierte el escalado antes de
+        retornar los valores.
+
+        Parameters
+        ----------
+        x_input : np.ndarray
+            Array de fechas para las cuales se desean predicciones.
+
+        Returns
+        -------
+        np.ndarray
+            Valores predichos para cada fecha en `x_input`, combinando
+            datos conocidos y pronósticos futuros desescalados.
+
+        Notes
+        -----
+        Actualiza los atributos `self.confidence_int_lower_series` y
+        `self.confidence_int_upper_series` con los intervalos de confianza
+        de los pasos pronosticados.
+        """
         known_data = self.known_data 
         known_outputs = known_data[known_data.index.isin(x_input)].to_numpy()
 
@@ -1295,18 +1749,31 @@ class ARIMAModel(ForecastModel):
     
     def plot_prediction(self,y_pred:np.ndarray,y_true:np.ndarray, title:str="Predicción vs Real", xlabel:str="Tiempo (días)", ylabel:str="Ventas")->Figure:
         """
-        Gráfica de predicción de modelo y datos reales.
-            
-        Parametros:
-        - y_true: array-like, Valores reales
-        - y_pred: array-like, Valores predecidos
-        - title: str, Título de gráfico
-        - xlabel: str, Etiqueta de eje horizontal
-        - ylabel: str,  Etiqueta de eje vertical
+        Genera una gráfica de predicción frente a valores reales con
+        intervalo de confianza sombreado.
 
-        Regresa:
-        - test_fig: matplotlib Figure object, Gráfica de contraste entre predicción y datos reales
+        Extiende `ForecastModel.plot_prediction` añadiendo una banda
+        sombreada entre `confidence_int_lower_series` y
+        `confidence_int_upper_series`.
 
+        Parameters
+        ----------
+        y_pred : np.ndarray
+            Valores predichos por el modelo.
+        y_true : np.ndarray
+            Valores reales observados.
+        title : str, optional
+            Título de la gráfica. Por defecto `'Predicción vs Real'`.
+        xlabel : str, optional
+            Etiqueta del eje horizontal. Por defecto `'Tiempo (días)'`.
+        ylabel : str, optional
+            Etiqueta del eje vertical. Por defecto `'Ventas'`.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Figura con las series de valores reales y predichos, más la
+            banda de intervalo de confianza.
         """
         fig, ax = plt.subplots(figsize=(10,5))
         ax.plot(y_true, label="Real", marker='o')
@@ -1328,12 +1795,37 @@ class ARIMAModel(ForecastModel):
         return fig
     
     def save(self, path:Path):
+        """
+        Serializa el modelo a disco usando pickle.
+
+        Parameters
+        ----------
+        path : Path
+            Ruta del archivo de destino donde se guardará el modelo.
+
+        Returns
+        -------
+        None
+        """
         import pickle
         with open(path, "wb") as f:
             pickle.dump(self, f)
 
     @classmethod
     def load(cls, path: Path):
+        """
+        Deserializa un modelo ARIMAModel desde disco.
+
+        Parameters
+        ----------
+        path : Path
+            Ruta del archivo pickle que contiene el modelo serializado.
+
+        Returns
+        -------
+        ARIMAModel
+            Instancia del modelo cargada desde el archivo.
+        """
         import pickle
         with open(path, "rb") as f:
             return pickle.load(f)    

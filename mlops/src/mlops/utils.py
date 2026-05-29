@@ -17,6 +17,30 @@ data_dir = Path('data')
 
 @dataclass
 class Metrics:
+    """
+    Contenedor de métricas de evaluación para modelos de pronóstico.
+
+    Parameters
+    ----------
+    mae : float | None, default=None
+        Error absoluto medio (*Mean Absolute Error*).
+    mfe : float | None, default=None
+        Error medio de pronóstico (*Mean Forecast Error*).
+    rmse : float | None, default=None
+        Raíz del error cuadrático medio (*Root Mean Squared Error*).
+    da : float | None, default=None
+        Precisión direccional (*Directional Accuracy*).
+
+    Raises
+    ------
+    ValueError
+        Si `rmse`, `mae` o `da` son menores o iguales a cero.
+
+    Notes
+    -----
+    Todas las métricas son opcionales y se validan únicamente cuando
+    contienen un valor distinto de ``None``.
+    """
     mae: float |None = None
     mfe : float|None = None
     rmse : float |None = None
@@ -36,6 +60,42 @@ class Metrics:
             
 @dataclass
 class ExperimentConfig:
+    """
+    Configuración general para experimentos de entrenamiento y evaluación.
+
+    Parameters
+    ----------
+    dataset : str
+        Nombre del conjunto de datos utilizado.
+    parameters : dict[str, Any]
+        Diccionario con hiperparámetros del modelo.
+    model_type : str
+        Tipo de modelo utilizado en el experimento.
+    horizon : int
+        Número de periodos a predecir.
+    frequency : str
+        Frecuencia temporal de los datos. Valores válidos:
+        ``"daily"``, ``"weekly"`` o ``"monthly"``.
+    training_window : int
+        Número de observaciones utilizadas para entrenamiento.
+    seed : int
+        Semilla para reproducibilidad.
+    training_data_start_date : Date | str, default="oldest"
+        Fecha inicial de entrenamiento.
+    training_data_end_date : Date | str, default="latest"
+        Fecha final de entrenamiento.
+    metrics : list[str] | None, default=None
+        Lista de métricas a calcular.
+    git_commit : str | None, default=None
+        Hash del commit asociado al experimento.
+    feature_set : str | None, default=None
+        Nombre del conjunto de características utilizado.
+
+    Methods
+    -------
+    copy()
+        Retorna una copia superficial de la configuración.
+    """
     dataset: str
     parameters : dict[str,Any]
     model_type: str
@@ -50,10 +110,42 @@ class ExperimentConfig:
     feature_set: str|None =None
 
     def copy(self):
+        """
+        Genera una copia de la configuración actual.
+
+        Returns
+        -------
+        ExperimentConfig
+            Nueva instancia con los mismos atributos.
+        """
         return replace(self)
 
 @dataclass
 class DatasetFilterConfig:
+    """
+    Configuración para filtrado y segmentación de series temporales.
+
+    Parameters
+    ----------
+    frequency : str
+        Frecuencia temporal de la serie. Valores válidos:
+        ``"daily"``, ``"weekly"`` o ``"monthly"``.
+    horizon : int
+        Número de observaciones utilizadas para prueba.
+    training_window : int
+        Número de observaciones utilizadas para entrenamiento.
+    start_date : Date | str, default="oldest"
+        Fecha inicial del periodo.
+    end_date : Date | str, default="latest"
+        Fecha final del periodo.
+
+    Raises
+    ------
+    ValueError
+        Si las fechas son inválidas, si `horizon` o
+        `training_window` son menores o iguales a cero,
+        o si `frequency` no es válida.
+    """
     frequency : str
     horizon: int 
     training_window: int
@@ -76,18 +168,40 @@ class DatasetFilterConfig:
     
 
 class DatasetFilters:
+    """
+    Utilidades para filtrar, transformar y dividir series temporales.
+
+    Parameters
+    ----------
+    config : DatasetFilterConfig
+        Configuración de filtros y segmentación.
+
+    Attributes
+    ----------
+    cfg : DatasetFilterConfig
+        Configuración asociada a la instancia.
+    """
     def __init__(self, config: DatasetFilterConfig):
         self.cfg = config
 
     def apply_period_filter(self, data: pd.DataFrame)->pd.DataFrame:
         """
-        Aplica filtro de periodo especificado a los datos
-        
-        Parametros:
-        - data: pandas.DataFrame, Datos que se quieren filtrar
+        Filtra un conjunto de datos según el rango de fechas configurado.
 
-        Regresa:
-        - df: pandas.DataFrame, Datos filtrados
+        Parameters
+        ----------
+        data : pandas.DataFrame
+            Datos de entrada. Debe contener una columna ``date``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Datos filtrados y ordenados cronológicamente.
+
+        Notes
+        -----
+        Si el filtro produce un conjunto vacío, se genera un
+        DataFrame auxiliar con valores de cantidad igual a cero.
         """
         
         if self.cfg.start_date=="oldest":
@@ -122,15 +236,28 @@ class DatasetFilters:
     
     def prepare_series(self,data:pd.DataFrame)->tuple[np.ndarray[Date],np.ndarray[int]]:
         """
-        Agarra un dataset de pandas y lo convierte en un par de series, uno de los valores
-        del periodo y otro con las fechas del periodo. 
+        Convierte un conjunto de datos en una serie temporal.
 
-        Parametros: 
-        - data:pandas.DataFrame, Datos que se quieren convertir a serie de tiempo  
+        Parameters
+        ----------
+        data : pandas.DataFrame
+            Datos de entrada con información temporal y cantidades.
 
-        Regresa:
-        - x: numpy.ndarray, Serie que contiene fechas del periodo
-        - y: numpy.ndarray, Series que contiene los valores del periodo
+        Returns
+        -------
+        tuple[numpy.ndarray, numpy.ndarray]
+            Tupla con:
+
+            - ``x``: arreglo de fechas.
+            - ``y``: arreglo de valores agregados.
+
+        Notes
+        -----
+        La agregación depende de la frecuencia configurada:
+
+        - ``daily``: valores diarios.
+        - ``weekly``: suma semanal.
+        - ``monthly``: suma mensual.
         """
         df = self.apply_period_filter(data)
         
@@ -169,17 +296,29 @@ class DatasetFilters:
     
     def apply_split(self, data: pd.DataFrame)->tuple[np.ndarray[Date],np.ndarray[int],np.ndarray[Date],np.ndarray[int]]|None:
         """
-        Divide datos en datos de entrenamiento y de prueba en base los parametros
-        de frecuencia, ventana de entrenamiento y ventana de horizonte.
+        Divide una serie temporal en entrenamiento y prueba.
 
-        Parametros:
-        - data: pandas.DataFrame, Datos filtrados que se quieren dividir
+        Parameters
+        ----------
+        data : pandas.DataFrame
+            Datos de entrada.
 
-        Regresa:
-        - x_train: numpy.ndarray, Datos de entrada de entrenamiento
-        - y_train: numpy.ndarray, Datos de objetivo de entrenamiento
-        - x_test: numpy.ndarray, Datos de entrada de prueba
-        - y_test: numpy.ndarray, Datos de objetivo de prueba
+        Returns
+        -------
+        tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.ndarray] | None
+            Tupla con:
+
+            - ``x_train``: fechas de entrenamiento.
+            - ``y_train``: valores de entrenamiento.
+            - ``x_test``: fechas de prueba.
+            - ``y_test``: valores de prueba.
+
+            Retorna ``None`` si no existen suficientes datos.
+
+        Notes
+        -----
+        El tamaño de entrenamiento y prueba se determina mediante
+        ``training_window`` y ``horizon``.
         """
 
         x,y = self.prepare_series(data)
@@ -202,14 +341,24 @@ class DatasetFilters:
 
 def time_period(start_date: Date,end_date: Date = Date.today()) -> list[Date]:
     """
-    Genera una lista de fechas en el periodo designado
+    Genera una lista de fechas consecutivas entre dos fechas.
 
-    Parametros:
-    - start_date: Date , Fecha inicio del periodo
-    - end_date: Date , Fecha fin del periodo
-    
-    Regresa:
-    - dates:list[Date], Lista de fechas entre 'start_date' y 'end_date'
+    Parameters
+    ----------
+    start_date : Date
+        Fecha inicial del periodo.
+    end_date : Date, default=Date.today()
+        Fecha final del periodo.
+
+    Returns
+    -------
+    list[Date]
+        Lista de fechas entre ``start_date`` y ``end_date``.
+
+    Raises
+    ------
+    ValueError
+        Si ``start_date`` es posterior a ``end_date``.
     """
     if start_date > end_date:
         raise ValueError("Fecha inicial debe tomar lugar antes que la fecha final de periodo")
@@ -225,14 +374,23 @@ def time_period(start_date: Date,end_date: Date = Date.today()) -> list[Date]:
 
 def save_file_safe(data: pd.DataFrame, file_path: Path) -> None:
     """
-    Recibe un dataframe de pandas y la guarda de manera segura en ubicación específicada
-    
-    Parametros:
-    - data: pandas.DataFrame , Datos que se quieren almacenar
-    - file_path: pathlib.Path , Ubicación en donde se quieren almacenar los datos
+    Guarda un DataFrame en formato parquet de manera segura.
 
-    Regresa:
-    -, :None
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Datos a almacenar.
+    file_path : pathlib.Path
+        Ruta destino del archivo.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    El archivo se guarda primero en una ruta temporal y luego
+    se reemplaza el archivo final para evitar corrupción.
     """
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -243,13 +401,21 @@ def save_file_safe(data: pd.DataFrame, file_path: Path) -> None:
 
 def get_experiment_config(file_path:Path=Path('params.yaml'))->ExperimentConfig:
     """
-    Lee archivo de configuración de experimentos y lo carga como objeto de configuración
+    Carga la configuración de un experimento desde un archivo YAML.
 
-    Parametros:
-    - file_path: pathlib.Path , Ubicación de archivo de configuración. 
-    
-    Regresa:
-    - ExperimentConfig(**config): ExperimentConfig, Configuración de experimento
+    Parameters
+    ----------
+    file_path : pathlib.Path, default=Path("params.yaml")
+        Ruta del archivo de configuración.
+
+    Returns
+    -------
+    ExperimentConfig
+        Configuración cargada del experimento.
+
+    Notes
+    -----
+    Las fechas se convierten automáticamente desde formato ISO.
     """
     if file_path.suffix=='.yml' or file_path.suffix=='.yaml':
         with open(file_path, mode='r') as f:
@@ -260,13 +426,17 @@ def get_experiment_config(file_path:Path=Path('params.yaml'))->ExperimentConfig:
 
 def get_client_list()->pd.DataFrame:
     """
-    Extrae claves de clientes registrados en el Data Ware House. 
+    Obtiene la lista de clientes registrados.
 
-    Parametros:
-    - :None,
-    Regresa:
-    - df: pandas.Dataframe, Columna que contiene las claves de cliente
-    - local_df: pandas.Dataframe, Columna que contiene las claves de cliente guardados localmente
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame con identificadores de clientes.
+
+    Notes
+    -----
+    Si existe un archivo local previamente almacenado,
+    se utiliza en lugar de consultar el Data Warehouse.
     """
     file =data_dir/'raw'/'clients.parquet'
     if file.exists():
@@ -302,16 +472,30 @@ def get_client_list()->pd.DataFrame:
 
 def make_time_series(data:pd.DataFrame,period:list[Date]|None=None,target_column:str="quantity",frequency:str="daily")-> np.ndarray:
     """
-    Convierte datos de ventas a serie temporal, llenando los huecos de fechas con venta '0'
+    Convierte datos tabulares en una serie temporal continua.
 
-    Parametros:
-    - data: pandas.DataFrame, Datos de venta
-    - period: list[Date], Periodo de tiempo de interes
-    - target_column: str, Columna objetivo de serie
-    - frequency: str, Frecuencia de serie. Ej. 'days','weeks','months' 
-    Regresa:
-    - time_series: numpy.ndarray, Serie de tiempo resultado de los datos de venta
-    - time_axis: numpy.ndarray, Fechas de serie de tiempo
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Datos de ventas.
+    period : list[Date] | None, default=None
+        Periodo temporal objetivo.
+    target_column : str, default="quantity"
+        Nombre de la columna objetivo.
+    frequency : str, default="daily"
+        Frecuencia temporal de agregación.
+
+    Returns
+    -------
+    tuple[numpy.ndarray, numpy.ndarray]
+        Tupla con:
+
+        - ``time_axis``: arreglo de fechas.
+        - ``time_series``: arreglo de valores.
+
+    Notes
+    -----
+    Las fechas faltantes se rellenan con valores iguales a cero.
     """
     df = data.copy()
     if period is None:
@@ -351,16 +535,23 @@ def make_time_series(data:pd.DataFrame,period:list[Date]|None=None,target_column
 
 def plot_series(series:np.ndarray,title:str="Ventas realizadas dentro del periodo",xlabel:str="Tiempo (días)", ylabel:str="Ventas"):
     """
-    Gráfica de predicción de modelo y datos reales.
-            
-    Parametros:
-    - series: array-like, Valores de venta
-    - title: str, Título de gráfico
-    - xlabel: str, Etiqueta de eje horizontal
-    - ylabel: str,  Etiqueta de eje vertical
+    Genera una gráfica de una serie temporal.
 
-    Regresa:
-    - fig: matplotlib Figure object, Gráfica de ventas 
+    Parameters
+    ----------
+    series : numpy.ndarray
+        Valores de la serie temporal.
+    title : str, default="Ventas realizadas dentro del periodo"
+        Título de la gráfica.
+    xlabel : str, default="Tiempo (días)"
+        Etiqueta del eje X.
+    ylabel : str, default="Ventas"
+        Etiqueta del eje Y.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Figura generada.
     """
     fig, ax = plt.subplots(figsize=(10,5))
     ax.plot(series, label="Ventas", marker='x')
@@ -373,19 +564,29 @@ def plot_series(series:np.ndarray,title:str="Ventas realizadas dentro del period
 
 def load_dataset(dataset:str,config:ExperimentConfig|dict[str,Any],train_split:bool=True)->tuple|pd.DataFrame:
     """
-    Carga datos que se utilizaran para el experimento de entrenamiento de un modelo
+    Carga y filtra un conjunto de datos para entrenamiento.
 
-    Parametros:
-    - model_name: str, Nombre del tipo de modelo siendo utilizado
-    - dataset: str, Nombre de los datos que se quieren utilizar
-    - config: ExperimentConfig, Configuración del experimento
+    Parameters
+    ----------
+    dataset : str
+        Nombre del dataset.
+    config : ExperimentConfig | dict[str, Any]
+        Configuración del experimento.
+    train_split : bool, default=True
+        Indica si se debe dividir en entrenamiento y prueba.
 
-    Regresa:
-    - df: pandas.DataFrame, Datos con filtro de periodo
-    - x_train: numpy.ndarray, Datos de entrada de entrenamiento
-    - y_train: numpy.ndarray, Datos de objetivo de entrenamiento
-    - x_test: numpy.ndarray, Datos de entrada de prueba
-    - y_test: numpy.ndarray, Datos de objetivo de prueba
+    Returns
+    -------
+    tuple | pandas.DataFrame
+        Si ``train_split=True`` retorna:
+
+        - ``df``
+        - ``x_train``
+        - ``y_train``
+        - ``x_test``
+        - ``y_test``
+
+        En caso contrario, retorna únicamente el DataFrame filtrado.
     """
     branch, productId = dataset.split('_', 1)
     file_path = data_dir/'processed'/ branch / f'{productId}.parquet'
@@ -415,41 +616,76 @@ def load_dataset(dataset:str,config:ExperimentConfig|dict[str,Any],train_split:b
 
 
 def calculate_metrics(y_pred:np.ndarray,y_true:np.ndarray,test_metrics:list[str]=['mae','mfe','rmse','da'])->Metrics:
-        """
-        Calcula las métricas específicadas acorde la predicción del modelo y los datos reales
+    """
+        Calcula métricas de evaluación para predicciones.
 
-        Parametros:
-        - y_pred: array-like , Predicciones del modelo 
-        - y_true: array-like , Datos reales
+        Parameters
+        ----------
+        y_pred : numpy.ndarray
+            Valores predichos por el modelo.
+        y_true : numpy.ndarray
+            Valores reales observados.
+        test_metrics : list[str], default=["mae", "mfe", "rmse", "da"]
+            Métricas a calcular.
 
-        Regresa:
-        - Metrics(**result_metrics): Metrics, Resultado de los cálculos de métricas  
-        """
-        def directional_accuracy(y_pred:np.ndarray,y_true:np.ndarray)->float:
-            true_direction =np.sign(y_true[1:] - y_true[:-1])
-            pred_direction =np.sign(y_pred[1:] - y_pred[:-1])
-            d_i = (true_direction == pred_direction).astype(float)
-            return d_i.mean()
+        Returns
+        -------
+        Metrics
+            Objeto con las métricas calculadas.
+
+        Notes
+        -----
+        Métricas soportadas:
+
+        - ``mae``: error absoluto medio.
+        - ``mfe``: error medio de pronóstico.
+        - ``rmse``: raíz del error cuadrático medio.
+        - ``da``: precisión direccional.
+    """
+    def directional_accuracy(y_pred:np.ndarray,y_true:np.ndarray)->float:
+        true_direction =np.sign(y_true[1:] - y_true[:-1])
+        pred_direction =np.sign(y_pred[1:] - y_pred[:-1])
+        d_i = (true_direction == pred_direction).astype(float)
+        return d_i.mean()
         
-        if len(y_pred)!=len(y_true):
-            print(f"Discrepancia en cantidad de datos :  y_pred = {len(y_pred)} , y_true = {len(y_true)}")
-            return Metrics()
-        result_metrics = {} 
-        for m in test_metrics:
-            if m=='mae': # Mean Absolute Error
-                result_metrics['mae'] = np.mean(abs(y_true-y_pred))
+    if len(y_pred)!=len(y_true):
+        print(f"Discrepancia en cantidad de datos :  y_pred = {len(y_pred)} , y_true = {len(y_true)}")
+        return Metrics()
+    result_metrics = {} 
+    for m in test_metrics:
+        if m=='mae': # Mean Absolute Error
+            result_metrics['mae'] = np.mean(abs(y_true-y_pred))
 
-            if m=='mfe':# Mean Forecast Error
-                result_metrics['mfe'] = np.mean(y_pred-y_true)
+        if m=='mfe':# Mean Forecast Error
+            result_metrics['mfe'] = np.mean(y_pred-y_true)
                 
-            if m=='rmse':# Root Mean Square Error
-                result_metrics['rmse'] = np.sqrt( np.mean( (y_true-y_pred)**2 ) )
+        if m=='rmse':# Root Mean Square Error
+            result_metrics['rmse'] = np.sqrt( np.mean( (y_true-y_pred)**2 ) )
 
-            if m=='da':# Directional Accuracy
-                result_metrics['da'] = directional_accuracy(y_pred,y_true)
-        return Metrics(**result_metrics)
+        if m=='da':# Directional Accuracy
+            result_metrics['da'] = directional_accuracy(y_pred,y_true)
+    return Metrics(**result_metrics)
 
 def calculate_iqr_bounds(sales_series:pd.Series)->tuple[float,float]:
+    """
+    Calcula límites basados en rango intercuartílico (IQR).
+
+    Parameters
+    ----------
+    sales_series : pandas.Series
+        Serie numérica de ventas.
+
+    Returns
+    -------
+    tuple[float, float]
+        Límite inferior y superior para detección de outliers.
+
+    Notes
+    -----
+    Los límites se calculan usando:
+
+    ``Q1 - 1.5 * IQR`` y ``Q3 + 1.5 * IQR``.
+    """
     q1 = sales_series.quantile(0.25)
     q3 = sales_series.quantile(0.75)
     iqr = q3 - q1
@@ -458,6 +694,26 @@ def calculate_iqr_bounds(sales_series:pd.Series)->tuple[float,float]:
 
 def identify_outlier_sales(data: pd.DataFrame,
                            element_column:str)->pd.DataFrame:
+    """
+    Identifica registros atípicos en datos de ventas.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Datos de ventas.
+    element_column : str
+        Columna utilizada para agrupar elementos.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame con una columna booleana ``is_outlier``.
+
+    Notes
+    -----
+    Los outliers se identifican utilizando límites basados
+    en rango intercuartílico (IQR).
+    """
     df = data.copy()
 
     bounds_dict = df.groupby(element_column)['quantity'].apply(calculate_iqr_bounds).to_dict()
