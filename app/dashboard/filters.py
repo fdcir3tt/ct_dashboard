@@ -226,7 +226,7 @@ def main_element_filter(analysis_lvl:str,element_list:list[str],default_element:
         o ``"Categorías"``.
     element_list : list of str
         Lista de elementos disponibles para selección.
-    top_element : str
+    default_element : str
         Elemento seleccionado por defecto.
     tab : str
         Nombre de la pestaña o contexto utilizado para generar
