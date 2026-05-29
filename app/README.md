@@ -127,4 +127,4 @@ Muestra los productos con mayor prioridad de surtimiento junto con su volumen de
 | Frontend / Visualización | Streamlit |
 | Contenerización | Podman + podman-compose |
 | Lenguaje | Python |
-| <!-- Agrega aquí: BD, ETL, etc. --> | |
+| Bases de datos | PostgreSQL 15.0, PostGIS 15.4 |

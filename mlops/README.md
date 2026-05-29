@@ -62,6 +62,10 @@ Al acceder a una corrida específica se pueden consultar los parámetros de entr
 
 | Capa | Tecnología |
 |------|------------|
-| Experimentación y monitoreo | MLflow |
-| Gestión de dependencias | Poetry |
-| Lenguaje | Python |
+| Experimentación y monitoreo | MLflow 3.10 |
+| Gestión de dependencias | Poetry 2.3|
+| Procesamiento de datos | Pandas 2.3 |
+| Lenguaje | Python 3.12 |
+
+
+
