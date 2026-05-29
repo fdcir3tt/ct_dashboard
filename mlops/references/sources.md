@@ -10,6 +10,11 @@
 
 [What is LSTM - Long Short Term Memory?](https://www.geeksforgeeks.org/deep-learning/deep-learning-introduction-to-long-short-term-memory/)
 
+[Improving the accuracy of physics-informed neural networks via
+last-layer retraining](https://arxiv.org/pdf/2603.04672)
+
+[FEM-PINN: integrating finite element method and physics-informed neural network for performance prediction of engineering structures via graph neural network](https://link.springer.com/article/10.1007/s00158-026-04257-2)
+
 ## Practicas de MLOps
 
 [MLOps best practices, challenges and maturity models: A systematic literature review](https://www.sciencedirect.com/science/article/pii/S0950584925000722)
