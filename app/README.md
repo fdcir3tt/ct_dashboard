@@ -45,7 +45,8 @@ Aplicación web construida con Streamlit para el monitoreo continuo de ventas e 
 **Requisitos previos:** `podman >= 5.4` y `podman-compose >= 0.11`
 
 1. Copia el archivo `compose.yml` en la raíz del proyecto.
-2. Levanta la aplicación:
+2. Definir url de conexión a base de datos como variable de entorno `DASHBOARD_URL`
+3. Levanta la aplicación:
 
 ```bash
 podman compose up -d
